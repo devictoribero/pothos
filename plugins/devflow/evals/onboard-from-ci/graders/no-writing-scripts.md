@@ -1,6 +1,6 @@
 ---
 type: regex
-target: {source: file, path: ".agents/contract.json"}
+target: {source: file, path: ".devflow-home/contracts/github.com/acme/shop-web.json"}
 pattern: 'lint:fix'
 match: not_contains
 weight: 2

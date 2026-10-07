@@ -6,7 +6,9 @@ The rules for the code agents produce will live in the plugin itself, in `plugin
 
 ## The plugin knows how you work. The repository knows the project.
 
-No skill names a project, a company, a person, a tracker key or a path on someone's machine. Everything project-specific reaches a skill through the repository's contract (`.agents/contract.json`) or through a skill that lives in that repository. `scripts/lint_skills.py` fails the build on known project terms.
+No skill names a project, a company, a person, a tracker key or a path on someone's machine. Everything project-specific reaches a skill through the repository's contract or through a skill that lives in that repository.
+
+Contracts are private. They live in `~/.config/devflow/contracts/`, keyed by the repository's remote, never inside the repository, so using devflow changes nothing a teammate can see. `scripts/lint_skills.py` fails the build on known project terms.
 
 When a plugin default and a repository convention disagree, the repository wins.
 

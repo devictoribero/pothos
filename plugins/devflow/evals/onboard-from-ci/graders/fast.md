@@ -1,6 +1,6 @@
 ---
 type: regex
-target: {source: file, path: ".agents/contract.json"}
+target: {source: file, path: ".devflow-home/contracts/github.com/acme/shop-web.json"}
 pattern: '"fast"\s*:\s*"npm run type-check:fast'
 weight: 1
 ---

@@ -17,10 +17,11 @@ def detect(repo):
 class DetectTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.repo = self.tmp.name
+        self.repo = os.path.join(self.tmp.name, "repo")
         subprocess.run(["git", "init", "-q", "-b", "main", self.repo], check=True)
 
     def tearDown(self):
+        os.environ.pop("DEVFLOW_HOME", None)
         self.tmp.cleanup()
 
     def write(self, rel, content):
@@ -60,14 +61,20 @@ class DetectTest(unittest.TestCase):
         self.write("docs/decisions/0001.md", "x")
         self.write("AGENTS.md", "We track work in Jira, e.g. ABC-12.")
         os.symlink("AGENTS.md", os.path.join(self.repo, "CLAUDE.md"))
-        self.write(".agents/contract.json", "{}")
+        home = os.path.join(self.tmp.name, "devflow-home")
+        os.environ["DEVFLOW_HOME"] = home
+        subprocess.run(["git", "-C", self.repo, "remote", "add", "origin", "https://github.com/acme/pets.git"], check=True)
+        contract = os.path.join(home, "contracts", "github.com", "acme", "pets.json")
+        os.makedirs(os.path.dirname(contract))
+        with open(contract, "w") as fh:
+            fh.write("{}")
         report = detect(self.repo)
         self.assertEqual(report["docs"]["glossary"], ["CONTEXT.md"])
         self.assertEqual(report["docs"]["decisions"], ["docs/decisions"])
         self.assertEqual(report["agent_files"]["CLAUDE.md"]["symlink_to"], "AGENTS.md")
         self.assertEqual(report["tracker_hints"]["words_found"], ["jira"])
         self.assertEqual(report["tracker_hints"]["issue_keys"], ["ABC"])
-        self.assertEqual(report["existing_contract"], ".agents/contract.json")
+        self.assertEqual(report["existing_contract"], contract)
 
 
 if __name__ == "__main__":

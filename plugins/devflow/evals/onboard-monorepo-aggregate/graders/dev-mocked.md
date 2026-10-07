@@ -1,6 +1,6 @@
 ---
 type: regex
-target: {source: file, path: ".agents/contract.json"}
+target: {source: file, path: ".devflow-home/contracts/github.com/acme/pets.json"}
 pattern: '"dev"\s*:\s*"pnpm run dev:mock"[\s\S]*"mocked"\s*:\s*true|"mocked"\s*:\s*true[\s\S]*"dev"\s*:\s*"pnpm run dev:mock"'
 weight: 2
 ---

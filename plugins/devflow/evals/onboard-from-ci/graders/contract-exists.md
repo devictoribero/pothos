@@ -1,6 +1,6 @@
 ---
 type: file_exists
-path: ".agents/contract.json"
+path: ".devflow-home/contracts/github.com/acme/shop-web.json"
 weight: 1
 ---
 

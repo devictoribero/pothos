@@ -3,8 +3,7 @@ name: onboard-from-ci
 description: >
   An npm repo with no aggregate verify script. CI runs lint, type-check and test:unit in that order.
   onboard must compose verify.full from the CI scripts in CI order, keep lint:fix out of it, use
-  type-check:fast for verify.fast, validate the contract, and add the AGENTS.md block without
-  touching the existing content.
+  type-check:fast for verify.fast, save the contract privately, and leave AGENTS.md and the rest of the repo untouched.
 tags: [onboard, create]
 runs: 3
 expected_outcome: Valid contract with verify.full chained from CI scripts; AGENTS.md keeps its notes and gains the block.

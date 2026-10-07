@@ -1,7 +1,7 @@
 ---
 type: tool_used
 tool: Bash
-input_match: 'contract\.py\\?"? validate'
+input_match: 'contract\.py\\?"? (write|validate)'
 min: 1
 weight: 2
 ---

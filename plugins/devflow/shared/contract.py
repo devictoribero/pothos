@@ -1,38 +1,86 @@
 #!/usr/bin/env python3
-"""Locate, read and validate a devflow agent contract.
+"""Locate, read, write and validate a devflow agent contract.
+
+Contracts are private: they live outside the repository, under
+$DEVFLOW_HOME (default $XDG_CONFIG_HOME/devflow, usually ~/.config/devflow)/contracts/, one file per repository,
+keyed by the origin remote (host/owner/repo.json). Every worktree and clone of
+the same repository shares one contract, and the repository itself is never
+touched. A repository without a remote is keyed by the path of its main worktree.
 
 Usage:
-  contract.py locate [--repo DIR]           print the contract path
+  contract.py path   [--repo DIR]           print where the contract for this repo lives
+  contract.py locate [--repo DIR]           print the path only if the contract exists
   contract.py get KEY [--repo DIR]          print one value, KEY is dotted (verify.fast)
-  contract.py validate [FILE] [--strict]    check the contract against the schema;
-                                            --strict also checks that referenced paths exist
+  contract.py show   [--repo DIR]           print the whole contract
+  contract.py write  [--repo DIR]           read a contract as JSON on stdin, validate it
+                                            with --strict, and save it (nothing saved if invalid)
+  contract.py validate [FILE] [--strict] [--repo DIR]
+                                            check against the schema; --strict also checks
+                                            that referenced paths exist in the repository
 
 Exit codes: 0 ok, 1 invalid contract, 2 no contract found, 3 key not set, 64 usage error.
 Standard library only, so it runs anywhere python3 does.
 """
+import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 
-CONTRACT_RELATIVE_PATH = os.path.join(".agents", "contract.json")
 SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "contract.schema.json")
 PATH_FIELDS = ("docs.glossary", "tracker.path", "docs.decisions", "docs.specs", "docs.prd", "run.login", "pr.template")
 
 EXIT_OK, EXIT_INVALID, EXIT_MISSING, EXIT_UNSET, EXIT_USAGE = 0, 1, 2, 3, 64
 
 
-def repo_root(start):
+def git(args, cwd):
     try:
-        out = subprocess.run(["git", "-C", start, "rev-parse", "--show-toplevel"],
-                             capture_output=True, text=True, check=True)
-        return out.stdout.strip()
+        out = subprocess.run(["git", "-C", cwd, *args], capture_output=True, text=True, check=True)
+        return out.stdout.strip() or None
     except (subprocess.CalledProcessError, FileNotFoundError):
-        return os.path.abspath(start)
+        return None
+
+
+def devflow_home():
+    if os.environ.get("DEVFLOW_HOME"):
+        return os.environ["DEVFLOW_HOME"]
+    config = os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config")
+    return os.path.join(config, "devflow")
+
+
+def repo_root(start):
+    return git(["rev-parse", "--show-toplevel"], start) or os.path.abspath(start)
+
+
+def remote_key(url):
+    """host/owner/repo from any common git remote URL form."""
+    url = url.strip()
+    match = re.match(r"^(?:[a-z+]+://)?(?:[^@/]+@)?([^:/]+)(?::\d+)?[:/](.+?)(?:\.git)?/?$", url)
+    if not match:
+        return None
+    host, path = match.group(1).lower(), match.group(2).strip("/")
+    if host.startswith("github.com"):  # ssh host aliases such as github.com-work
+        host = "github.com"
+    parts = [p for p in path.split("/") if p]
+    if not parts:
+        return None
+    return "/".join([host, *parts])
+
+
+def contract_path(start):
+    remote = git(["remote", "get-url", "origin"], start)
+    key = remote_key(remote) if remote else None
+    if not key:
+        common = git(["rev-parse", "--path-format=absolute", "--git-common-dir"], start)
+        main = os.path.dirname(common) if common else repo_root(start)
+        digest = hashlib.sha1(main.encode()).hexdigest()[:8]
+        key = f"local/{os.path.basename(main)}-{digest}"
+    return os.path.join(devflow_home(), "contracts", key + ".json")
 
 
 def locate(start):
-    path = os.path.join(repo_root(start), CONTRACT_RELATIVE_PATH)
+    path = contract_path(start)
     return path if os.path.isfile(path) else None
 
 
@@ -58,8 +106,7 @@ def schema_errors(value, schema, where="contract"):
     errors = []
     expected = schema.get("type")
     if expected:
-        py_type = TYPES[expected]
-        ok = isinstance(value, py_type) and not (expected == "integer" and isinstance(value, bool))
+        ok = isinstance(value, TYPES[expected]) and not (expected == "integer" and isinstance(value, bool))
         if not ok:
             return [f"{where}: expected {expected}, got {type(value).__name__}"]
     if "enum" in schema and value not in schema["enum"]:
@@ -91,7 +138,14 @@ def path_errors(data, root):
     for field in PATH_FIELDS:
         rel = lookup(data, field)
         if isinstance(rel, str) and not os.path.exists(os.path.join(root, rel)):
-            errors.append(f"contract.{field}: path '{rel}' does not exist")
+            errors.append(f"contract.{field}: path '{rel}' does not exist in {root}")
+    return errors
+
+
+def check(data, repo, strict):
+    errors = schema_errors(data, load(SCHEMA_PATH))
+    if strict:
+        errors.extend(path_errors(data, repo_root(repo)))
     return errors
 
 
@@ -106,6 +160,11 @@ def parse_flag(args, name):
     return None
 
 
+def missing(repo):
+    print(f"no contract for this repository; expected at {contract_path(repo)}", file=sys.stderr)
+    return EXIT_MISSING
+
+
 def main(argv):
     args = list(argv)
     if not args or args[0] in ("-h", "--help"):
@@ -113,31 +172,59 @@ def main(argv):
         return EXIT_OK if args else EXIT_USAGE
     command = args.pop(0)
     try:
-        repo = parse_flag(args, "--repo") or os.getcwd()
+        repo = os.path.abspath(parse_flag(args, "--repo") or os.getcwd())
     except ValueError as exc:
         print(exc, file=sys.stderr)
         return EXIT_USAGE
 
+    if command == "path":
+        print(contract_path(repo))
+        return EXIT_OK
+
     if command == "locate":
         path = locate(repo)
         if not path:
-            print(f"no contract at {CONTRACT_RELATIVE_PATH}", file=sys.stderr)
-            return EXIT_MISSING
+            return missing(repo)
         print(path)
         return EXIT_OK
 
-    if command == "get":
-        if len(args) != 1:
+    if command in ("get", "show"):
+        if command == "get" and len(args) != 1:
             print("usage: contract.py get KEY", file=sys.stderr)
             return EXIT_USAGE
         path = locate(repo)
         if not path:
-            print(f"no contract at {CONTRACT_RELATIVE_PATH}", file=sys.stderr)
-            return EXIT_MISSING
-        value = lookup(load(path), args[0])
+            return missing(repo)
+        data = load(path)
+        if command == "show":
+            print(json.dumps(data, indent=2))
+            return EXIT_OK
+        value = lookup(data, args[0])
         if value is None:
             return EXIT_UNSET
         print(value if isinstance(value, str) else json.dumps(value))
+        return EXIT_OK
+
+    if command == "write":
+        try:
+            data = json.loads(sys.stdin.read())
+        except json.JSONDecodeError as exc:
+            print(f"contract: not valid JSON ({exc})")
+            return EXIT_INVALID
+        errors = check(data, repo, strict=True)
+        for error in errors:
+            print(error)
+        if errors:
+            print("nothing saved")
+            return EXIT_INVALID
+        path = contract_path(repo)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, indent=2)
+            fh.write("\n")
+        os.replace(tmp, path)
+        print(f"ok: saved {path}")
         return EXIT_OK
 
     if command == "validate":
@@ -145,17 +232,13 @@ def main(argv):
         args = [a for a in args if a != "--strict"]
         path = args[0] if args else locate(repo)
         if not path or not os.path.isfile(path):
-            print(f"no contract at {path or CONTRACT_RELATIVE_PATH}", file=sys.stderr)
-            return EXIT_MISSING
+            return missing(repo)
         try:
             data = load(path)
         except json.JSONDecodeError as exc:
             print(f"contract: not valid JSON ({exc})")
             return EXIT_INVALID
-        errors = schema_errors(data, load(SCHEMA_PATH))
-        if strict:
-            root = os.path.dirname(os.path.dirname(os.path.abspath(path)))
-            errors.extend(path_errors(data, root))
+        errors = check(data, repo, strict)
         for error in errors:
             print(error)
         if not errors:

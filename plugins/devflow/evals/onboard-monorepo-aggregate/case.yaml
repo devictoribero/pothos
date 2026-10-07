@@ -4,10 +4,10 @@ description: >
   A pnpm monorepo with a validate script that runs everything, a check script that only builds,
   a mocked dev script, CONTEXT.md, decision records and only a CLAUDE.md. CLAUDE.md says the team
   does not use Jira. onboard must pick validate over check, prefer dev:mock and mark it mocked,
-  map the docs, choose tracker none despite the word Jira, and put the block in CLAUDE.md.
+  map the docs, choose a tracker other than Jira despite the word, and leave CLAUDE.md untouched.
 tags: [onboard, create]
 runs: 3
-expected_outcome: verify.full is pnpm run validate, run.dev is the mocked script, tracker kind none, block in CLAUDE.md.
+expected_outcome: verify.full is pnpm run validate, run.dev is the mocked script, tracker not Jira, repo untouched.
 execution:
   max_turns: 40
   timeout_seconds: 600

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/devictoribero/devflow/main/plugins/devflow/shared/contract.schema.json",
   "title": "devflow agent contract",
-  "description": "Tells the devflow skills and hooks how this repository is verified, run and documented. Lives at .agents/contract.json.",
+  "description": "Tells the devflow skills and hooks how this repository is verified, run and documented. Private to each developer: stored under ~/.config/devflow/contracts/<host>/<owner>/<repo>.json, never inside the repository.",
   "type": "object",
   "required": [
     "version",

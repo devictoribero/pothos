@@ -142,8 +142,10 @@ def detect(root):
     head = run(["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"], root)
     report["default_branch"] = head.split("/", 1)[1] if head and "/" in head else run(["git", "branch", "--show-current"], root)
 
-    contract = os.path.join(root, ".agents", "contract.json")
-    report["existing_contract"] = ".agents/contract.json" if os.path.isfile(contract) else None
+    contract_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "shared", "contract.py")
+    path = run([sys.executable, contract_script, "path", "--repo", root], root)
+    report["contract_path"] = path
+    report["existing_contract"] = path if path and os.path.isfile(path) else None
     return report
 
 

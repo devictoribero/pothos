@@ -20,11 +20,11 @@ Then, in each repository:
 ## How it fits together
 
 ```
-plugin (how you work)  ──reads──▶  .agents/contract.json  ──points to──▶  repository (the project)
+plugin (how you work)  ──reads──▶  private contract  ──points to──▶  repository (the project)
 ```
 
 - **The plugin** holds skills, agents and hooks that never mention a specific project.
-- **The contract** is a short JSON file in each repository. It says how to verify a change, how to run the app, where the domain docs live, where tickets go and how pull requests are made.
+- **The contract** is a short JSON file per repository, kept privately in `~/.config/devflow/contracts/<host>/<owner>/<repo>.json`, never inside the repository. Every clone and worktree of a repository shares it. It says how to verify a change, how to run the app, where the domain docs live, where tickets go and how pull requests are made.
 - **The repository** keeps everything project-specific: its scripts, its docs, its conventions and its own skills.
 
 ## The contract

@@ -1,6 +1,6 @@
 ---
 type: regex
-target: {source: file, path: ".agents/contract.json"}
+target: {source: file, path: ".devflow-home/contracts/github.com/acme/pets.json"}
 pattern: '"kind"\s*:\s*"jira"'
 match: not_contains
 weight: 2
