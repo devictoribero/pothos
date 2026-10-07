@@ -30,11 +30,11 @@ Use the first `candidates.e2e` script. Leave it out if `e2e_tools` is empty.
 
 ## docs
 
-Use the first existing path of each `docs` entry. Leave out the empty ones.
+Use the first existing path of each `docs` entry. Leave out the empty ones. `GLOSSARY.md` and `CONTEXT.md` are the same thing under the old and new name; map either to `docs.glossary`.
 
 ## tracker
 
-- `kind`: `jira` or `linear` only when the agent files describe using it. A mention such as "we do not use Jira" means `none`. A GitHub remote with issues in use means `github`. Default to `none`.
+- `kind`: `jira` or `linear` only when the agent files describe using it. A mention such as "we do not use Jira" does not count. A GitHub remote with issues in use means `github`. When the repo plans work in markdown files (`tracker_hints.local_dir`, or docs that say so), use `local` with `path` set to that folder. When there is no tracker at all, propose `local` with `path` `.scratch`, but leave the folder uncreated and list it as an assumption. Use `none` only when the user rejects that.
 - `project`: the key the docs or issue keys show, such as the prefix of `ABC-123`.
 - `skill`: a repository skill in `.claude/skills` or `.agents/skills` whose description says it creates tickets for this tracker.
 

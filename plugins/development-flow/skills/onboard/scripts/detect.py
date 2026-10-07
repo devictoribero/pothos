@@ -36,7 +36,7 @@ ROLES = {
 }
 
 DOC_CANDIDATES = {
-    "context": ["CONTEXT.md", "docs/CONTEXT.md", "docs/glossary.md", "GLOSSARY.md"],
+    "glossary": ["GLOSSARY.md", "docs/GLOSSARY.md", "docs/glossary.md", "CONTEXT.md", "docs/CONTEXT.md"],
     "decisions": ["docs/decisions", "docs/adr", "docs/adrs", "docs/architecture/decisions", "adr"],
     "specs": ["docs/specs", "specs"],
     "prd": ["docs/prd", "docs/prds", "prd"],
@@ -137,6 +137,7 @@ def detect(root):
         "words_found": trackers,
         "issue_keys": sorted({m for m in JIRA_KEY.findall(hint_text) if m not in {"UTF", "ISO", "RFC", "HTTP", "SHA"}})[:5],
         "git_remote": run(["git", "remote", "get-url", "origin"], root),
+        "local_dir": next((d for d in [".scratch", "docs/plans"] if exists(d)), None),
     }
     head = run(["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"], root)
     report["default_branch"] = head.split("/", 1)[1] if head and "/" in head else run(["git", "branch", "--show-current"], root)

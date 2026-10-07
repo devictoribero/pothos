@@ -13,13 +13,14 @@
     "login": ""
   },
   "docs": {
-    "context": "",
+    "glossary": "",
     "decisions": "",
     "specs": "",
     "prd": ""
   },
   "tracker": {
     "kind": "none",
+    "path": "",
     "project": "",
     "skill": ""
   },

@@ -62,7 +62,7 @@ class DetectTest(unittest.TestCase):
         os.symlink("AGENTS.md", os.path.join(self.repo, "CLAUDE.md"))
         self.write(".agents/contract.json", "{}")
         report = detect(self.repo)
-        self.assertEqual(report["docs"]["context"], ["CONTEXT.md"])
+        self.assertEqual(report["docs"]["glossary"], ["CONTEXT.md"])
         self.assertEqual(report["docs"]["decisions"], ["docs/decisions"])
         self.assertEqual(report["agent_files"]["CLAUDE.md"]["symlink_to"], "AGENTS.md")
         self.assertEqual(report["tracker_hints"]["words_found"], ["jira"])

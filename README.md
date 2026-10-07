@@ -39,8 +39,8 @@ plugin (how you work)  ──reads──▶  .agents/contract.json  ──points
     "e2e": "pnpm run e2e"
   },
   "run": { "dev": "pnpm run dev:mock", "url": "http://localhost:3000", "mocked": true },
-  "docs": { "context": "CONTEXT.md", "decisions": "docs/decisions", "prd": "docs/prd" },
-  "tracker": { "kind": "none" },
+  "docs": { "glossary": "GLOSSARY.md", "decisions": "docs/decisions", "prd": "docs/prd" },
+  "tracker": { "kind": "local", "path": ".scratch" },
   "review": { "skills": ["i18n-review"] },
   "pr": { "base": "main", "template": ".github/pull_request_template.md" }
 }
@@ -75,7 +75,7 @@ claude plugin validate plugins/development-flow    # manifest checks
 claude plugin eval plugins/development-flow --scaffold   # evals, costs tokens
 ```
 
-[PRINCIPLES.md](PRINCIPLES.md) explains the rules every change follows.
+[PRINCIPLES.md](PRINCIPLES.md) explains the rules every change follows. [docs/work-model.md](docs/work-model.md) explains the artifacts (spec, plan, ticket), the outer and inner loops, and who orchestrates them.
 
 ## License
 

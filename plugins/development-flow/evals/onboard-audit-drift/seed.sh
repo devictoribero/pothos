@@ -14,7 +14,7 @@ cat > .agents/contract.json <<'JSON'
   "version": 1,
   "verify": { "fast": "npm run lint", "full": "npm run lint && npm run test:old" },
   "run": { "dev": "npm run dev" },
-  "docs": { "context": "GLOSSARY.md" },
+  "docs": { "glossary": "GLOSSARY.md" },
   "tracker": { "kind": "none" }
 }
 JSON

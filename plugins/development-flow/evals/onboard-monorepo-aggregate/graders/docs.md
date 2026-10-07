@@ -1,7 +1,7 @@
 ---
 type: regex
 target: {source: file, path: ".agents/contract.json"}
-pattern: '"context"\s*:\s*"CONTEXT\.md"[\s\S]*"decisions"\s*:\s*"docs/decisions"'
+pattern: '"glossary"\s*:\s*"CONTEXT\.md"[\s\S]*"decisions"\s*:\s*"docs/decisions"'
 weight: 1
 ---
 

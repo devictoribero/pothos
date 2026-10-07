@@ -17,7 +17,7 @@ import sys
 
 CONTRACT_RELATIVE_PATH = os.path.join(".agents", "contract.json")
 SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "contract.schema.json")
-PATH_FIELDS = ("docs.context", "docs.decisions", "docs.specs", "docs.prd", "run.login", "pr.template")
+PATH_FIELDS = ("docs.glossary", "tracker.path", "docs.decisions", "docs.specs", "docs.prd", "run.login", "pr.template")
 
 EXIT_OK, EXIT_INVALID, EXIT_MISSING, EXIT_UNSET, EXIT_USAGE = 0, 1, 2, 3, 64
 

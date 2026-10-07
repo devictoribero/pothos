@@ -61,11 +61,11 @@ class ContractTest(unittest.TestCase):
             self.assertIn(expected, result.stdout)
 
     def test_strict_reports_missing_paths(self):
-        self.write({"version": 1, "verify": {"full": "npm test"}, "docs": {"context": "CONTEXT.md"}})
+        self.write({"version": 1, "verify": {"full": "npm test"}, "docs": {"glossary": "GLOSSARY.md"}})
         self.assertEqual(run(["validate"], self.repo).returncode, 0)
         result = run(["validate", "--strict"], self.repo)
         self.assertEqual(result.returncode, 1)
-        self.assertIn("CONTEXT.md", result.stdout)
+        self.assertIn("GLOSSARY.md", result.stdout)
 
     def test_invalid_json_exits_1(self):
         os.makedirs(os.path.join(self.repo, ".agents"))
