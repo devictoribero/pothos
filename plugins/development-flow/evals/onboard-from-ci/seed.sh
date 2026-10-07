@@ -19,7 +19,7 @@ cat > package.json <<'JSON'
   }
 }
 JSON
-touch yarn.lock
+echo '{"name":"shop-web","lockfileVersion":3,"requires":true,"packages":{}}' > package-lock.json
 mkdir -p .github/workflows
 cat > .github/workflows/ci.yml <<'YML'
 name: ci
@@ -29,10 +29,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: yarn install --frozen-lockfile
-      - run: yarn lint
-      - run: yarn type-check
-      - run: yarn test:unit
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run type-check
+      - run: npm run test:unit
 YML
 cat > AGENTS.md <<'MD'
 # shop-web

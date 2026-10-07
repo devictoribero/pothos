@@ -23,7 +23,7 @@ Use the first `candidates.e2e` script. Leave it out if `e2e_tools` is empty.
 
 ## run
 
-- `run.dev`: prefer `candidates.dev_mocked`, then a `dev` candidate. In a monorepo with several apps, pick the script that starts the app most changes touch, and say which one you picked.
+- `run.dev`: if `candidates.dev_mocked` has a script, use it, always, including in a monorepo. An agent that needs a real backend cannot check its own work, so the mocked script wins over every other consideration. Only when there is no mocked script, use a `dev` candidate; in a monorepo with several apps, pick the script that starts the app most changes touch, and say which one you picked.
 - `run.mocked`: true only for a `dev_mocked` script, or when the docs state the dev mode needs no real backend or secrets. Otherwise false.
 - `run.url`: only when the script body or the docs state the port.
 - `run.login`: only when a doc explains how to sign in as a test user.

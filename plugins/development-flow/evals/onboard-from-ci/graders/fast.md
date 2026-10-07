@@ -1,7 +1,7 @@
 ---
 type: regex
 target: {source: file, path: ".agents/contract.json"}
-pattern: '"fast"\s*:\s*"yarn type-check:fast'
+pattern: '"fast"\s*:\s*"npm run type-check:fast'
 weight: 1
 ---
 

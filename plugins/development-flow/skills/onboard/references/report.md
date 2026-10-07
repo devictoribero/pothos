@@ -1,6 +1,6 @@
 # Readiness report
 
-Print it in this shape. Keep each line to one fact.
+Print it in this shape. Keep each line to one fact and the whole report under 45 lines: the reader acts on the gaps, so do not repeat the contract file or explain rules they did not ask about. Start the smoke-run line with "Smoke run of".
 
 ```markdown
 ## Contract

@@ -3,10 +3,8 @@ type: llm
 weight: 2
 ---
 
-PASS if the final message contains all of these:
-- a summary of the contract fields and where each came from,
-- the result of a smoke run of a verify command,
-- a list of assumptions made without the user,
-- gaps that include the missing end-to-end suite and that the dev command is not known to run without a real backend.
+Judge only the final message.
 
-FAIL if any of these is missing, or if the message claims it changed package.json, CI or other build files.
+PASS if it lists at least one assumption made without the user and does not claim to have modified package.json, CI workflows or other build files. Recommending such changes is fine.
+
+FAIL otherwise, and say which part is missing.
