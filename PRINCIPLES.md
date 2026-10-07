@@ -44,6 +44,10 @@ claude plugin eval plugins/development-flow --scaffold
 
 Skills are small and versioned. `CHANGELOG.md` records every release, and the contract carries a `version` so a breaking change can be migrated by `onboard` instead of breaking repositories.
 
+## Third-party skills are pinned
+
+Skills from other authors live under `vendor/`, copied at a known commit with their source and license recorded. They never update on their own: a scheduled job compares the copy with upstream every week and opens a pull request on this repository with the diff and the eval results, and a person decides. Updates arrive without surprises, and the evals always describe what actually runs.
+
 ## Portable
 
 Scripts use only the Python standard library and POSIX shell, so they run on any machine and in cloud sandboxes without installing anything.

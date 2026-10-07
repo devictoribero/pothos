@@ -12,11 +12,12 @@ The vocabulary follows Matt Pocock's skills where they overlap: spec, ticket, bl
 | **Spec** | What problem, for whom, and why; what is out of scope | The work needs more than one ticket, or the why is not obvious. A PRD is a spec. | Tracker parent issue, or `spec.md` in the local tracker |
 | **Plan** | How the work splits and in which order | More than one ticket | The tickets themselves plus their `Blocked by` edges. There is no separate plan document unless the split needs explaining. |
 | **Ticket** | One change and how to check it is done | Always | Tracker issue, or `issues/NN-slug.md` in the local tracker |
-| **Pull request** | The change itself, with evidence | One per ticket | The code host |
+| **Ticket pull request** | One ticket's change, with evidence | One per ticket | Code host, targeting the feature branch |
+| **Feature pull request** | The whole initiative, ready for main | One per spec | Code host, feature branch into main |
 
 Rules:
 
-- **A ticket is the unit of delivery.** One ticket, one branch, one pull request. A plan groups tickets; a ticket never contains a plan.
+- **A ticket is the unit of delivery.** One ticket, one branch, one pull request into the feature branch. A plan groups tickets; a ticket never contains a plan.
 - **Tickets are vertical slices.** Each cuts a narrow, complete path through every layer it needs (schema, API, UI, tests) and can be verified on its own. The exceptions are prefactors and wide mechanical refactors, which are sequenced expand, migrate, contract.
 - **A ticket fits one fresh context window.** If an agent needs the conversation that produced it to understand it, the ticket is not finished.
 - **Acceptance criteria are checkable.** Each one is something verify, a test or evidence can prove.
@@ -60,7 +61,22 @@ INNER LOOP: one per ticket, an agent can run it alone
 - **Each inner loop runs with a fresh context in its own git worktree**, preferably as its own top-level session. Three reasons: subagents can only nest three levels below the main conversation, and an orchestrator, an inner loop, review's reviewers and their validators already use all three; the run can be long and must be resumable; and the loop maps one to one to a branch and a pull request. A workflow agent with an isolated worktree is acceptable at level 3 below, as long as review keeps its validators.
 - **Subagents are for work inside a loop that returns a summary:** review's reviewers and validators, codebase exploration, research.
 - **State lives in the tracker, never in a session.** Ticket status, claims and blocking edges are the only shared state. Any session can stop, and any other can pick up from the tracker. Status values: `ready-for-agent`, `claimed`, `in-review`, `needs-replan`, `done`.
-- **A ticket starts when its blockers are merged,** not when their pull requests open. Stacked branches are faster but make every review and rebase harder; they are out of scope until the simple path is reliable.
+- **A ticket starts when its blockers are merged into the feature branch,** not when their pull requests open. Truly stacked branches, where one unmerged pull request builds on another, are out of scope: a change to a lower branch forces a cascade of rebases, and squash merges break the stack.
+
+## Branches and pull requests
+
+```
+main ───────────────────────────────────────────────▶ feature pull request (a person reviews and merges)
+  └─ feature/<slug> ──●──────●──────●──●──────●──●──▶
+                       ▲ 01   ▲ 02   ▲ 03 ▲ 04  ▲ 05 ▲ 06
+         each ticket: a pull request into the feature branch, merged when its verify receipt is green
+```
+
+- **Before the first ticket starts,** the feature branch `feature/<slug>` is created from main.
+- **Ticket pull requests target the feature branch** and merge as soon as verify passes on their head commit. The plugin checks the receipt itself, so this works whether or not the repository's CI runs on feature branches. Agents never wait for a person between tickets.
+- **The feature branch is deployable.** A person can deploy it to a test environment and try the whole initiative before it reaches main.
+- **main is brought into the feature branch regularly,** so the final merge stays small.
+- **The feature pull request** is the only one into main. It must pass the repository's CI and its human review.
 
 ## Who orchestrates
 
