@@ -1,0 +1,41 @@
+name: vendor-sync
+
+# Weekly: if a pinned third-party skill has a newer upstream commit, copy it in and open a pull request.
+# A person reviews the diff and runs the evals locally before merging; nothing updates on its own.
+on:
+  schedule:
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check upstream
+        id: check
+        run: |
+          set +e
+          python3 scripts/vendor_sync.py check | tee check.txt
+          echo "status=$?" >> "$GITHUB_OUTPUT"
+      - name: Update pinned skills
+        if: steps.check.outputs.status == '10'
+        run: python3 scripts/vendor_sync.py update
+      - name: Script tests and skill lint
+        if: steps.check.outputs.status == '10'
+        run: |
+          python3 -m unittest discover -s tests
+          python3 scripts/lint_skills.py
+      - name: Open pull request
+        if: steps.check.outputs.status == '10'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: vendor-sync
+          title: "chore(vendor): update pinned third-party skills"
+          commit-message: "chore(vendor): update pinned third-party skills"
+          body-path: check.txt
+          add-paths: plugins/devflow

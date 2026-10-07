@@ -1,0 +1,11 @@
+{
+  "_comment": "Third-party skills copied into this plugin at a pinned commit. scripts/vendor_sync.py checks and updates them; never edit these folders by hand.",
+  "archify": {
+    "source": "https://github.com/tt-a1i/archify",
+    "upstream_path": "archify",
+    "local_path": "skills/archify",
+    "commit": "73aaa0696e8f72c232ea710e6fa94fd953f3e773",
+    "license": "MIT",
+    "exclude": ["test", "node_modules"]
+  }
+}

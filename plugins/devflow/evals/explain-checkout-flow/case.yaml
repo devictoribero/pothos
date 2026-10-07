@@ -3,8 +3,7 @@ name: explain-checkout-flow
 description: >
   A small repo with a checkout flow split across three modules. explain must write a private HTML page
   with the light theme and the dark toggle, a summary.md and an INDEX.md line, name the real functions
-  in order, leave the repository untouched, and, since archify is not installed in the sandbox, say so
-  instead of drawing SVG by hand.
+  in order, and leave the repository untouched.
 tags: [explain]
 runs: 3
 expected_outcome: Page, summary and index line in the private folder; the explanation follows the real code.

@@ -54,7 +54,7 @@ A repository can also declare that it follows its own workflow (`"workflow": "re
 
 ## Third-party skills are pinned
 
-Skills from other authors live under `vendor/`, copied at a known commit with their source and license recorded. They never update on their own: a scheduled job compares the copy with upstream every week and opens a pull request on this repository with the diff and the eval results, and a person decides. Updates arrive without surprises, and the evals always describe what actually runs.
+Skills from other authors are copied into the plugin at a known commit, with source, commit and license recorded in `plugins/devflow/vendor.json`. Never edit them by hand. They never update on their own: `.github/workflows/vendor-sync.yml` runs `scripts/vendor_sync.py` every week and, when upstream moved, opens a pull request with the new copy; a person reviews the diff, runs the evals and decides. Updates arrive without surprises, and the evals always describe what actually runs.
 
 ## Portable
 

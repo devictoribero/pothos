@@ -9,6 +9,7 @@ Checks:
 
 Exit 0 when clean, 1 when any check fails. Standard library only.
 """
+import json
 import os
 import re
 import sys
@@ -71,12 +72,19 @@ def check_skills():
     return errors
 
 
+def vendored_paths():
+    with open(os.path.join(PLUGIN, "vendor.json"), encoding="utf-8") as fh:
+        data = json.load(fh)
+    return [os.path.join(PLUGIN, v["local_path"]) for k, v in data.items() if not k.startswith("_")]
+
+
 def check_forbidden():
     errors = []
     patterns = forbidden_patterns()
+    vendored = vendored_paths()
     for base, _, files in os.walk(PLUGIN):
-        if "/evals" in base.replace(PLUGIN, ""):
-            continue
+        if "/evals" in base.replace(PLUGIN, "") or any(base == v or base.startswith(v + os.sep) for v in vendored):
+            continue  # eval fixtures and pinned third-party code
         for file in files:
             if not file.endswith(TEXT_EXTENSIONS):
                 continue
