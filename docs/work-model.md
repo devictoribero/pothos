@@ -1,6 +1,6 @@
 # Work model
 
-How development-flow turns an idea into merged code: the artifacts, the two loops, and who runs each step. Skills follow this document; when a skill and this document disagree, fix one of them.
+How devflow turns an idea into merged code: the artifacts, the two loops, and who runs each step. Skills follow this document; when a skill and this document disagree, fix one of them.
 
 The vocabulary follows Matt Pocock's skills where they overlap: spec, ticket, blocked by, frontier, tracer bullet, glossary.
 

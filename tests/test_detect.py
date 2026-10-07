@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCRIPT = os.path.join(ROOT, "plugins", "development-flow", "skills", "onboard", "scripts", "detect.py")
+SCRIPT = os.path.join(ROOT, "plugins", "devflow", "skills", "onboard", "scripts", "detect.py")
 
 
 def detect(repo):

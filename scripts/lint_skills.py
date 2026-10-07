@@ -14,7 +14,7 @@ import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PLUGIN = os.path.join(ROOT, "plugins", "development-flow")
+PLUGIN = os.path.join(ROOT, "plugins", "devflow")
 MAX_SKILL_LINES = 300
 MAX_DESCRIPTION = 1024
 TEXT_EXTENSIONS = (".md", ".json", ".py", ".sh", ".yaml", ".yml", ".txt")

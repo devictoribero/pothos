@@ -1,7 +1,7 @@
 ---
 type: regex
 target: {source: file, path: "CLAUDE.md"}
-pattern: 'We do not use Jira[\s\S]*development-flow:contract:start'
+pattern: 'We do not use Jira[\s\S]*devflow:contract:start'
 weight: 1
 ---
 

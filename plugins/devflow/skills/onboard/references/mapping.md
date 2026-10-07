@@ -40,7 +40,7 @@ Use the first existing path of each `docs` entry. Leave out the empty ones. `GLO
 
 ## review
 
-List repository skills whose description says they review conventions, such as design-system primitives, i18n or specs. Leave out generic review skills, because development-flow's review already does that.
+List repository skills whose description says they review conventions, such as design-system primitives, i18n or specs. Leave out generic review skills, because devflow's review already does that.
 
 ## pr
 

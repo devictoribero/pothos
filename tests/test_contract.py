@@ -6,8 +6,8 @@ import tempfile
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCRIPT = os.path.join(ROOT, "plugins", "development-flow", "shared", "contract.py")
-TEMPLATE = os.path.join(ROOT, "plugins", "development-flow", "templates", "contract.json")
+SCRIPT = os.path.join(ROOT, "plugins", "devflow", "shared", "contract.py")
+TEMPLATE = os.path.join(ROOT, "plugins", "devflow", "templates", "contract.json")
 
 
 def run(args, cwd):
@@ -76,7 +76,7 @@ class ContractTest(unittest.TestCase):
     def test_template_has_every_schema_field(self):
         with open(TEMPLATE) as fh:
             template = json.load(fh)
-        schema_path = os.path.join(ROOT, "plugins", "development-flow", "shared", "contract.schema.json")
+        schema_path = os.path.join(ROOT, "plugins", "devflow", "shared", "contract.schema.json")
         with open(schema_path) as fh:
             schema = json.load(fh)
         self.assertEqual(set(template) - {"$schema"}, set(schema["properties"]) - {"$schema"})

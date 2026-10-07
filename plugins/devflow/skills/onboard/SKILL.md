@@ -1,13 +1,13 @@
 ---
 name: onboard
-description: Connect a repository to development-flow by writing its agent contract (.agents/contract.json), which tells the other skills how the repo is verified, run, documented and shipped. Run it the first time you use development-flow in a repo, or again to audit an existing contract for drift. Use when the user says "onboard this repo", "set up development-flow", "create the agent contract", "audit the contract", or when another development-flow skill reports that no contract exists.
+description: Connect a repository to devflow by writing its agent contract (.agents/contract.json), which tells the other skills how the repo is verified, run, documented and shipped. Run it the first time you use devflow in a repo, or again to audit an existing contract for drift. Use when the user says "onboard this repo", "set up devflow", "create the agent contract", "audit the contract", or when another devflow skill reports that no contract exists.
 argument-hint: "[audit]"
 disable-model-invocation: true
 ---
 
 # onboard
 
-Write or audit `.agents/contract.json`, the only place where development-flow learns project specifics. Every other skill reads the contract; none of them hardcode a command, path or tracker.
+Write or audit `.agents/contract.json`, the only place where devflow learns project specifics. Every other skill reads the contract; none of them hardcode a command, path or tracker.
 
 **Output:** a contract that passes `contract.py validate --strict`, an "Agent contract" section in AGENTS.md, and a readiness report listing what still blocks autonomous work.
 

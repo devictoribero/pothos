@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/devictoribero/development-flow/main/plugins/development-flow/shared/contract.schema.json",
-  "title": "development-flow agent contract",
-  "description": "Tells the development-flow skills and hooks how this repository is verified, run and documented. Lives at .agents/contract.json.",
+  "$id": "https://raw.githubusercontent.com/devictoribero/devflow/main/plugins/devflow/shared/contract.schema.json",
+  "title": "devflow agent contract",
+  "description": "Tells the devflow skills and hooks how this repository is verified, run and documented. Lives at .agents/contract.json.",
   "type": "object",
   "required": [
     "version",

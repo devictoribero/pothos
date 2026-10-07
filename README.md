@@ -1,4 +1,4 @@
-# development-flow
+# devflow
 
 A portable development workflow for Claude Code. It carries how you work from repository to repository: specify, implement, verify, review and ship. Each repository describes itself in a small contract, so the same skills work in any codebase.
 
@@ -7,14 +7,14 @@ A portable development workflow for Claude Code. It carries how you work from re
 ## Install
 
 ```
-/plugin marketplace add devictoribero/development-flow
-/plugin install development-flow@devictoribero
+/plugin marketplace add devictoribero/devflow
+/plugin install devflow@devictoribero
 ```
 
 Then, in each repository:
 
 ```
-/development-flow:onboard
+/devflow:onboard
 ```
 
 ## How it fits together
@@ -31,7 +31,7 @@ plugin (how you work)  ──reads──▶  .agents/contract.json  ──points
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/devictoribero/development-flow/main/plugins/development-flow/shared/contract.schema.json",
+  "$schema": "https://raw.githubusercontent.com/devictoribero/devflow/main/plugins/devflow/shared/contract.schema.json",
   "version": 1,
   "verify": {
     "fast": "pnpm run type-check && pnpm run lint",
@@ -56,7 +56,8 @@ Only `version` and `verify.full` are required. The schema documents every field,
 | `grill` | planned | Interviews you until a task has no open questions. |
 | `distill` | planned | Turns a conversation, thread or note into tickets or a PRD with checkable acceptance criteria. |
 | `domain-model` | planned | Keeps the ubiquitous-language glossary and decision records. |
-| `implement` | planned | Builds a defined task with tests. |
+| `implement` | planned | Takes one ticket or a whole feature. For a feature it creates the feature branch and works through the ticket graph, running the inner loop for every unblocked ticket. |
+| `code` | planned | Writes the code and tests for one ticket. The inner loop runs it; you rarely type it. |
 | `diagnose` | planned | Finds the cause of a bug by building a feedback loop first. |
 | `verify` | planned | Runs the contract's checks and records a receipt for the commit. |
 | `evidence` | planned | Runs the app and captures proof that a change works. |
@@ -68,11 +69,11 @@ Only `version` and `verify.full` are required. The schema documents every field,
 ## Developing
 
 ```bash
-claude --plugin-dir plugins/development-flow      # try changes without reinstalling
+claude --plugin-dir plugins/devflow      # try changes without reinstalling
 python3 -m unittest discover -s tests              # script tests
 python3 scripts/lint_skills.py                     # skill checks
-claude plugin validate plugins/development-flow    # manifest checks
-claude plugin eval plugins/development-flow --scaffold   # evals, costs tokens
+claude plugin validate plugins/devflow    # manifest checks
+claude plugin eval plugins/devflow --scaffold   # evals, costs tokens
 ```
 
 [PRINCIPLES.md](PRINCIPLES.md) explains the rules every change follows. [docs/work-model.md](docs/work-model.md) explains the artifacts (spec, plan, ticket), the outer and inner loops, and who orchestrates them.

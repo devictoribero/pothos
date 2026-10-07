@@ -7,8 +7,8 @@
   "description": "Plugins by Victor Ribero for AI-driven software development.",
   "plugins": [
     {
-      "name": "development-flow",
-      "source": "./plugins/development-flow",
+      "name": "devflow",
+      "source": "./plugins/devflow",
       "description": "A portable development workflow for Claude Code: specify, implement, verify, review and ship, driven by a small per-repository contract.",
       "version": "0.1.0"
     }

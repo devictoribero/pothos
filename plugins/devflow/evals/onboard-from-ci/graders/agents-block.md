@@ -1,7 +1,7 @@
 ---
 type: regex
 target: {source: file, path: "AGENTS.md"}
-pattern: 'development-flow:contract:start[\s\S]*development-flow:contract:end'
+pattern: 'devflow:contract:start[\s\S]*devflow:contract:end'
 weight: 1
 ---
 

@@ -2,7 +2,7 @@
 
 How this plugin is built. Every skill, script and hook follows these rules, and the checks in `scripts/` enforce the ones a script can check.
 
-The rules for the code agents produce will live in the plugin itself, in `plugins/development-flow/shared/engineering.md`, because agents load that file while they work. This file is for people and agents changing the plugin.
+The rules for the code agents produce will live in the plugin itself, in `plugins/devflow/shared/engineering.md`, because agents load that file while they work. This file is for people and agents changing the plugin.
 
 ## The plugin knows how you work. The repository knows the project.
 
@@ -37,7 +37,7 @@ A skill's description says what it does and when to use it, in the words a user 
 Each skill ships cases under `evals/` with deterministic graders where possible and an LLM grader only for judgement. Check what the agent did, not what it says it did: a grader that reads `package.json` to confirm it is unchanged beats a judge asked whether the report claims changes. LLM judges also miss content at the end of long messages, so anything a regex can find goes to a regex. Run the evals before each release:
 
 ```bash
-claude plugin eval plugins/development-flow --scaffold
+claude plugin eval plugins/devflow --scaffold
 ```
 
 ## Easy to change

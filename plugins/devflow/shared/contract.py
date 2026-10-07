@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Locate, read and validate a development-flow agent contract.
+"""Locate, read and validate a devflow agent contract.
 
 Usage:
   contract.py locate [--repo DIR]           print the contract path

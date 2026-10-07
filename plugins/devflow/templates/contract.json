@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/devictoribero/development-flow/main/plugins/development-flow/shared/contract.schema.json",
+  "$schema": "https://raw.githubusercontent.com/devictoribero/devflow/main/plugins/devflow/shared/contract.schema.json",
   "version": 1,
   "verify": {
     "fast": "",
