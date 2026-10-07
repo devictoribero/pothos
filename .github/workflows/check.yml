@@ -1,0 +1,35 @@
+name: check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Script tests
+        run: python3 -m unittest discover -s tests -v
+      - name: Skill lint
+        run: python3 scripts/lint_skills.py
+      - name: Manifests
+        run: |
+          python3 -m json.tool .claude-plugin/marketplace.json > /dev/null
+          python3 -m json.tool plugins/development-flow/.claude-plugin/plugin.json > /dev/null
+          python3 -m json.tool plugins/development-flow/shared/contract.schema.json > /dev/null
+      - name: Manifest versions agree
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          market = json.load(open(".claude-plugin/marketplace.json"))
+          plugin = json.load(open("plugins/development-flow/.claude-plugin/plugin.json"))
+          entry = next(p for p in market["plugins"] if p["name"] == plugin["name"])
+          if entry.get("version") != plugin["version"]:
+              sys.exit(f"marketplace says {entry.get('version')}, plugin.json says {plugin['version']}")
+          print("versions agree:", plugin["version"])
+          PY

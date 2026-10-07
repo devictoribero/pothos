@@ -1,0 +1,11 @@
+# One case-insensitive regular expression per line. Skills, agents, hooks, shared files and templates
+# must not match any of them: project specifics belong in each repository's contract.
+homecloud
+gethomecloud
+lifetails
+fidelitzand
+nundina
+grovi
+/Users/
+\bHOM-\d+
+atlassian\.net

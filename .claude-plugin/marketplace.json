@@ -1,0 +1,16 @@
+{
+  "name": "devictoribero",
+  "owner": {
+    "name": "Victor Ribero",
+    "url": "https://github.com/devictoribero"
+  },
+  "description": "Plugins by Victor Ribero for AI-driven software development.",
+  "plugins": [
+    {
+      "name": "development-flow",
+      "source": "./plugins/development-flow",
+      "description": "A portable development workflow for Claude Code: specify, implement, verify, review and ship, driven by a small per-repository contract.",
+      "version": "0.1.0"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "development-flow",
+  "version": "0.1.0",
+  "description": "A portable development workflow for Claude Code: specify, implement, verify, review and ship, driven by a small per-repository contract.",
+  "author": {
+    "name": "Victor Ribero",
+    "url": "https://github.com/devictoribero"
+  },
+  "homepage": "https://github.com/devictoribero/development-flow",
+  "repository": "https://github.com/devictoribero/development-flow",
+  "license": "MIT",
+  "keywords": ["workflow", "agents", "verification", "contract", "skills"]
+}

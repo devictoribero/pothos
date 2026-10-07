@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/devictoribero/development-flow/main/plugins/development-flow/shared/contract.schema.json",
+  "title": "development-flow agent contract",
+  "description": "Tells the development-flow skills and hooks how this repository is verified, run and documented. Lives at .agents/contract.json.",
+  "type": "object",
+  "required": ["version", "verify"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": {
+      "description": "Contract format version. Bumped only on breaking changes; onboard migrates older contracts.",
+      "type": "integer",
+      "enum": [1]
+    },
+    "verify": {
+      "description": "Shell commands, run from the repository root. Each must exit 0 when the change is good.",
+      "type": "object",
+      "required": ["full"],
+      "additionalProperties": false,
+      "properties": {
+        "fast": { "description": "Seconds-range check run after edits and on Stop, e.g. type-check plus lint.", "type": "string", "minLength": 1 },
+        "full": { "description": "Everything CI checks before merge. pull-request requires a green run of this on the current commit.", "type": "string", "minLength": 1 },
+        "e2e": { "description": "End-to-end suite over the critical flows. Optional while the repo has none.", "type": "string", "minLength": 1 }
+      }
+    },
+    "run": {
+      "description": "How an agent starts the app to look at a change.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dev"],
+      "properties": {
+        "dev": { "description": "Starts the app. Prefer a mode that needs no real backend or credentials.", "type": "string", "minLength": 1 },
+        "url": { "description": "Where the running app answers.", "type": "string", "minLength": 1 },
+        "mocked": { "description": "true when run.dev works without a real backend or secrets.", "type": "boolean" },
+        "login": { "description": "Path to a doc that explains how an agent signs in to the running app.", "type": "string", "minLength": 1 }
+      }
+    },
+    "docs": {
+      "description": "Repository-relative paths to the domain knowledge agents must read.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": { "description": "Ubiquitous-language glossary, usually CONTEXT.md.", "type": "string", "minLength": 1 },
+        "decisions": { "description": "Directory of architecture decision records.", "type": "string", "minLength": 1 },
+        "specs": { "description": "Directory of business-rule specs.", "type": "string", "minLength": 1 },
+        "prd": { "description": "Directory where distill writes product requirement documents.", "type": "string", "minLength": 1 }
+      }
+    },
+    "tracker": {
+      "description": "Where work items live. distill writes there; implement reads from there.",
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "type": "string", "enum": ["none", "github", "jira", "linear"] },
+        "project": { "description": "Project key or board identifier, e.g. a Jira key.", "type": "string", "minLength": 1 },
+        "skill": { "description": "Repository skill that knows the tracker's fields and templates. When set, distill delegates ticket creation to it.", "type": "string", "minLength": 1 }
+      }
+    },
+    "review": {
+      "description": "Repository skills that review adds to its generic pass.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "skills": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+      }
+    },
+    "pr": {
+      "description": "Pull request conventions.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "base": { "description": "Branch pull requests target.", "type": "string", "minLength": 1 },
+        "template": { "description": "Path to the pull request body template.", "type": "string", "minLength": 1 },
+        "evidence": { "description": "Command that uploads screenshots and prints markdown to embed.", "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

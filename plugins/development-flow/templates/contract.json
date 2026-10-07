@@ -1,0 +1,34 @@
+{
+  "$schema": "https://raw.githubusercontent.com/devictoribero/development-flow/main/plugins/development-flow/shared/contract.schema.json",
+  "version": 1,
+  "verify": {
+    "fast": "",
+    "full": "",
+    "e2e": ""
+  },
+  "run": {
+    "dev": "",
+    "url": "",
+    "mocked": false,
+    "login": ""
+  },
+  "docs": {
+    "context": "",
+    "decisions": "",
+    "specs": "",
+    "prd": ""
+  },
+  "tracker": {
+    "kind": "none",
+    "project": "",
+    "skill": ""
+  },
+  "review": {
+    "skills": []
+  },
+  "pr": {
+    "base": "main",
+    "template": "",
+    "evidence": ""
+  }
+}

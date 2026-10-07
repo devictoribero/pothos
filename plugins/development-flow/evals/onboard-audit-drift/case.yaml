@@ -1,0 +1,15 @@
+schema_version: "1.1"
+name: onboard-audit-drift
+description: >
+  An existing contract names a script that was renamed (test:old, now test) and a glossary file
+  that was deleted. In audit mode with nobody to confirm, onboard must report both drifts with a
+  proposed fix and leave the contract unchanged.
+tags: [onboard, audit]
+runs: 3
+expected_outcome: Both drifts reported with fixes; the contract file is unchanged.
+execution:
+  max_turns: 30
+  timeout_seconds: 600
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit]
+context:
+  scaffold_script: seed.sh
