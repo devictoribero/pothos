@@ -109,6 +109,22 @@ class ContractTest(unittest.TestCase):
         self.assertTrue(os.path.isfile(self.expected))
         self.assertEqual(os.listdir(self.repo), [".git"])
 
+    def test_repo_workflow_needs_no_verify(self):
+        self.write({"version": 1, "workflow": "repo"})
+        self.assertEqual(run(["validate", "--strict"], self.repo).returncode, 0)
+
+    def test_devflow_workflow_requires_verify(self):
+        self.write({"version": 1})
+        result = run(["validate"], self.repo)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("verify", result.stdout)
+
+    def test_environments_are_validated(self):
+        self.write({"version": 1, "verify": {"full": "x"}, "run": {"environments": [{"name": "dev", "dev": "yarn local:dev", "note": "with the backend developer"}, {"name": "demo"}]}})
+        result = run(["validate"], self.repo)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("run.environments[1]: missing required field 'dev'", result.stdout)
+
     def test_template_has_every_schema_field(self):
         with open(TEMPLATE) as fh:
             template = json.load(fh)

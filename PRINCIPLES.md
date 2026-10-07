@@ -46,6 +46,12 @@ claude plugin eval plugins/devflow --scaffold
 
 Skills are small and versioned. `CHANGELOG.md` records every release, and the contract carries a `version` so a breaking change can be migrated by `onboard` instead of breaking repositories.
 
+## Missing capabilities are skipped, never improvised
+
+Repositories differ. One has no end-to-end suite, another cannot run without a real backend. When the contract does not declare a capability, skills skip that step and say so in their report. They never invent a substitute command or set up tooling on their own: that is a decision for the person, and the gap shows up in onboard's readiness report.
+
+A repository can also declare that it follows its own workflow (`"workflow": "repo"`). devflow's cycle skills then stand aside there and point to the repository's process; only the knowledge skills apply.
+
 ## Third-party skills are pinned
 
 Skills from other authors live under `vendor/`, copied at a known commit with their source and license recorded. They never update on their own: a scheduled job compares the copy with upstream every week and opens a pull request on this repository with the diff and the eval results, and a person decides. Updates arrive without surprises, and the evals always describe what actually runs.

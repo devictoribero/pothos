@@ -5,8 +5,7 @@
   "description": "Tells the devflow skills and hooks how this repository is verified, run and documented. Private to each developer: stored under ~/.config/devflow/contracts/<host>/<owner>/<repo>.json, never inside the repository.",
   "type": "object",
   "required": [
-    "version",
-    "verify"
+    "version"
   ],
   "additionalProperties": false,
   "properties": {
@@ -20,8 +19,16 @@
         1
       ]
     },
+    "workflow": {
+      "description": "Who owns the development cycle in this repository. devflow (default): the devflow skills run the cycle. repo: the repository's own workflow applies, devflow's cycle skills stand aside and point to it, and hooks stay silent. Knowledge skills still apply.",
+      "type": "string",
+      "enum": [
+        "devflow",
+        "repo"
+      ]
+    },
     "verify": {
-      "description": "Shell commands, run from the repository root. Each must exit 0 when the change is good.",
+      "description": "Shell commands, run from the repository root. Each must exit 0 when the change is good. Required unless workflow is repo. A missing e2e means the repo has no end-to-end suite yet: skills skip that check and report it, never improvise one.",
       "type": "object",
       "required": [
         "full"
@@ -49,12 +56,10 @@
       "description": "How an agent starts the app to look at a change.",
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "dev"
-      ],
+      "required": [],
       "properties": {
         "dev": {
-          "description": "Starts the app. Prefer a mode that needs no real backend or credentials.",
+          "description": "Starts the app against the default backend. Prefer a mode that needs no real backend or credentials.",
           "type": "string",
           "minLength": 1
         },
@@ -71,6 +76,39 @@
           "description": "Path to a doc that explains how an agent signs in to the running app.",
           "type": "string",
           "minLength": 1
+        },
+        "environments": {
+          "description": "Backends the app can run against, when there is more than one. Before starting work on a feature, implement asks which one to use, because the choice usually depends on who you are working with.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "dev"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "dev": {
+                "description": "Command that starts the app against this backend.",
+                "type": "string",
+                "minLength": 1
+              },
+              "e2e": {
+                "description": "Headless end-to-end command against this backend, when it differs from verify.e2e.",
+                "type": "string",
+                "minLength": 1
+              },
+              "note": {
+                "description": "When to choose this backend.",
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
         }
       }
     },

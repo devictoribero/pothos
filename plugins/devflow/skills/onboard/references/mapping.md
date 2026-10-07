@@ -2,7 +2,11 @@
 
 Apply these rules in order. Each one names the report field it reads.
 
-## verify.full (required)
+## workflow
+
+Leave it out (the default is `devflow`) unless the user says this repository follows its own workflow. Then save `{"version": 1, "workflow": "repo"}` and nothing else unless the user asks: devflow stands aside in that repo.
+
+## verify.full (required unless workflow is repo)
 
 1. If `candidates.aggregate` has a script whose body runs lint, types and tests, use it. Prefer `verify`, then `validate`, then `check`. Skip a `check` that only builds.
 2. Otherwise, if a CI workflow runs package scripts (`ci[].scripts_used_in_order`), chain those scripts with `&&` in that order, excluding scripts that deploy, publish or need secrets. This is what the pull request must pass anyway.
@@ -19,12 +23,13 @@ Never put a script that writes files, such as `format` with `--write` or `lint:f
 
 ## verify.e2e
 
-Use the first `candidates.e2e` script. Leave it out if `e2e_tools` is empty.
+Use the first `candidates.e2e` script, preferring a headless variant. Leave it out if `e2e_tools` is empty: many repos have no end-to-end suite, and the other skills skip the check when this field is missing.
 
 ## run
 
 - `run.dev`: if `candidates.dev_mocked` has a script, use it, always, including in a monorepo. An agent that needs a real backend cannot check its own work, so the mocked script wins over every other consideration. Only when there is no mocked script, use a `dev` candidate; in a monorepo with several apps, pick the script that starts the app most changes touch, and say which one you picked.
 - `run.mocked`: true only for a `dev_mocked` script, or when the docs state the dev mode needs no real backend or secrets. Otherwise false.
+- `run.environments`: when `environment_variants` lists two or more backends a person would work against (such as dev and demo, not prod), add one entry per backend with its `dev` command, and ask the user what `note` each should carry, such as who works on it. Leave production out. Never pick a default: implement asks which one to use when work starts.
 - `run.url`: only when the script body or the docs state the port.
 - `run.login`: only when a doc explains how to sign in as a test user.
 

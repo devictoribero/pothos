@@ -45,6 +45,13 @@ class DetectTest(unittest.TestCase):
         self.assertEqual(report["candidates"]["aggregate"][0]["command"], "pnpm run validate")
         self.assertEqual(report["candidates"]["dev_mocked"][0]["script"], "dev:mock")
 
+    def test_environment_variants(self):
+        self.write("yarn.lock", "")
+        self.write("package.json", json.dumps({"scripts": {"local:dev": "a", "local:demo": "b", "local:mock": "c", "dev": "d"}}))
+        variants = detect(self.repo)["environment_variants"]
+        self.assertEqual([v["name"] for v in variants], ["dev", "demo"])
+        self.assertEqual(variants[1]["command"], "yarn local:demo")
+
     def test_yarn_runner_has_no_run_keyword(self):
         self.write("yarn.lock", "")
         self.write("package.json", json.dumps({"scripts": {"test": "vitest"}}))

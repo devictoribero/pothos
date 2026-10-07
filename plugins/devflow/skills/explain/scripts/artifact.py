@@ -1,0 +1,190 @@
+#!/usr/bin/env python3
+"""Create, register, list and open explanation artifacts.
+
+Artifacts are private and persistent, like contracts: they live under
+$DEVFLOW_HOME/artifacts/<host>/<owner>/<repo>/<YYYY-MM-DD>-<slug>/ (or artifacts/general/ outside a
+git repository), never inside the repository. Each folder holds index.html, a diagrams/ folder
+and summary.md. The repository folder keeps INDEX.md, one line per artifact, so any agent can find
+earlier explanations by reading a few lines instead of the HTML.
+
+Usage:
+  artifact.py new --slug SLUG --title TITLE [--repo DIR]   create the folder from the page template; prints its path
+  artifact.py put FOLDER RELPATH                            write stdin to FOLDER/RELPATH (the only way skills write pages)
+  artifact.py light FILE...                                 make archify diagrams open in the light theme by default
+  artifact.py register DIR                                  add or refresh DIR's line in INDEX.md (needs summary.md)
+  artifact.py list [--repo DIR]                             print INDEX.md for this repository
+  artifact.py open PATH                                     open in Brave, falling back to the default browser
+
+Exit codes: 0 ok, 1 failure, 64 usage error. Standard library only.
+"""
+import datetime
+import html
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "..", "..", "shared"))
+import contract  # noqa: E402  (shared location and repo-key logic)
+
+TEMPLATE = os.path.join(HERE, "..", "assets", "page.html")
+ARCHIFY_FALLBACK = "window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'"
+
+
+def repo_folder(start):
+    root = contract.git(["rev-parse", "--show-toplevel"], start)
+    if not root:
+        return os.path.join(contract.devflow_home(), "artifacts", "general")
+    key = os.path.relpath(contract.contract_path(start), os.path.join(contract.devflow_home(), "contracts"))
+    return os.path.join(contract.devflow_home(), "artifacts", key[: -len(".json")])
+
+
+def flag(args, name, default=None):
+    if name in args:
+        i = args.index(name)
+        if i + 1 >= len(args):
+            raise SystemExit(f"{name} needs a value")
+        value = args[i + 1]
+        del args[i:i + 2]
+        return value
+    return default
+
+
+def cmd_new(args):
+    slug = flag(args, "--slug")
+    title = flag(args, "--title")
+    repo = os.path.abspath(flag(args, "--repo", os.getcwd()))
+    if not slug or not title or not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", slug):
+        print("usage: artifact.py new --slug kebab-case-slug --title 'Title'", file=sys.stderr)
+        return 64
+    folder = os.path.join(repo_folder(repo), f"{datetime.date.today().isoformat()}-{slug}")
+    if os.path.exists(folder):
+        print(folder)
+        print("exists: update it instead of creating a duplicate", file=sys.stderr)
+        return 0
+    os.makedirs(os.path.join(folder, "diagrams"))
+    with open(TEMPLATE, encoding="utf-8") as fh:
+        page = fh.read().replace("{{TITLE}}", html.escape(title))
+    with open(os.path.join(folder, "index.html"), "w", encoding="utf-8") as fh:
+        fh.write(page)
+    meta = {"title": title, "slug": slug, "created": datetime.date.today().isoformat(),
+            "repo": contract.git(["remote", "get-url", "origin"], repo),
+            "commit": contract.git(["rev-parse", "--short", "HEAD"], repo)}
+    with open(os.path.join(folder, "meta.json"), "w", encoding="utf-8") as fh:
+        json.dump(meta, fh, indent=2)
+    print(folder)
+    return 0
+
+
+def cmd_put(args):
+    """Artifact folders live outside the project, where file tools prompt or are denied; write through here."""
+    if len(args) != 2:
+        print("usage: artifact.py put FOLDER RELPATH < content", file=sys.stderr)
+        return 64
+    folder = os.path.realpath(args[0])
+    artifacts = os.path.realpath(os.path.join(contract.devflow_home(), "artifacts"))
+    target = os.path.realpath(os.path.join(folder, args[1]))
+    if not folder.startswith(artifacts + os.sep) or not target.startswith(folder + os.sep):
+        print("refused: put only writes inside an artifact folder", file=sys.stderr)
+        return 1
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    with open(target, "w", encoding="utf-8") as fh:
+        fh.write(sys.stdin.read())
+    print(f"wrote {target}")
+    return 0
+
+
+def cmd_light(files):
+    if not files:
+        print("usage: artifact.py light FILE...", file=sys.stderr)
+        return 64
+    for path in files:
+        with open(path, encoding="utf-8") as fh:
+            text = fh.read()
+        patched = text.replace('data-theme="dark"', 'data-theme="light"', 1).replace(ARCHIFY_FALLBACK, "'light'")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(patched)
+        print(f"light by default: {path}")
+    return 0
+
+
+def first_line(path):
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip().lstrip("#").strip()
+            if line:
+                return line
+    return ""
+
+
+def cmd_register(args):
+    if len(args) != 1:
+        print("usage: artifact.py register DIR", file=sys.stderr)
+        return 64
+    folder = os.path.abspath(args[0])
+    summary = os.path.join(folder, "summary.md")
+    meta_path = os.path.join(folder, "meta.json")
+    if not os.path.isfile(summary) or not os.path.isfile(meta_path):
+        print(f"{folder} needs summary.md and meta.json", file=sys.stderr)
+        return 1
+    with open(meta_path, encoding="utf-8") as fh:
+        meta = json.load(fh)
+    index = os.path.join(os.path.dirname(folder), "INDEX.md")
+    name = os.path.basename(folder)
+    line = f"- [{meta['title']}]({name}/index.html) · {meta['created']} · commit {meta.get('commit') or 'n/a'} · {first_line(summary)} · summary: {name}/summary.md"
+    lines = []
+    if os.path.isfile(index):
+        with open(index, encoding="utf-8") as fh:
+            lines = [l.rstrip("\n") for l in fh if l.strip() and not l.startswith("# ") and f"]({name}/" not in l]
+    lines = sorted(lines + [line], reverse=True)
+    with open(index, "w", encoding="utf-8") as fh:
+        fh.write("# Explanations\n\nNewest first. Read summary.md before opening the HTML.\n\n" + "\n".join(l for l in lines if l.startswith("- ")) + "\n")
+    print(f"registered in {index}")
+    return 0
+
+
+def cmd_list(args):
+    repo = os.path.abspath(flag(args, "--repo", os.getcwd()))
+    index = os.path.join(repo_folder(repo), "INDEX.md")
+    if not os.path.isfile(index):
+        print(f"no explanations yet ({index})")
+        return 0
+    with open(index, encoding="utf-8") as fh:
+        print(fh.read().rstrip())
+    return 0
+
+
+def cmd_open(args):
+    if len(args) != 1:
+        print("usage: artifact.py open PATH", file=sys.stderr)
+        return 64
+    path = os.path.abspath(args[0])
+    if os.environ.get("DEVFLOW_NO_OPEN"):
+        print(f"not opened (DEVFLOW_NO_OPEN): {path}")
+        return 0
+    attempts = [["open", "-a", "Brave Browser", path], ["open", path], ["xdg-open", path]]
+    for cmd in attempts:
+        if shutil.which(cmd[0]) and subprocess.run(cmd, capture_output=True).returncode == 0:
+            print(f"opened with {' '.join(cmd[:-1])}: {path}")
+            return 0
+    print(f"could not open a browser; open it yourself: {path}")
+    return 0
+
+
+def main(argv):
+    if not argv or argv[0] in ("-h", "--help"):
+        print(__doc__.strip())
+        return 0 if argv else 64
+    command, args = argv[0], list(argv[1:])
+    handlers = {"new": cmd_new, "put": cmd_put, "light": cmd_light, "register": cmd_register, "list": cmd_list, "open": cmd_open}
+    if command not in handlers:
+        print(f"unknown command '{command}'", file=sys.stderr)
+        return 64
+    return handlers[command](args)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

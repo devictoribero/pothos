@@ -19,6 +19,8 @@ The contract is private. It lives under `~/.config/devflow/contracts/`, keyed by
 - Never invent a command. Every command in the contract must come from the detection report: a declared script, or scripts chained with `&&`. If a role has no candidate, leave the field out and report it as a gap.
 - Ask only when the detection report leaves a real choice, such as two dev scripts or no obvious verify command. When nobody can answer, apply the rules in `references/mapping.md`, and list each assumption in the report.
 
+If the user says the repository follows its own workflow, skip the steps: save `{"version": 1, "workflow": "repo"}` with `contract.py write` and say that devflow will stand aside in this repo.
+
 ## Steps
 
 1. **Detect.** Run the detection script from the repository root and read its JSON:

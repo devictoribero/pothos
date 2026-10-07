@@ -1,6 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/devictoribero/devflow/main/plugins/devflow/shared/contract.schema.json",
   "version": 1,
+  "workflow": "devflow",
   "verify": {
     "fast": "",
     "full": "",
@@ -10,7 +11,8 @@
     "dev": "",
     "url": "",
     "mocked": false,
-    "login": ""
+    "login": "",
+    "environments": []
   },
   "docs": {
     "glossary": "",

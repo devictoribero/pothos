@@ -144,6 +144,8 @@ def path_errors(data, root):
 
 def check(data, repo, strict):
     errors = schema_errors(data, load(SCHEMA_PATH))
+    if isinstance(data, dict) and data.get("workflow", "devflow") == "devflow" and "verify" not in data:
+        errors.append("contract: missing required field 'verify' (only optional when workflow is repo)")
     if strict:
         errors.extend(path_errors(data, repo_root(repo)))
     return errors

@@ -105,6 +105,9 @@ def detect(root):
         if found:
             candidates[role] = [{"script": n, "command": f"{prefix} {n}", "body": scripts[n]} for n in found]
     report["candidates"] = candidates
+    # Same app started against different backends: local:dev, local:demo, start:staging...
+    env_scripts = [n for n in scripts if re.match(r"^(local|dev|start|serve):[a-z][\w-]*$", n) and not re.search(r"mock|seed", n)]
+    report["environment_variants"] = [{"script": n, "name": n.split(":", 1)[1], "command": f"{prefix} {n}"} for n in env_scripts]
     report["other_build_files"] = [f for f in ["Makefile", "justfile", "Taskfile.yml", "pyproject.toml", "go.mod", "Cargo.toml"] if exists(f)]
 
     report["agent_files"] = {

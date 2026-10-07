@@ -72,7 +72,7 @@ main ─────────────────────────
          each ticket: a pull request into the feature branch, merged when its verify receipt is green
 ```
 
-- **Before the first ticket starts,** the feature branch `feature/<slug>` is created from main.
+- **Before the first ticket starts,** the feature branch `feature/<slug>` is created from main, and when the contract lists several backends under `run.environments`, implement asks which one this feature runs against. The answer is recorded on the spec, so every ticket, every evidence run and every end-to-end run uses the same backend.
 - **Ticket pull requests target the feature branch** and merge as soon as verify passes on their head commit. The plugin checks the receipt itself, so this works whether or not the repository's CI runs on feature branches. Agents never wait for a person between tickets.
 - **The feature branch is deployable.** A person can deploy it to a test environment and try the whole initiative before it reaches main.
 - **main is brought into the feature branch regularly,** so the final merge stays small.
