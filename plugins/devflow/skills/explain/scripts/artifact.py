@@ -32,6 +32,7 @@ import contract  # noqa: E402  (shared location and repo-key logic)
 
 TEMPLATE = os.path.join(HERE, "..", "assets", "page.html")
 ARCHIFY_FALLBACK = "window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'"
+ARCHIFY_LIVE_OS = "apply(e.matches ? 'light' : 'dark');"
 
 
 def repo_folder(start):
@@ -104,7 +105,7 @@ def cmd_light(files):
     for path in files:
         with open(path, encoding="utf-8") as fh:
             text = fh.read()
-        patched = text.replace('data-theme="dark"', 'data-theme="light"', 1).replace(ARCHIFY_FALLBACK, "'light'")
+        patched = text.replace('data-theme="dark"', 'data-theme="light"', 1).replace(ARCHIFY_FALLBACK, "'light'").replace(ARCHIFY_LIVE_OS, "return;")
         with open(path, "w", encoding="utf-8") as fh:
             fh.write(patched)
         print(f"light by default: {path}")

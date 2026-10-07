@@ -54,11 +54,12 @@ class ArtifactTest(unittest.TestCase):
     def test_light_patches_archify_defaults(self):
         path = os.path.join(self.tmp.name, "d.html")
         with open(path, "w") as fh:
-            fh.write('<html data-theme="dark"><script>t = window.matchMedia(\'(prefers-color-scheme: light)\').matches ? \'light\' : \'dark\';</script>')
+            fh.write('<html data-theme="dark"><script>t = window.matchMedia(\'(prefers-color-scheme: light)\').matches ? \'light\' : \'dark\'; f = function (e) { apply(e.matches ? \'light\' : \'dark\'); };</script>')
         self.assertEqual(run(["light", path], self.repo).returncode, 0)
         text = open(path).read()
         self.assertIn('data-theme="light"', text)
         self.assertIn("t = 'light';", text)
+        self.assertNotIn("e.matches ? 'light' : 'dark'", text)
 
     def test_register_writes_one_line_per_artifact_and_list_prints_it(self):
         folder = self.new()
