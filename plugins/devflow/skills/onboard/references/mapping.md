@@ -8,6 +8,9 @@ Leave it out (the default is `devflow`) unless the user says this repository fol
 
 ## verify.full (required unless workflow is repo)
 
+If the report has `package_json_error`, say so first: the scripts could not be read, so no command can be trusted until package.json parses.
+
+
 1. If `candidates.aggregate` has a script whose body runs lint, types and tests, use it. Prefer `verify`, then `validate`, then `check`. Skip a `check` that only builds.
 2. Otherwise, if a CI workflow runs package scripts (`ci[].scripts_used_in_order`), chain those scripts with `&&` in that order, excluding scripts that deploy, publish or need secrets. This is what the pull request must pass anyway.
 3. Otherwise chain the first candidate of `typecheck`, `lint` and `test`, in that order, using whichever exist.
@@ -19,11 +22,11 @@ Never put a script that writes files, such as `format` with `--write` or `lint:f
 
 1. Use `candidates.fast` if present.
 2. Otherwise chain the typecheck and lint candidates, when both exist and the body of neither runs a full build.
-3. Leave it out when the only option takes longer than a test run. The Stop hook skips repos without it.
+3. Leave it out when the only option takes longer than a test run.
 
 ## verify.e2e
 
-Use the first `candidates.e2e` script, preferring a headless variant. Leave it out if `e2e_tools` is empty: many repos have no end-to-end suite, and the other skills skip the check when this field is missing.
+Use the first `candidates.e2e` script, preferring a headless variant. `e2e_tools` and `e2e_config_paths` only confirm that a suite exists, including in monorepo apps. Leave the field out when there is no e2e script: many repos have no end-to-end suite, and the other skills skip the check when this field is missing.
 
 ## run
 
@@ -49,6 +52,6 @@ List repository skills whose description says they review conventions, such as d
 
 ## pr
 
-- `base`: `default_branch`.
+- `base`: `default_branch`. When it is null, ask; without a user, use `main` only if that branch exists and list it as an assumption.
 - `template`: `pr_template`.
 - `evidence`: a script that uploads screenshots, when one exists under `scripts/`.

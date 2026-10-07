@@ -125,6 +125,35 @@ class ContractTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("run.environments[1]: missing required field 'dev'", result.stdout)
 
+    def test_remote_key_edge_cases(self):
+        sys.path.insert(0, os.path.dirname(SCRIPT))
+        import contract
+        self.assertEqual(contract.remote_key("git@github.company.com:o/r.git"), "github.company.com/o/r")
+        self.assertEqual(contract.remote_key("HTTPS://github.com/Acme/Shop"), "github.com/acme/shop")
+        self.assertEqual(contract.remote_key("git@gitlab.com-work:g/app.git"), "gitlab.com/g/app")
+        for unsafe in ["../../../escaped", "../upstream", "/srv/git/repo.git", "file:///srv/x.git", "git@github.com:a/../b.git"]:
+            self.assertIsNone(contract.remote_key(unsafe), unsafe)
+
+    def test_path_remotes_share_a_contract_between_clones(self):
+        upstream = os.path.join(self.tmp.name, "up.git")
+        subprocess.run(["git", "init", "-q", "--bare", upstream], check=True)
+        paths = []
+        for name in ("clone-a", "clone-b"):
+            clone = os.path.join(self.tmp.name, name)
+            subprocess.run(["git", "init", "-q", clone], check=True)
+            subprocess.run(["git", "-C", clone, "remote", "add", "origin", "../up.git"], check=True)
+            paths.append(run(["path"], clone).stdout.strip())
+        self.assertEqual(paths[0], paths[1])
+        self.assertIn(os.path.join("contracts", "local", "up-"), paths[0])
+
+    def test_folders_created_later_need_not_exist_but_must_stay_inside(self):
+        ok = run(["write"], self.repo, stdin=json.dumps({"version": 1, "verify": {"full": "x"}, "tracker": {"kind": "local", "path": ".scratch"}, "docs": {"prd": "docs/prd"}}))
+        self.assertEqual(ok.returncode, 0, ok.stdout)
+        for bad in ["/etc/hosts", "../outside"]:
+            result = run(["write"], self.repo, stdin=json.dumps({"version": 1, "verify": {"full": "x"}, "docs": {"glossary": bad}}))
+            self.assertEqual(result.returncode, 1, bad)
+            self.assertIn("inside the repository", result.stdout)
+
     def test_template_has_every_schema_field(self):
         with open(TEMPLATE) as fh:
             template = json.load(fh)

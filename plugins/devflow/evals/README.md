@@ -1,6 +1,6 @@
 # Evals
 
-Each folder is one case for `claude plugin eval`: `case.yaml` sets the run, `prompt.md` is what the user types, `seed.sh` builds the repository the agent works in, and `graders/` score the result. Deterministic graders (file content, trace) carry the weight; an LLM grader judges only the report.
+Each folder is one case for `claude plugin eval`: `case.yaml` sets the run, `prompt.md` is what the user types, `seed.sh` builds the repository the agent works in, and `graders/` score the result. Graders are deterministic (file existence, file content, the final message, tool calls). Add an LLM grader only for judgement a regex cannot make, and keep what it reads short: judges miss content at the end of long messages.
 
 ```bash
 claude plugin eval plugins/devflow --scaffold --allow-tools Bash Write Edit

@@ -6,7 +6,7 @@ description: >
   type-check:fast for verify.fast, save the contract privately, and leave AGENTS.md and the rest of the repo untouched.
 tags: [onboard, create]
 runs: 3
-expected_outcome: Valid contract with verify.full chained from CI scripts; AGENTS.md keeps its notes and gains the block.
+expected_outcome: Valid private contract with verify.full chained from CI scripts; AGENTS.md and the rest of the repo unchanged.
 execution:
   max_turns: 40
   timeout_seconds: 600

@@ -2,7 +2,7 @@
 
 A portable development workflow for Claude Code. It carries how you work from repository to repository: specify, implement, verify, review and ship. Each repository describes itself in a small contract, so the same skills work in any codebase.
 
-> Status: early. Version 0.1.0 ships the contract and the `onboard` skill. The rest of the cycle is in progress.
+> Status: early. Version 0.1.0 ships the private contract and three skills: `onboard`, `explain` and the bundled `archify`. The rest of the cycle, agents and hooks are planned.
 
 ## Install
 
@@ -23,7 +23,7 @@ Then, in each repository:
 plugin (how you work)  ──reads──▶  private contract  ──points to──▶  repository (the project)
 ```
 
-- **The plugin** holds skills, agents and hooks that never mention a specific project.
+- **The plugin** holds skills (and, later, agents and hooks) that never mention a specific project.
 - **The contract** is a short JSON file per repository, kept privately in `~/.config/devflow/contracts/<host>/<owner>/<repo>.json`, never inside the repository. Every clone and worktree of a repository shares it. It says how to verify a change, how to run the app, where the domain docs live, where tickets go and how pull requests are made.
 - **The repository** keeps everything project-specific: its scripts, its docs, its conventions and its own skills.
 

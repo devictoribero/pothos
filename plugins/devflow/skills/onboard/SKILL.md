@@ -1,6 +1,6 @@
 ---
 name: onboard
-description: Connect a repository to devflow by writing its private agent contract, which tells the other skills how the repo is verified, run, documented and shipped. The contract lives outside the repository, so the repo and its team see no change. Run it the first time you use devflow in a repo, or again to audit an existing contract for drift. Use when the user says "onboard this repo", "set up devflow", "create the agent contract", "audit the contract", or when another devflow skill reports that no contract exists.
+description: Connect a repository to devflow by writing its private agent contract, which tells the other skills how the repo is verified, run, documented and shipped. The contract lives outside the repository, so the repo and its team see no change. Run it by hand the first time you use devflow in a repo, or with "audit" to check an existing contract for drift.
 argument-hint: "[audit]"
 disable-model-invocation: true
 ---

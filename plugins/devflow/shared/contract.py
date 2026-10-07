@@ -29,7 +29,11 @@ import subprocess
 import sys
 
 SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "contract.schema.json")
-PATH_FIELDS = ("docs.glossary", "tracker.path", "docs.decisions", "docs.specs", "docs.prd", "run.login", "pr.template")
+# Paths that must already exist in the repository.
+PATH_FIELDS = ("docs.glossary", "docs.decisions", "docs.specs", "run.login", "pr.template")
+# Folders a skill creates on first use: they must be relative and inside the repo, but may not exist yet.
+CREATED_LATER_FIELDS = ("tracker.path", "docs.prd")
+CASE_INSENSITIVE_HOSTS = ("github.com", "gitlab.com", "bitbucket.org")
 
 EXIT_OK, EXIT_INVALID, EXIT_MISSING, EXIT_UNSET, EXIT_USAGE = 0, 1, 2, 3, 64
 
@@ -53,30 +57,60 @@ def repo_root(start):
     return git(["rev-parse", "--show-toplevel"], start) or os.path.abspath(start)
 
 
+def is_path_remote(url):
+    return url.startswith(("/", "./", "../", "~", "file://")) or re.match(r"^[A-Za-z]:[\\/]", url) is not None
+
+
 def remote_key(url):
-    """host/owner/repo from any common git remote URL form."""
+    """host/owner/repo from a network git remote URL; None for filesystem remotes or anything unsafe."""
     url = url.strip()
-    match = re.match(r"^(?:[a-z+]+://)?(?:[^@/]+@)?([^:/]+)(?::\d+)?[:/](.+?)(?:\.git)?/?$", url)
+    if not url or is_path_remote(url):
+        return None
+    match = re.match(r"^(?:[a-z][a-z0-9+.-]*://)?(?:[^@/]+@)?([^:/\s]+)(?::\d+)?[:/](.+?)(?:\.git)?/?$", url, re.I)
     if not match:
         return None
     host, path = match.group(1).lower(), match.group(2).strip("/")
-    if host.startswith("github.com"):  # ssh host aliases such as github.com-work
-        host = "github.com"
+    # ssh host aliases such as github.com-work point at github.com; github.company.com does not.
+    host = re.sub(r"^((?:github|gitlab)\.com|bitbucket\.org)-[\w.-]+$", r"\1", host)
     parts = [p for p in path.split("/") if p]
-    if not parts:
+    if not parts or any(p in (".", "..") or p.startswith(".") for p in parts):
         return None
+    if host in CASE_INSENSITIVE_HOSTS:
+        parts = [p.lower() for p in parts]
     return "/".join([host, *parts])
 
 
-def contract_path(start):
+def local_identity(start, remote):
+    """A stable folder for repos without a network remote, shared by clones and worktrees where possible."""
+    root = repo_root(start)
+    if remote and is_path_remote(remote):
+        target = remote[len("file://"):] if remote.startswith("file://") else os.path.expanduser(remote)
+        target = os.path.realpath(os.path.join(root, target))
+        return os.path.basename(target.rstrip("/")).removesuffix(".git") or "repo", target
+    common = git(["rev-parse", "--git-common-dir"], start)
+    if common:
+        common = os.path.realpath(os.path.join(start, common))
+        if f"{os.sep}modules{os.sep}" not in common:  # submodules keep their git dir inside the parent
+            main = os.path.dirname(common)
+            return os.path.basename(main), main
+    return os.path.basename(root), os.path.realpath(root)
+
+
+def key_for(start, folder):
     remote = git(["remote", "get-url", "origin"], start)
     key = remote_key(remote) if remote else None
     if not key:
-        common = git(["rev-parse", "--path-format=absolute", "--git-common-dir"], start)
-        main = os.path.dirname(common) if common else repo_root(start)
-        digest = hashlib.sha1(main.encode()).hexdigest()[:8]
-        key = f"local/{os.path.basename(main)}-{digest}"
-    return os.path.join(devflow_home(), "contracts", key + ".json")
+        name, identity = local_identity(start, remote)
+        key = f"local/{name}-{hashlib.sha1(identity.encode()).hexdigest()[:8]}"
+    base = os.path.realpath(os.path.join(devflow_home(), folder))
+    path = os.path.realpath(os.path.join(base, key))
+    if not path.startswith(base + os.sep):
+        raise ValueError(f"refusing a repository key that leaves {base}: {key}")
+    return key
+
+
+def contract_path(start):
+    return os.path.join(devflow_home(), "contracts", key_for(start, "contracts") + ".json")
 
 
 def locate(start):
@@ -135,9 +169,15 @@ def schema_errors(value, schema, where="contract"):
 
 def path_errors(data, root):
     errors = []
-    for field in PATH_FIELDS:
+    real_root = os.path.realpath(root)
+    for field in PATH_FIELDS + CREATED_LATER_FIELDS:
         rel = lookup(data, field)
-        if isinstance(rel, str) and not os.path.exists(os.path.join(root, rel)):
+        if not isinstance(rel, str):
+            continue
+        target = os.path.realpath(os.path.join(root, rel))
+        if os.path.isabs(rel) or not (target == real_root or target.startswith(real_root + os.sep)):
+            errors.append(f"contract.{field}: '{rel}' must be a path inside the repository")
+        elif field in PATH_FIELDS and not os.path.exists(target):
             errors.append(f"contract.{field}: path '{rel}' does not exist in {root}")
     return errors
 
@@ -175,6 +215,7 @@ def main(argv):
     command = args.pop(0)
     try:
         repo = os.path.abspath(parse_flag(args, "--repo") or os.getcwd())
+        contract_path(repo)
     except ValueError as exc:
         print(exc, file=sys.stderr)
         return EXIT_USAGE

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/devictoribero/devflow/main/plugins/devflow/shared/contract.schema.json",
   "title": "devflow agent contract",
-  "description": "Tells the devflow skills and hooks how this repository is verified, run and documented. Private to each developer: stored under ~/.config/devflow/contracts/<host>/<owner>/<repo>.json, never inside the repository.",
+  "description": "Tells the devflow skills how this repository is verified, run and documented. Private to each developer: stored under ~/.config/devflow/contracts/<host>/<owner>/<repo>.json, never inside the repository.",
   "type": "object",
   "required": [
     "version"
@@ -13,7 +13,7 @@
       "type": "string"
     },
     "version": {
-      "description": "Contract format version. Bumped only on breaking changes; onboard migrates older contracts.",
+      "description": "Contract format version. Bumped only on breaking changes. Migrating older contracts is planned for onboard's audit mode.",
       "type": "integer",
       "enum": [
         1
@@ -36,7 +36,7 @@
       "additionalProperties": false,
       "properties": {
         "fast": {
-          "description": "Seconds-range check run after edits and on Stop, e.g. type-check plus lint.",
+          "description": "Seconds-range check for quick feedback after edits, e.g. type-check plus lint. A Stop hook that runs it is planned.",
           "type": "string",
           "minLength": 1
         },

@@ -8,14 +8,15 @@ and summary.md. The repository folder keeps INDEX.md, one line per artifact, so 
 earlier explanations by reading a few lines instead of the HTML.
 
 Usage:
-  artifact.py new --slug SLUG --title TITLE [--repo DIR]   create the folder from the page template; prints its path
+  artifact.py new --slug SLUG --title TITLE [--lang LANG] [--repo DIR]
+                                                            create the folder from the page template; prints its path
   artifact.py put FOLDER RELPATH                            write stdin to FOLDER/RELPATH (the only way skills write pages)
   artifact.py light FILE...                                 make archify diagrams open in the light theme by default
   artifact.py register DIR                                  add or refresh DIR's line in INDEX.md (needs summary.md)
   artifact.py list [--repo DIR]                             print INDEX.md for this repository
   artifact.py open PATH                                     open in Brave, falling back to the default browser
 
-Exit codes: 0 ok, 1 failure, 64 usage error. Standard library only.
+Exit codes: 0 ok, 1 failure (including: nothing to patch, no browser), 64 usage error. Standard library only.
 """
 import datetime
 import html
@@ -47,7 +48,8 @@ def flag(args, name, default=None):
     if name in args:
         i = args.index(name)
         if i + 1 >= len(args):
-            raise SystemExit(f"{name} needs a value")
+            print(f"{name} needs a value", file=sys.stderr)
+            raise SystemExit(64)
         value = args[i + 1]
         del args[i:i + 2]
         return value
@@ -57,6 +59,7 @@ def flag(args, name, default=None):
 def cmd_new(args):
     slug = flag(args, "--slug")
     title = flag(args, "--title")
+    lang = flag(args, "--lang", "en")
     repo = os.path.abspath(flag(args, "--repo", os.getcwd()))
     if not slug or not title or not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", slug):
         print("usage: artifact.py new --slug kebab-case-slug --title 'Title'", file=sys.stderr)
@@ -68,7 +71,7 @@ def cmd_new(args):
         return 0
     os.makedirs(os.path.join(folder, "diagrams"))
     with open(TEMPLATE, encoding="utf-8") as fh:
-        page = fh.read().replace("{{TITLE}}", html.escape(title))
+        page = fh.read().replace("{{TITLE}}", html.escape(title)).replace("{{LANG}}", html.escape(lang))
     with open(os.path.join(folder, "index.html"), "w", encoding="utf-8") as fh:
         fh.write(page)
     meta = {"title": title, "slug": slug, "created": datetime.date.today().isoformat(),
@@ -88,8 +91,9 @@ def cmd_put(args):
     folder = os.path.realpath(args[0])
     artifacts = os.path.realpath(os.path.join(contract.devflow_home(), "artifacts"))
     target = os.path.realpath(os.path.join(folder, args[1]))
-    if not folder.startswith(artifacts + os.sep) or not target.startswith(folder + os.sep):
-        print("refused: put only writes inside an artifact folder", file=sys.stderr)
+    is_artifact = folder.startswith(artifacts + os.sep) and os.path.isfile(os.path.join(folder, "meta.json"))
+    if not is_artifact or not target.startswith(folder + os.sep):
+        print("refused: put only writes inside a folder created by `artifact.py new`", file=sys.stderr)
         return 1
     os.makedirs(os.path.dirname(target), exist_ok=True)
     with open(target, "w", encoding="utf-8") as fh:
@@ -102,14 +106,21 @@ def cmd_light(files):
     if not files:
         print("usage: artifact.py light FILE...", file=sys.stderr)
         return 64
+    failed = False
     for path in files:
         with open(path, encoding="utf-8") as fh:
             text = fh.read()
         patched = text.replace('data-theme="dark"', 'data-theme="light"', 1).replace(ARCHIFY_FALLBACK, "'light'").replace(ARCHIFY_LIVE_OS, "return;")
-        with open(path, "w", encoding="utf-8") as fh:
-            fh.write(patched)
-        print(f"light by default: {path}")
-    return 0
+        if ARCHIFY_FALLBACK in text or 'data-theme="dark"' in text:
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(patched)
+            print(f"light by default: {path}")
+        elif "'light'" in text and ARCHIFY_LIVE_OS not in text and "data-theme" in text:
+            print(f"already light: {path}")
+        else:
+            failed = True
+            print(f"not an archify page this script knows how to patch: {path}", file=sys.stderr)
+    return 1 if failed else 0
 
 
 def first_line(path):
@@ -140,7 +151,8 @@ def cmd_register(args):
     if os.path.isfile(index):
         with open(index, encoding="utf-8") as fh:
             lines = [l.rstrip("\n") for l in fh if l.strip() and not l.startswith("# ") and f"]({name}/" not in l]
-    lines = sorted(lines + [line], reverse=True)
+    folder_of = lambda entry: entry.split("](", 1)[1].split("/", 1)[0] if "](" in entry else ""
+    lines = sorted(lines + [line], key=folder_of, reverse=True)  # folders start with the date
     with open(index, "w", encoding="utf-8") as fh:
         fh.write("# Explanations\n\nNewest first. Read summary.md before opening the HTML.\n\n" + "\n".join(l for l in lines if l.startswith("- ")) + "\n")
     print(f"registered in {index}")
@@ -172,7 +184,7 @@ def cmd_open(args):
             print(f"opened with {' '.join(cmd[:-1])}: {path}")
             return 0
     print(f"could not open a browser; open it yourself: {path}")
-    return 0
+    return 1
 
 
 def main(argv):

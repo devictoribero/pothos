@@ -2,7 +2,7 @@ schema_version: "1.1"
 name: explain-checkout-flow
 description: >
   A small repo with a checkout flow split across three modules. explain must write a private HTML page
-  with the light theme and the dark toggle, a summary.md and an INDEX.md line, name the real functions
+  (the template's light theme and dark toggle are covered by unit tests), a summary.md and an INDEX.md line, name the real functions
   in order, and leave the repository untouched.
 tags: [explain]
 runs: 3

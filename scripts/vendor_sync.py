@@ -27,21 +27,29 @@ def load():
     return {k: v for k, v in data.items() if not k.startswith("_")}, data
 
 
-def upstream_head(source):
-    out = subprocess.run(["git", "ls-remote", source, "HEAD"], capture_output=True, text=True, check=True).stdout
-    return out.split()[0]
+def path_changes(entry):
+    """Commits on upstream HEAD since the pinned one that touch the vendored folder (newest first)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        subprocess.run(["git", "clone", "-q", "--filter=blob:none", "--no-checkout", entry["source"], tmp], check=True)
+        head = subprocess.run(["git", "-C", tmp, "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
+        log = subprocess.run(["git", "-C", tmp, "log", "--format=%H %s", f"{entry['commit']}..{head}", "--", entry["upstream_path"]],
+                             capture_output=True, text=True, check=True).stdout.strip()
+    return head, [line for line in log.splitlines() if line]
 
 
 def check():
     entries, _ = load()
     stale = False
     for name, entry in entries.items():
-        head = upstream_head(entry["source"])
-        if head == entry["commit"]:
-            print(f"{name}: current at {head[:12]}")
-        else:
-            stale = True
-            print(f"{name}: update available {entry['commit'][:12]} -> {head[:12]} ({entry['source']}/compare/{entry['commit'][:12]}...{head[:12]})")
+        head, commits = path_changes(entry)
+        if not commits:
+            print(f"{name}: current (no change to {entry['upstream_path']} since {entry['commit'][:12]})")
+            continue
+        stale = True
+        print(f"{name}: {len(commits)} upstream commit(s) touch {entry['upstream_path']} since {entry['commit'][:12]}")
+        for line in commits[:20]:
+            print(f"  - {line[:12]} {line[41:]}")
+        print(f"  {entry['source']}/compare/{entry['commit'][:12]}...{head[:12]}")
     return 10 if stale else 0
 
 

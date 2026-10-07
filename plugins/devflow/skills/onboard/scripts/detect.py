@@ -72,10 +72,37 @@ def run(cmd, cwd):
 
 def read(path):
     try:
-        with open(path, encoding="utf-8", errors="replace") as fh:
+        with open(path, encoding="utf-8-sig", errors="replace") as fh:
             return fh.read()
     except OSError:
         return None
+
+
+def find_upwards_of_depth(root, names, depth=2):
+    """Relative paths of files or folders named in `names`, at most `depth` folders deep, skipping dependencies."""
+    found = []
+    for base, dirs, files in os.walk(root):
+        rel = os.path.relpath(base, root)
+        level = 0 if rel == "." else rel.count(os.sep) + 1
+        dirs[:] = [d for d in dirs if d not in ("node_modules", ".git") and level < depth]
+        for name in set(names) & (set(files) | set(dirs)):
+            found.append(name if rel == "." else os.path.join(rel, name))
+    return sorted(found)
+
+
+def default_branch(root):
+    head = run(["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"], root)
+    if head and "/" in head:
+        return head.split("/", 1)[1]
+    symref = run(["git", "ls-remote", "--symref", "origin", "HEAD"], root)
+    match = re.search(r"ref: refs/heads/(\S+)\s+HEAD", symref or "")
+    if match:
+        return match.group(1)
+    for name in ("main", "master"):
+        if run(["git", "rev-parse", "--verify", "--quiet", f"refs/heads/{name}"], root) is not None:
+            return name
+    current = run(["git", "symbolic-ref", "--short", "HEAD"], root)  # unborn branch in a repo with no commits
+    return current if current in ("main", "master") else None
 
 
 def runner_prefix(pm):
@@ -89,7 +116,12 @@ def detect(root):
 
     pm = next((name for lock, name in LOCKFILES if exists(lock)), None)
     pkg_text = read(os.path.join(root, "package.json"))
-    pkg = json.loads(pkg_text) if pkg_text else None
+    pkg = None
+    if pkg_text:
+        try:
+            pkg = json.loads(pkg_text)
+        except ValueError as exc:
+            report["package_json_error"] = str(exc)
     if pkg and not pm:
         declared = str(pkg.get("packageManager", ""))
         pm = declared.split("@")[0] or "npm"
@@ -116,7 +148,9 @@ def detect(root):
     }
     report["docs"] = {key: [p for p in paths if exists(p)] for key, paths in DOC_CANDIDATES.items()}
     report["pr_template"] = next((p for p in PR_TEMPLATES if exists(p)), None)
-    report["e2e_tools"] = [tool for tool, files in E2E_CONFIGS.items() if any(exists(f) for f in files)]
+    e2e_found = {tool: find_upwards_of_depth(root, files) for tool, files in E2E_CONFIGS.items()}
+    report["e2e_tools"] = [tool for tool, paths in e2e_found.items() if paths]
+    report["e2e_config_paths"] = sorted(p for paths in e2e_found.values() for p in paths)
 
     workflows_dir = os.path.join(root, ".github", "workflows")
     ci = []
@@ -126,7 +160,11 @@ def detect(root):
                 text = read(os.path.join(workflows_dir, name)) or ""
                 positions = {}
                 for script in scripts:
-                    match = re.search(rf"(run|yarn|pnpm|npm run|bun run)\s+{re.escape(script)}(\s|$|\")", text)
+                    if script in ("test", "start"):  # npm test / npm start need no "run"
+                        pattern = rf"(?:\brun:|&&|;)?\s*(?:npm(?:\s+run)?|pnpm(?:\s+run)?|yarn|bun\s+run)\s+{script}(\s|$|\")"
+                    else:
+                        pattern = rf"(?:npm\s+run|pnpm(?:\s+run)?|yarn|bun\s+run)\s+{re.escape(script)}(\s|$|\")"
+                    match = re.search(pattern, text)
                     if match:
                         positions[script] = match.start()
                 used = sorted(positions, key=positions.get)
@@ -142,8 +180,7 @@ def detect(root):
         "git_remote": run(["git", "remote", "get-url", "origin"], root),
         "local_dir": next((d for d in [".scratch", "docs/plans"] if exists(d)), None),
     }
-    head = run(["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"], root)
-    report["default_branch"] = head.split("/", 1)[1] if head and "/" in head else run(["git", "branch", "--show-current"], root)
+    report["default_branch"] = default_branch(root)
 
     contract_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "shared", "contract.py")
     path = run([sys.executable, contract_script, "path", "--repo", root], root)

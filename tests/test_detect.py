@@ -52,6 +52,34 @@ class DetectTest(unittest.TestCase):
         self.assertEqual([v["name"] for v in variants], ["dev", "demo"])
         self.assertEqual(variants[1]["command"], "yarn local:demo")
 
+    def test_npm_test_shorthand_in_ci(self):
+        self.write("package.json", json.dumps({"scripts": {"lint": "l", "test": "t", "build": "b"}}))
+        self.write(".github/workflows/ci.yml", "steps:\n  - run: npm run lint\n  - run: npm test\n  - run: npm run build\n")
+        self.assertEqual(detect(self.repo)["ci"][0]["scripts_used_in_order"], ["lint", "test", "build"])
+
+    def test_default_branch_is_not_the_current_feature_branch(self):
+        subprocess.run(["git", "-C", self.repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "x"], check=True)
+        subprocess.run(["git", "-C", self.repo, "checkout", "-q", "-b", "feature/x"], check=True)
+        self.assertEqual(detect(self.repo)["default_branch"], "main")
+        subprocess.run(["git", "-C", self.repo, "branch", "-q", "-m", "main", "trunk"], check=True)
+        self.assertIsNone(detect(self.repo)["default_branch"])
+
+    def test_broken_package_json_is_reported_not_fatal(self):
+        self.write("package.json", '{"scripts": {"test": "t",}}')
+        report = detect(self.repo)
+        self.assertIn("package_json_error", report)
+        bom = os.path.join(self.repo, "package.json")
+        with open(bom, "w", encoding="utf-8-sig") as fh:
+            fh.write(json.dumps({"scripts": {"test": "t"}}))
+        self.assertIn("test", detect(self.repo)["candidates"])
+
+    def test_e2e_config_in_a_monorepo_app(self):
+        self.write("apps/web/playwright.config.ts", "")
+        self.write("node_modules/x/cypress.config.js", "")
+        report = detect(self.repo)
+        self.assertEqual(report["e2e_tools"], ["playwright"])
+        self.assertEqual(report["e2e_config_paths"], ["apps/web/playwright.config.ts"])
+
     def test_yarn_runner_has_no_run_keyword(self):
         self.write("yarn.lock", "")
         self.write("package.json", json.dumps({"scripts": {"test": "vitest"}}))

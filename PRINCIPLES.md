@@ -1,6 +1,6 @@
 # Principles
 
-How this plugin is built. Every skill, script and hook follows these rules, and the checks in `scripts/` enforce the ones a script can check.
+How this plugin is built. Every skill and script, and every hook once there are any, follows these rules, and the checks in `scripts/` enforce the ones a script can check.
 
 The rules for the code agents produce will live in the plugin itself, in `plugins/devflow/shared/engineering.md`, because agents load that file while they work. This file is for people and agents changing the plugin.
 
@@ -44,7 +44,7 @@ claude plugin eval plugins/devflow --scaffold
 
 ## Easy to change
 
-Skills are small and versioned. `CHANGELOG.md` records every release, and the contract carries a `version` so a breaking change can be migrated by `onboard` instead of breaking repositories.
+Skills are small and versioned. `CHANGELOG.md` records every release, and the contract carries a `version` so a breaking change can be migrated (planned for onboard's audit mode) instead of breaking repositories.
 
 ## Missing capabilities are skipped, never improvised
 

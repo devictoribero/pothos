@@ -84,6 +84,45 @@ class ArtifactTest(unittest.TestCase):
         self.assertEqual(outside.returncode, 1)
         self.assertEqual(os.listdir(self.repo), [".git"])
 
+    def test_light_works_on_real_archify_output_and_refuses_unknown_pages(self):
+        examples = os.path.join(ROOT, "plugins", "devflow", "skills", "archify", "examples")
+        real = next(os.path.join(examples, f) for f in sorted(os.listdir(examples)) if f.endswith(".html"))
+        copy = os.path.join(self.tmp.name, "real.html")
+        with open(real) as src, open(copy, "w") as dst:
+            dst.write(src.read())
+        self.assertEqual(run(["light", copy], self.repo).returncode, 0)
+        text = open(copy).read()
+        self.assertNotIn("matches ? 'light' : 'dark'", text)
+        self.assertEqual(run(["light", copy], self.repo).returncode, 0)  # idempotent
+        plain = os.path.join(self.tmp.name, "plain.html")
+        with open(plain, "w") as fh:
+            fh.write("<html>x</html>")
+        self.assertEqual(run(["light", plain], self.repo).returncode, 1)
+
+    def test_index_is_sorted_newest_first(self):
+        base = self.base
+        for folder, title in [("2026-01-01-zebra", "Zebra old"), ("2026-10-08-alpha", "Alpha new")]:
+            path = os.path.join(base, folder)
+            os.makedirs(path)
+            with open(os.path.join(path, "meta.json"), "w") as fh:
+                fh.write('{"title": "%s", "created": "%s"}' % (title, folder[:10]))
+            with open(os.path.join(path, "summary.md"), "w") as fh:
+                fh.write("x\n")
+            run(["register", path], self.repo)
+        index = open(os.path.join(base, "INDEX.md")).read()
+        self.assertLess(index.index("Alpha new"), index.index("Zebra old"))
+
+    def test_put_refuses_folders_that_are_not_artifacts(self):
+        folder = self.new()
+        parent = os.path.dirname(folder)
+        result = subprocess.run([sys.executable, SCRIPT, "put", parent, "INDEX.md"], input="pwned", capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1)
+
+    def test_usage_errors_exit_64_and_lang_is_set(self):
+        self.assertEqual(run(["new", "--slug"], self.repo).returncode, 64)
+        folder = run(["new", "--slug", "en-page", "--title", "T", "--lang", "en"], self.repo).stdout.strip()
+        self.assertIn('<html lang="en"', open(os.path.join(folder, "index.html")).read())
+
     def test_open_respects_no_open(self):
         folder = self.new()
         result = run(["open", os.path.join(folder, "index.html")], self.repo)
