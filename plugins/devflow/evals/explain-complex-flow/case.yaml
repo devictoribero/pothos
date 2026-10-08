@@ -1,0 +1,16 @@
+schema_version: "1.1"
+name: explain-complex-flow
+description: >
+  A reminders subsystem spread over api, shared queue, worker, templates and the mobile app. A question
+  about the whole flow must produce a page that traces the real path from creation to the tap on the phone.
+  The fixture is small enough that reading it directly is the right call, so the graders check the result,
+  not whether explorers ran; the parallel-explorer path for large codebases is not covered by an eval yet.
+tags: [explain, how]
+runs: 2
+expected_outcome: Parallel explorers, then a page that follows the real flow end to end.
+execution:
+  max_turns: 60
+  timeout_seconds: 1200
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit, Task]
+context:
+  scaffold_script: seed.sh

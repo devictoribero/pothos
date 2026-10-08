@@ -166,6 +166,9 @@ class ArtifactTest(unittest.TestCase):
         self.assertIn("df-nav", nav)
         page = open(os.path.join(parent, "index.html")).read()
         self.assertEqual(page.count('<script src="../nav.js"></script>'), 1)
+        latest = os.path.join(self.base, "latest")
+        self.assertEqual(os.readlink(latest), os.path.basename(child))
+        self.assertNotIn("latest", [p["folder"] for p in data])
 
     def test_old_pages_get_the_sidebar_and_parents_cannot_loop(self):
         a = self.new("a-topic", "A")

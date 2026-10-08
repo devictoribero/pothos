@@ -66,7 +66,11 @@ def check_skills():
         lines = text.count("\n") + 1
         if lines > MAX_SKILL_LINES:
             errors.append(f"skills/{name}/SKILL.md: {lines} lines, max {MAX_SKILL_LINES}; move detail to references/")
-        for ref in sorted(set(re.findall(r"\b((?:references|scripts)/[\w./-]+\.\w+)", text))):
+        local_refs = set()
+        for match in re.finditer(r"[^\s`'\"(]*?\b((?:references|scripts)/[\w./-]+\.\w+)", text):
+            if "vendor/" not in match.group(0):  # files inside pinned third-party copies are checked by vendor.json
+                local_refs.add(match.group(1))
+        for ref in sorted(local_refs):
             if not os.path.exists(os.path.join(skill_dir, ref)):
                 errors.append(f"skills/{name}/SKILL.md: references missing file {ref}")
     return errors

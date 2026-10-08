@@ -53,7 +53,7 @@ Only `version` and `verify.full` are required. The schema documents every field,
 | Skill | Status | What it does |
 |---|---|---|
 | `onboard` | available | Writes or audits the repository's contract and reports what blocks autonomous work. |
-| `explain` | available | Explains a flow, architecture or concept as a local HTML page with archify diagrams, opened in the browser and indexed so later sessions can find it. |
+| `explain` | available | Explains a flow, architecture or concept as a local HTML page with archify diagrams, opened in the browser and indexed so later sessions can find it. Questions about code use the pinned [poteto/how](https://github.com/poteto/how) method: parallel explorers, a synthesis and, on request, a multi-model architecture critique. |
 | `archify` | available, third-party | Draws validated, explorable architecture, workflow, sequence, data-flow and lifecycle diagrams. Pinned copy of [tt-a1i/archify](https://github.com/tt-a1i/archify); explain uses it. |
 | `grill` | planned | Interviews you until a task has no open questions. |
 | `distill` | planned | Turns a conversation, thread or note into tickets or a PRD with checkable acceptance criteria. |

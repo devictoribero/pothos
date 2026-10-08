@@ -15,7 +15,8 @@ Usage:
   artifact.py put FOLDER RELPATH                            write stdin to FOLDER/RELPATH (the only way skills write pages)
   artifact.py light FILE...                                 make archify diagrams open in the light theme by default
   artifact.py register DIR                                  add or refresh DIR's line in INDEX.md (needs summary.md)
-                                                            and rebuild the sidebar for every page of the repository
+                                                            rebuild the sidebar for every page of the repository, and
+                                                            point <repo folder>/latest at this page
   artifact.py nav [--repo DIR]                              rebuild the sidebar (nav.js) for this repository
   artifact.py list [--repo DIR]                             print INDEX.md for this repository
   artifact.py open PATH                                     open in Brave, falling back to the default browser
@@ -172,6 +173,13 @@ def cmd_register(args):
     with open(index, "w", encoding="utf-8") as fh:
         fh.write("# Explanations\n\nNewest first. Read summary.md before opening the HTML.\n\n" + "\n".join(l for l in lines if l.startswith("- ")) + "\n")
     build_nav(os.path.dirname(folder))
+    latest = os.path.join(os.path.dirname(folder), "latest")
+    if os.path.islink(latest) or not os.path.exists(latest):
+        tmp = latest + ".tmp"
+        if os.path.lexists(tmp):
+            os.remove(tmp)
+        os.symlink(name, tmp)
+        os.replace(tmp, latest)
     print(f"registered in {index}")
     return 0
 
@@ -180,7 +188,7 @@ def pages_in(base):
     pages = []
     for name in sorted(os.listdir(base)) if os.path.isdir(base) else []:
         meta_path = os.path.join(base, name, "meta.json")
-        if os.path.isfile(meta_path):
+        if not os.path.islink(os.path.join(base, name)) and os.path.isfile(meta_path):
             with open(meta_path, encoding="utf-8") as fh:
                 meta = json.load(fh)
             pages.append({"folder": name, "title": meta.get("title", name), "created": meta.get("created", name[:10]), "parent": meta.get("parent")})

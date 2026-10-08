@@ -8,3 +8,5 @@ claude plugin eval plugins/devflow --scaffold --allow-tools Bash Write Edit --ca
 ```
 
 `--scaffold` runs the seed scripts, which only write files inside the case workspace.
+
+In Claude Code the subagent tool is `Agent` (use `tool: Agent` in `tool_used` graders), subagents report back through notifications, and grader regexes are JavaScript: no inline flags such as `(?i)`, use `flags: i`. Pages written by explain are graded through `<repo folder>/latest/`, which points at the last registered page.
