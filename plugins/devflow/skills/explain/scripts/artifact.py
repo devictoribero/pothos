@@ -8,11 +8,15 @@ and summary.md. The repository folder keeps INDEX.md, one line per artifact, so 
 earlier explanations by reading a few lines instead of the HTML.
 
 Usage:
-  artifact.py new --slug SLUG --title TITLE [--lang LANG] [--repo DIR]
-                                                            create the folder from the page template; prints its path
+  artifact.py new --slug SLUG --title TITLE [--lang LANG] [--parent FOLDER] [--repo DIR]
+                                                            create the folder from the page template; prints its path.
+                                                            --parent nests the page under an earlier one in the sidebar
+  artifact.py parent FOLDER PARENT|none                     change where a page sits in the sidebar
   artifact.py put FOLDER RELPATH                            write stdin to FOLDER/RELPATH (the only way skills write pages)
   artifact.py light FILE...                                 make archify diagrams open in the light theme by default
   artifact.py register DIR                                  add or refresh DIR's line in INDEX.md (needs summary.md)
+                                                            and rebuild the sidebar for every page of the repository
+  artifact.py nav [--repo DIR]                              rebuild the sidebar (nav.js) for this repository
   artifact.py list [--repo DIR]                             print INDEX.md for this repository
   artifact.py open PATH                                     open in Brave, falling back to the default browser
 
@@ -32,6 +36,8 @@ sys.path.insert(0, os.path.join(HERE, "..", "..", "..", "shared"))
 import contract  # noqa: E402  (shared location and repo-key logic)
 
 TEMPLATE = os.path.join(HERE, "..", "assets", "page.html")
+NAV_RUNTIME = os.path.join(HERE, "..", "assets", "nav-runtime.js")
+NAV_TAG = '<script src="../nav.js"></script>'
 ARCHIFY_FALLBACK = "window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'"
 ARCHIFY_LIVE_OS = "apply(e.matches ? 'light' : 'dark');"
 
@@ -60,11 +66,16 @@ def cmd_new(args):
     slug = flag(args, "--slug")
     title = flag(args, "--title")
     lang = flag(args, "--lang", "en")
+    parent = flag(args, "--parent")
     repo = os.path.abspath(flag(args, "--repo", os.getcwd()))
     if not slug or not title or not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", slug):
         print("usage: artifact.py new --slug kebab-case-slug --title 'Title'", file=sys.stderr)
         return 64
-    folder = os.path.join(repo_folder(repo), f"{datetime.date.today().isoformat()}-{slug}")
+    base = repo_folder(repo)
+    if parent and not os.path.isfile(os.path.join(base, parent, "meta.json")):
+        print(f"--parent must be an existing page folder in {base}, such as 2026-01-31-some-topic", file=sys.stderr)
+        return 64
+    folder = os.path.join(base, f"{datetime.date.today().isoformat()}-{slug}")
     if os.path.exists(folder):
         print(folder)
         print("exists: update it instead of creating a duplicate", file=sys.stderr)
@@ -76,7 +87,7 @@ def cmd_new(args):
         fh.write(page)
     meta = {"title": title, "slug": slug, "created": datetime.date.today().isoformat(),
             "repo": contract.git(["remote", "get-url", "origin"], repo),
-            "commit": contract.git(["rev-parse", "--short", "HEAD"], repo)}
+            "commit": contract.git(["rev-parse", "--short", "HEAD"], repo), "parent": parent}
     with open(os.path.join(folder, "meta.json"), "w", encoding="utf-8") as fh:
         json.dump(meta, fh, indent=2)
     print(folder)
@@ -156,7 +167,73 @@ def cmd_register(args):
     lines = sorted([line] + lines, key=date_of, reverse=True)
     with open(index, "w", encoding="utf-8") as fh:
         fh.write("# Explanations\n\nNewest first. Read summary.md before opening the HTML.\n\n" + "\n".join(l for l in lines if l.startswith("- ")) + "\n")
+    build_nav(os.path.dirname(folder))
     print(f"registered in {index}")
+    return 0
+
+
+def pages_in(base):
+    pages = []
+    for name in sorted(os.listdir(base)) if os.path.isdir(base) else []:
+        meta_path = os.path.join(base, name, "meta.json")
+        if os.path.isfile(meta_path):
+            with open(meta_path, encoding="utf-8") as fh:
+                meta = json.load(fh)
+            pages.append({"folder": name, "title": meta.get("title", name), "created": meta.get("created", name[:10]), "parent": meta.get("parent")})
+    return sorted(pages, key=lambda p: p["folder"], reverse=True)
+
+
+def build_nav(base):
+    """Write base/nav.js and make sure every page loads it. Returns the number of pages."""
+    pages = pages_in(base)
+    with open(NAV_RUNTIME, encoding="utf-8") as fh:
+        runtime = fh.read()
+    with open(os.path.join(base, "nav.js"), "w", encoding="utf-8") as fh:
+        fh.write("window.DEVFLOW_NAV = " + json.dumps(pages, ensure_ascii=False, indent=1) + ";\n" + runtime)
+    for page in pages:
+        index = os.path.join(base, page["folder"], "index.html")
+        if not os.path.isfile(index):
+            continue
+        with open(index, encoding="utf-8") as fh:
+            text = fh.read()
+        if NAV_TAG not in text and "</body>" in text:
+            with open(index, "w", encoding="utf-8") as fh:
+                fh.write(text.replace("</body>", NAV_TAG + "\n</body>", 1))
+    return len(pages)
+
+
+def cmd_nav(args):
+    repo = os.path.abspath(flag(args, "--repo", os.getcwd()))
+    base = repo_folder(repo)
+    print(f"sidebar rebuilt for {build_nav(base)} page(s) in {base}")
+    return 0
+
+
+def cmd_parent(args):
+    if len(args) != 2:
+        print("usage: artifact.py parent FOLDER PARENT|none", file=sys.stderr)
+        return 64
+    folder = os.path.abspath(args[0])
+    base, name = os.path.dirname(folder), os.path.basename(folder)
+    parent = None if args[1] == "none" else os.path.basename(os.path.abspath(args[1]))
+    meta_path = os.path.join(folder, "meta.json")
+    if not os.path.isfile(meta_path) or (parent and not os.path.isfile(os.path.join(base, parent, "meta.json"))):
+        print("both folders must be pages of the same repository", file=sys.stderr)
+        return 64
+    parents = {p["folder"]: p["parent"] for p in pages_in(base)}
+    step = parent
+    while step:
+        if step == name:
+            print("refused: that would make a page its own ancestor", file=sys.stderr)
+            return 1
+        step = parents.get(step)
+    with open(meta_path, encoding="utf-8") as fh:
+        meta = json.load(fh)
+    meta["parent"] = parent
+    with open(meta_path, "w", encoding="utf-8") as fh:
+        json.dump(meta, fh, indent=2)
+    build_nav(base)
+    print(f"{name}: parent is now {parent or 'none'}")
     return 0
 
 
@@ -193,7 +270,7 @@ def main(argv):
         print(__doc__.strip())
         return 0 if argv else 64
     command, args = argv[0], list(argv[1:])
-    handlers = {"new": cmd_new, "put": cmd_put, "light": cmd_light, "register": cmd_register, "list": cmd_list, "open": cmd_open}
+    handlers = {"new": cmd_new, "put": cmd_put, "nav": cmd_nav, "parent": cmd_parent, "light": cmd_light, "register": cmd_register, "list": cmd_list, "open": cmd_open}
     if command not in handlers:
         print(f"unknown command '{command}'", file=sys.stderr)
         return 64

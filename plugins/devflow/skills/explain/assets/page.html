@@ -33,7 +33,8 @@
   p { margin: 0 0 12px; }
   .lede { font-size: 1.12rem; margin-top: 12px; }
   .meta { font: 600 .75rem/1.4 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
-  code { font-family: var(--mono); font-size: .86em; background: var(--soft); padding: 1px 5px; border-radius: 4px; }
+  code { font-family: var(--mono); font-size: .86em; background: var(--soft); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+  .wrap > * { min-width: 0; max-width: 100%; }
   pre { font: 13px/1.6 var(--mono); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; overflow-x: auto; margin: 0; }
   ul, ol { margin: 0 0 12px; padding-left: 22px; } li { margin-bottom: 6px; }
   .theme-toggle { font: 600 .8rem var(--sans); color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; cursor: pointer; white-space: nowrap; }
@@ -100,5 +101,6 @@
     });
   })();
 </script>
+<script src="../nav.js"></script>
 </body>
 </html>

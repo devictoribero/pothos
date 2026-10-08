@@ -1,4 +1,5 @@
 import datetime
+import json
 import os
 import subprocess
 import sys
@@ -131,6 +132,34 @@ class ArtifactTest(unittest.TestCase):
         self.assertEqual(run(["new", "--slug"], self.repo).returncode, 64)
         folder = run(["new", "--slug", "en-page", "--title", "T", "--lang", "en"], self.repo).stdout.strip()
         self.assertIn('<html lang="en"', open(os.path.join(folder, "index.html")).read())
+
+    def test_sidebar_lists_every_page_with_nesting(self):
+        parent = self.new("devflow-overview", "devflow overview")
+        child = run(["new", "--slug", "work-model", "--title", "Work model", "--parent", os.path.basename(parent)], self.repo).stdout.strip()
+        for folder in (parent, child):
+            with open(os.path.join(folder, "summary.md"), "w") as fh:
+                fh.write("x\n")
+            self.assertEqual(run(["register", folder], self.repo).returncode, 0)
+        nav = open(os.path.join(self.base, "nav.js")).read()
+        data = json.loads(nav.split("window.DEVFLOW_NAV = ", 1)[1].split(";\n", 1)[0])
+        by_folder = {p["folder"]: p for p in data}
+        self.assertIsNone(by_folder[os.path.basename(parent)]["parent"])
+        self.assertEqual(by_folder[os.path.basename(child)]["parent"], os.path.basename(parent))
+        self.assertIn("df-nav", nav)
+        page = open(os.path.join(parent, "index.html")).read()
+        self.assertEqual(page.count('<script src="../nav.js"></script>'), 1)
+
+    def test_old_pages_get_the_sidebar_and_parents_cannot_loop(self):
+        a = self.new("a-topic", "A")
+        b = run(["new", "--slug", "b-topic", "--title", "B", "--parent", os.path.basename(a)], self.repo).stdout.strip()
+        old = os.path.join(a, "index.html")
+        with open(old, "w") as fh:
+            fh.write("<html><body>old page</body></html>")
+        self.assertEqual(run(["nav"], self.repo).returncode, 0)
+        self.assertIn('<script src="../nav.js"></script>', open(old).read())
+        self.assertEqual(run(["parent", a, b], self.repo).returncode, 1)
+        self.assertEqual(run(["parent", b, "none"], self.repo).returncode, 0)
+        self.assertEqual(run(["new", "--slug", "c", "--title", "C", "--parent", "missing"], self.repo).returncode, 64)
 
     def test_open_respects_no_open(self):
         folder = self.new()
