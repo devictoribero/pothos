@@ -1,4 +1,5 @@
 import datetime
+import re
 import json
 import os
 import subprocess
@@ -30,6 +31,13 @@ class ArtifactTest(unittest.TestCase):
         os.environ.pop("DEVFLOW_NO_OPEN", None)
         self.tmp.cleanup()
 
+    def finish(self, folder):
+        path = os.path.join(folder, "index.html")
+        with open(path) as fh:
+            text = fh.read()
+        with open(path, "w") as fh:
+            fh.write(re.sub(r"\s*<p class=\"callout\" data-devflow-placeholder>.*?</p>", "", text))
+
     def new(self, slug="checkout-flow", title="Checkout flow"):
         result = run(["new", "--slug", slug, "--title", title], self.repo)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -42,6 +50,7 @@ class ArtifactTest(unittest.TestCase):
         self.assertIn("<title>Checkout flow</title>", page)
         self.assertIn('data-theme="light"', page)
         self.assertIn('id="theme-toggle"', page)
+        self.assertIn("data-devflow-placeholder", page)
         self.assertTrue(os.path.isdir(os.path.join(folder, "diagrams")))
         self.assertEqual(os.listdir(self.repo), [".git"])
 
@@ -65,6 +74,10 @@ class ArtifactTest(unittest.TestCase):
     def test_register_writes_one_line_per_artifact_and_list_prints_it(self):
         folder = self.new()
         self.assertEqual(run(["register", folder], self.repo).returncode, 1)
+        with open(os.path.join(folder, "summary.md"), "w") as fh:
+            fh.write("x\n")
+        self.assertEqual(run(["register", folder], self.repo).returncode, 1)  # notice still there
+        self.finish(folder)
         with open(os.path.join(folder, "summary.md"), "w") as fh:
             fh.write("# Checkout charges the card after stock is reserved.\n\nMore facts.\n")
         self.assertEqual(run(["register", folder], self.repo).returncode, 0)
@@ -109,6 +122,8 @@ class ArtifactTest(unittest.TestCase):
                 fh.write('{"title": "%s", "created": "%s"}' % (title, folder[:10]))
             with open(os.path.join(path, "summary.md"), "w") as fh:
                 fh.write("x\n")
+            with open(os.path.join(path, "index.html"), "w") as fh:
+                fh.write("<html><body>page</body></html>")
             run(["register", path], self.repo)
         index = open(os.path.join(base, "INDEX.md")).read()
         self.assertLess(index.index("Alpha new"), index.index("Zebra old"))
@@ -118,6 +133,8 @@ class ArtifactTest(unittest.TestCase):
             fh.write('{"title": "Same day, later", "created": "2026-10-08"}')
         with open(os.path.join(later, "summary.md"), "w") as fh:
             fh.write("x\n")
+        with open(os.path.join(later, "index.html"), "w") as fh:
+            fh.write("<html><body>page</body></html>")
         run(["register", later], self.repo)
         index = open(os.path.join(base, "INDEX.md")).read()
         self.assertLess(index.index("Same day, later"), index.index("Alpha new"))
@@ -137,6 +154,7 @@ class ArtifactTest(unittest.TestCase):
         parent = self.new("devflow-overview", "devflow overview")
         child = run(["new", "--slug", "work-model", "--title", "Work model", "--parent", os.path.basename(parent)], self.repo).stdout.strip()
         for folder in (parent, child):
+            self.finish(folder)
             with open(os.path.join(folder, "summary.md"), "w") as fh:
                 fh.write("x\n")
             self.assertEqual(run(["register", folder], self.repo).returncode, 0)

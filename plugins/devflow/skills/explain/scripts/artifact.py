@@ -150,9 +150,13 @@ def cmd_register(args):
     folder = os.path.abspath(args[0])
     summary = os.path.join(folder, "summary.md")
     meta_path = os.path.join(folder, "meta.json")
-    if not os.path.isfile(summary) or not os.path.isfile(meta_path):
-        print(f"{folder} needs summary.md and meta.json", file=sys.stderr)
+    if not all(os.path.isfile(os.path.join(folder, f)) for f in ("summary.md", "meta.json", "index.html")):
+        print(f"{folder} needs index.html, summary.md and meta.json", file=sys.stderr)
         return 1
+    with open(os.path.join(folder, "index.html"), encoding="utf-8") as fh:
+        if "data-devflow-placeholder" in fh.read():
+            print("index.html still has the 'being written' notice; finish the page first", file=sys.stderr)
+            return 1
     with open(meta_path, encoding="utf-8") as fh:
         meta = json.load(fh)
     index = os.path.join(os.path.dirname(folder), "INDEX.md")
