@@ -151,8 +151,9 @@ def cmd_register(args):
     if os.path.isfile(index):
         with open(index, encoding="utf-8") as fh:
             lines = [l.rstrip("\n") for l in fh if l.strip() and not l.startswith("# ") and f"]({name}/" not in l]
-    folder_of = lambda entry: entry.split("](", 1)[1].split("/", 1)[0] if "](" in entry else ""
-    lines = sorted(lines + [line], key=folder_of, reverse=True)  # folders start with the date
+    date_of = lambda entry: entry.split("](", 1)[1][:10] if "](" in entry else ""
+    # Newest date first; within a day, the page registered last goes first (sorted() is stable).
+    lines = sorted([line] + lines, key=date_of, reverse=True)
     with open(index, "w", encoding="utf-8") as fh:
         fh.write("# Explanations\n\nNewest first. Read summary.md before opening the HTML.\n\n" + "\n".join(l for l in lines if l.startswith("- ")) + "\n")
     print(f"registered in {index}")

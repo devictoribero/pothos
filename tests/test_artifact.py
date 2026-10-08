@@ -111,6 +111,15 @@ class ArtifactTest(unittest.TestCase):
             run(["register", path], self.repo)
         index = open(os.path.join(base, "INDEX.md")).read()
         self.assertLess(index.index("Alpha new"), index.index("Zebra old"))
+        later = os.path.join(base, "2026-10-08-aaa-later")
+        os.makedirs(later)
+        with open(os.path.join(later, "meta.json"), "w") as fh:
+            fh.write('{"title": "Same day, later", "created": "2026-10-08"}')
+        with open(os.path.join(later, "summary.md"), "w") as fh:
+            fh.write("x\n")
+        run(["register", later], self.repo)
+        index = open(os.path.join(base, "INDEX.md")).read()
+        self.assertLess(index.index("Same day, later"), index.index("Alpha new"))
 
     def test_put_refuses_folders_that_are_not_artifacts(self):
         folder = self.new()
