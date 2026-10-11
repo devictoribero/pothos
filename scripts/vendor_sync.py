@@ -54,7 +54,8 @@ def path_changes(clones, entry):
     """Commits on upstream HEAD since the pinned one that touch the vendored folder (newest first)."""
     repo = clones.get(entry["source"])
     head = clones.head(entry["source"])
-    log = subprocess.run(["git", "-C", repo, "log", "--format=%H %s", f"{entry['commit']}..{head}", "--", entry["upstream_path"]],
+    excluded = [f":(exclude){entry['upstream_path']}/{pattern}" for pattern in entry.get("exclude", [])]
+    log = subprocess.run(["git", "-C", repo, "log", "--format=%H %s", f"{entry['commit']}..{head}", "--", entry["upstream_path"], *excluded],
                          capture_output=True, text=True, check=True).stdout.strip()
     return head, [line for line in log.splitlines() if line]
 
