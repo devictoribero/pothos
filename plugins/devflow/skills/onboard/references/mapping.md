@@ -32,6 +32,7 @@ Use the first `candidates.e2e` script, preferring a headless variant. `e2e_tools
 
 - `run.dev`: if `candidates.dev_mocked` has a script, use it, always, including in a monorepo. An agent that needs a real backend cannot check its own work, so the mocked script wins over every other consideration. Only when there is no mocked script, use a `dev` candidate; in a monorepo with several apps, pick the script that starts the app most changes touch, and say which one you picked.
 - `run.mocked`: true only for a `dev_mocked` script, or when the docs state the dev mode needs no real backend or secrets. Otherwise false.
+- `run.setup`: what a fresh worktree needs before the checks can run. Chain the install command with the code-generation steps from `ci[].setup_steps` (or a `setup` candidate that only installs and generates), e.g. `pnpm install --frozen-lockfile && pnpm --filter api db:generate`. Leave out steps that touch a real database or network service. Without it, every implementer worktree fails its first verify.
 - `run.environments`: when `environment_variants` lists two or more backends a person would work against (such as dev and demo, not prod), add one entry per backend with its `dev` command, and ask the user what `note` each should carry, such as who works on it. Leave production out. Never pick a default: implement asks which one to use when work starts.
 - `run.url`: only when the script body or the docs state the port.
 - `run.login`: only when a doc explains how to sign in as a test user.

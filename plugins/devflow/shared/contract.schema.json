@@ -58,6 +58,11 @@
       "additionalProperties": false,
       "required": [],
       "properties": {
+        "setup": {
+          "description": "Command that prepares a fresh clone or worktree before anything else runs: install dependencies, generate code (ORM clients, API types). Implementers run it first in every new worktree.",
+          "type": "string",
+          "minLength": 1
+        },
         "dev": {
           "description": "Starts the app against the default backend. Prefer a mode that needs no real backend or credentials.",
           "type": "string",

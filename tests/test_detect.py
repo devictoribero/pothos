@@ -91,6 +91,14 @@ class DetectTest(unittest.TestCase):
         ci = detect(self.repo)["ci"][0]
         self.assertEqual(ci["scripts_used_in_order"], ["b-lint", "a-test"])
 
+    def test_ci_setup_steps_before_the_first_check(self):
+        self.write("package.json", json.dumps({"scripts": {"validate": "v", "db:generate": "g"}}))
+        self.write(".github/workflows/ci.yml", "steps:\n  - uses: actions/checkout@v4\n  - run: pnpm install --frozen-lockfile\n"
+                   "  - run: pnpm --filter api db:generate\n  - run: echo hello\n  - run: pnpm run validate\n  - run: pnpm run generate:after\n")
+        ci = detect(self.repo)["ci"][0]
+        self.assertEqual(ci["setup_steps"], ["pnpm install --frozen-lockfile", "pnpm --filter api db:generate"])
+        self.assertEqual(detect(self.repo)["candidates"]["setup"][0]["script"], "db:generate")
+
     def test_docs_agent_files_and_existing_contract(self):
         self.write("CONTEXT.md", "# Terms")
         self.write("docs/decisions/0001.md", "x")

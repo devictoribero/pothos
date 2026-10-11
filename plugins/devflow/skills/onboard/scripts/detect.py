@@ -33,6 +33,7 @@ ROLES = {
     "e2e": ["e2e", "test:e2e", "e2e:smoke", "test:e2e:smoke", "cypress:run", "playwright"],
     "dev": ["dev", "start", "local:dev", "serve", "develop"],
     "dev_mocked": ["dev:mock", "dev:mocked", "local:mock", "dev:seeded", "mock"],
+    "setup": ["setup", "bootstrap", "postinstall", "generate", "codegen", "db:generate", "prisma:generate"],
 }
 
 DOC_CANDIDATES = {
@@ -168,7 +169,11 @@ def detect(root):
                     if match:
                         positions[script] = match.start()
                 used = sorted(positions, key=positions.get)
-                ci.append({"file": f".github/workflows/{name}", "scripts_used_in_order": used})
+                first_check = min(positions.values()) if positions else len(text)
+                # Steps CI runs before its first check: installs and code generation a fresh checkout needs.
+                setup = [m.group(1).strip() for m in re.finditer(r"^\s*-?\s*run:\s*(.+)$", text[:first_check], re.M)
+                         if re.search(r"install|\bci\b|generate|codegen|prisma|build:types", m.group(1))]
+                ci.append({"file": f".github/workflows/{name}", "scripts_used_in_order": used, "setup_steps": setup})
     report["ci"] = ci
 
     # Word hits only: "we do not use Jira" also matches. The model reads the files to decide.

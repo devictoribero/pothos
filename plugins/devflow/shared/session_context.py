@@ -110,6 +110,9 @@ def run_section(data):
     if not run:
         return None
     lines = []
+    if run.get("setup"):
+        lines.append(f"- In a fresh clone or worktree, run `{run['setup']}` before anything else, including verify. "
+                     "Tell every implementer subagent to do the same in its own worktree.")
     if run.get("dev"):
         mocked = " (mocked backend, no credentials needed)" if run.get("mocked") else ""
         lines.append(f"- Start the app: `{run['dev']}`{mocked}" + (f", served at {run['url']}" if run.get("url") else ""))
