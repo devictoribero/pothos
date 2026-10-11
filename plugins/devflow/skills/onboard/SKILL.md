@@ -1,8 +1,7 @@
 ---
 name: onboard
-description: Connect a repository to devflow by writing its private agent contract, which tells the other skills how the repo is verified, run, documented and shipped. The contract lives outside the repository, so the repo and its team see no change. Run it by hand the first time you use devflow in a repo, or with "audit" to check an existing contract for drift.
+description: Connect a repository to devflow by writing its private agent contract, which tells the other skills how the repo is verified, run, documented and shipped. The contract lives outside the repository, so the repo and its team see no change. Use it the first time devflow works in a repo, when the session context says the repository has no contract and the task needs one, or with "audit" to check an existing contract for drift.
 argument-hint: "[audit]"
-disable-model-invocation: true
 ---
 
 # onboard
@@ -28,7 +27,7 @@ If the user says the repository follows its own workflow, skip the steps: save `
    python3 "${CLAUDE_SKILL_DIR}/scripts/detect.py" .
    ```
    If `existing_contract` is set, or the argument is `audit`, follow **Audit mode** instead.
-2. **Read context.** Skim AGENTS.md or CLAUDE.md and the CI files the report lists. They settle what the word hits in `tracker_hints` cannot, such as "we do not use Jira".
+2. **Read context.** Skim AGENTS.md or CLAUDE.md, any `docs/agents/*.md` files, and the CI files the report lists. They settle what the word hits in `tracker_hints` cannot, such as "we do not use Jira".
 3. **Draft.** Map the report to contract fields with `references/mapping.md`. Start from `${CLAUDE_PLUGIN_ROOT}/templates/contract.json` and drop every field you cannot fill.
 4. **Confirm.** Show the draft and its assumptions in one message, and ask about the open choices only. Skip this step when the user asked for no questions or nobody is available.
 5. **Save.** Pipe the draft to the contract script, which validates it strictly and saves it only if it is valid:

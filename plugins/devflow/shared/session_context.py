@@ -26,8 +26,12 @@ CYCLE_SKILLS = ("grilling, grill-with-docs, to-spec, to-tickets, wayfinder, tria
 
 
 def template(name):
+    """A Pocock setup template without its own top heading; this context supplies the heading."""
     with open(os.path.join(TEMPLATES, name), encoding="utf-8") as fh:
-        return fh.read().strip()
+        lines = fh.read().strip().splitlines()
+    if lines and lines[0].startswith("# "):
+        lines = lines[1:]
+    return "\n".join(lines).strip()
 
 
 def demote(markdown, levels=1):
@@ -35,7 +39,13 @@ def demote(markdown, levels=1):
     return "\n".join("#" * levels + line if line.startswith("#") else line for line in markdown.splitlines())
 
 
-def tracker_section(data):
+def main_checkout(start):
+    """The main working tree, shared by every worktree of the repository."""
+    common = contract.git(["rev-parse", "--path-format=absolute", "--git-common-dir"], start)
+    return os.path.dirname(common) if common and os.path.basename(common) == ".git" else contract.repo_root(start)
+
+
+def tracker_section(data, start):
     tracker = data.get("tracker") or {"kind": "none"}
     kind = tracker.get("kind", "none")
     skill = tracker.get("skill")
@@ -44,7 +54,10 @@ def tracker_section(data):
         body = template("issue-tracker-local.md").replace(".scratch/", path.rstrip("/") + "/").replace("`.scratch`", f"`{path}`")
         note = "" if kind == "local" else ("The contract names no tracker, so specs and tickets go to local markdown as described here. "
                                            "Mention it once when you first write there.\n\n")
-        text = note + demote(body, 2)
+        absolute = os.path.join(main_checkout(start), path)
+        text = note + demote(body, 2) + (
+            f"\n\nThe tracker folder is shared by every worktree: read and update tickets at `{absolute}/`, "
+            "never in a worktree's own copy, and never commit it from a worktree.")
     elif kind in ("github", "gitlab"):
         text = demote(template(f"issue-tracker-{kind}.md"), 2)
     else:
@@ -84,6 +97,8 @@ def verify_section(data):
     rows = [f"- `{level}`: `{verify[level]}`" for level in ("fast", "full", "e2e") if verify.get(level)]
     text = ("### Verification\n\nRun `/devflow:verify` before merging anything into an integration or feature branch and "
             "before a pull request leaves draft; it runs these commands and records a receipt for the commit. "
+            "With `implement-spec`, the merger subagent runs `verify run all` on the integration branch after each merge and "
+            "hands a red result back to an implementer instead of moving on. "
             "Run the `fast` command yourself while working.\n\n" + "\n".join(rows))
     if not verify.get("e2e"):
         text += "\n\nThis repository has no end-to-end command; skip that step and say so in the pull request."
@@ -158,7 +173,7 @@ def build(start):
         return f"## devflow\n\nCould not resolve this repository's contract: {exc}"
     if not path:
         return ("## devflow\n\nThis repository has no devflow contract yet. Skills that need an issue tracker, verify commands "
-                "or a run command (" + CYCLE_SKILLS + ") should suggest `/devflow:onboard` first. "
+                "or a run command (" + CYCLE_SKILLS + ") should run `/devflow:onboard` first (it shows the draft contract to the user before saving). "
                 "Never run `/setup-matt-pocock-skills`: devflow keeps that configuration out of the repository.")
     try:
         data = contract.load(path)
@@ -177,7 +192,8 @@ def build(start):
     ]
     if errors:
         sections.append("The contract has problems; mention them and suggest `/devflow:onboard`:\n" + "\n".join(f"- {e}" for e in errors))
-    for part in (tracker_section, labels_section, domain_section, verify_section, run_section,
+    sections.append(tracker_section(data, start))
+    for part in (labels_section, domain_section, verify_section, run_section,
                  standards_section, review_section, pr_section):
         text = part(data)
         if text:

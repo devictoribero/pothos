@@ -139,6 +139,16 @@ class SessionContextTest(unittest.TestCase):
         self.assertIn("The contract has problems", text)
         self.assertIn("### Verification", text)
 
+    def test_local_tracker_points_worktrees_at_the_main_checkout(self):
+        self.write({"version": 1, "verify": {"full": "npm test"}, "tracker": {"kind": "local", "path": ".scratch"}})
+        git = ["git", "-C", self.repo, "-c", "user.name=t", "-c", "user.email=t@t"]
+        subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "init"], check=True)
+        worktree = os.path.join(self.tmp.name, "wt")
+        subprocess.run([*git, "worktree", "add", "-q", "-b", "ticket-01", worktree], check=True)
+        text = context(worktree, env=self.env, stdin="")
+        shared = text.split("read and update tickets at `")[1].split("`")[0]
+        self.assertEqual(os.path.realpath(shared), os.path.join(os.path.realpath(self.repo), ".scratch"))
+
     def test_explicit_directory_argument_wins(self):
         self.write({"version": 1, "verify": {"full": "make check"}})
         text = context(self.tmp.name, env=self.env, stdin="", args=[self.repo])

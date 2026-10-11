@@ -42,13 +42,17 @@ Use the first existing path of each `docs` entry. Leave out the empty ones. `GLO
 
 ## tracker
 
-- `kind`: `jira` or `linear` only when the agent files describe using it. A mention such as "we do not use Jira" does not count. A GitHub remote with issues in use means `github`. When the repo plans work in markdown files (`tracker_hints.local_dir`, or docs that say so), use `local` with `path` set to that folder. When there is no tracker at all, propose `local` with `path` `.scratch`, but leave the folder uncreated and list it as an assumption. Use `none` only when the user rejects that.
+If the repository already has Matt Pocock's setup output (`docs/agents/issue-tracker.md`, `docs/agents/triage-labels.md`, `docs/agents/domain.md`, or an `## Agent skills` block in CLAUDE.md or AGENTS.md), it is the strongest signal: map its tracker, labels and doc layout into the contract, and never edit or delete those files.
+
+- `kind`: `jira` or `linear` only when the agent files describe using it. A mention such as "we do not use Jira" does not count. A GitHub remote with issues in use means `github`; a GitLab remote with issues in use means `gitlab`. When the repo plans work in markdown files (`tracker_hints.local_dir`, or docs that say so), use `local` with `path` set to that folder. When there is no tracker at all, propose `local` with `path` `.scratch`, but leave the folder uncreated and list it as an assumption. Use `none` only when the user rejects that.
 - `project`: the key the docs or issue keys show, such as the prefix of `ABC-123`.
 - `skill`: a repository skill in `.claude/skills` or `.agents/skills` whose description says it creates tickets for this tracker.
+- `labels`: only for roles whose label differs from the role name (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), taken from `docs/agents/triage-labels.md` or labels already in use on the tracker. Leave it out otherwise.
 
 ## review
 
-List repository skills whose description says they review conventions, such as design-system primitives, i18n or specs. Leave out generic review skills, because devflow's review already does that.
+- `skills`: repository skills whose description says they review conventions, such as design-system primitives, i18n or specs. Leave out generic review skills, because `code-review` already does that.
+- `standards`: repository files that document how code should be written but that `code-review` would not find by name, such as `docs/conventions.md` or a style guide under `docs/`. Leave out `CODING_STANDARDS.md` and `CONTRIBUTING.md`, which it always reads.
 
 ## pr
 

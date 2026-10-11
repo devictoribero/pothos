@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.0
+
+- devflow now runs the cycle with Matt Pocock's skills, vendored unchanged at a pinned commit: `grilling`, `grill-with-docs`, `to-spec`, `to-tickets`, `wayfinder`, `triage`, `implement`, `implement-spec`, `tdd`, `code-review`, `pr`, `prototype`, `diagnosing-bugs`, `retro`, `domain-modeling`, `codebase-design`, `improve-codebase-architecture`, `handoff`, `writing-for-agents`. His setup skill is left out because it writes into the repository; its templates are kept as shared data.
+- SessionStart hook (`shared/session_context.py`): hands the private contract to every skill as context (tracker, triage labels, domain docs, verify commands, environments, standards, review skills, pull request rules). Repositories with `workflow: repo` get a note that keeps the cycle skills out.
+- `verify` skill: runs the contract's checks and keeps a receipt per commit outside the repository; `check` is the merge gate.
+- `evidence` skill: starts the app, takes headless or simulator screenshots into a per-branch folder outside the repository, and guides before/after proof for the pull request.
+- `component-design` skill moves into the plugin.
+- Standards read by `code-review`, `tdd` and `implement`: `standards/testing.md` (replaces a testing skill that measured no better than no skill at twice the cost) and `standards/review.md` (28 rules distilled from 260 past review comments). Personal standards can also live in `~/.config/devflow/standards/`.
+- Contract: `tracker.kind` `gitlab`, `tracker.labels` and `review.standards`.
+- `onboard` can start on its own and reads existing Pocock setup files. The side-effects principle now gates the publishing step, not the skill.
+- `vendor_sync.py` clones each source once per run and rejects unknown entry names.
+
 ## 0.1.0
 
 - Plugin and marketplace skeleton.

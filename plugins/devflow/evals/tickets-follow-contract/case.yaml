@@ -1,0 +1,15 @@
+schema_version: "1.1"
+name: tickets-follow-contract
+description: >
+  A repo whose private contract names a local tracker in work/. Given an approved spec, to-tickets must
+  publish one file per ticket under work/<feature>/issues/ with blocking edges, using only what the
+  SessionStart adapter provided: no /setup-matt-pocock-skills, no docs/agents files, no .scratch folder.
+tags: [adapter, to-tickets]
+runs: 2
+expected_outcome: Ticket files under work/<feature>/issues/, numbered from 01, at least one with a Blocked by line; no repo configuration written.
+execution:
+  max_turns: 40
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit]
+context:
+  scaffold_script: seed.sh

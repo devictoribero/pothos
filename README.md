@@ -2,7 +2,7 @@
 
 A portable development workflow for Claude Code. It carries how you work from repository to repository: specify, implement, verify, review and ship. Each repository describes itself in a small contract, so the same skills work in any codebase.
 
-> Status: early. Version 0.1.0 ships the private contract and three skills: `onboard`, `explain` and the bundled `archify`. The rest of the cycle, agents and hooks are planned.
+> Status: early. Version 0.2.0 runs the whole cycle: Matt Pocock's skills for specifying, planning, building and reviewing, plus devflow's own contract, verification, evidence and explanations.
 
 ## Install
 
@@ -23,7 +23,8 @@ Then, in each repository:
 plugin (how you work)  ──reads──▶  private contract  ──points to──▶  repository (the project)
 ```
 
-- **The plugin** holds skills (and, later, agents and hooks) that never mention a specific project.
+- **The plugin** holds skills, standards and one hook, none of which mention a specific project. Most cycle skills are [Matt Pocock's](https://github.com/mattpocock/skills), vendored unchanged at a pinned commit.
+- **The hook** runs at session start, reads the contract and hands it to every skill as context. Pocock's skills expect their configuration (issue tracker, labels, domain docs) "to have been provided"; his setup skill writes it into the repository, devflow provides it from the contract instead.
 - **The contract** is a short JSON file per repository, kept privately in `~/.config/devflow/contracts/<host>/<owner>/<repo>.json`, never inside the repository. Every clone and worktree of a repository shares it. It says how to verify a change, how to run the app, where the domain docs live, where tickets go and how pull requests are made.
 - **The repository** keeps everything project-specific: its scripts, its docs, its conventions and its own skills.
 
@@ -50,23 +51,31 @@ Only `version` and `verify.full` are required. The schema documents every field,
 
 ## Skills
 
-| Skill | Status | What it does |
-|---|---|---|
-| `onboard` | available | Writes or audits the repository's contract and reports what blocks autonomous work. |
-| `explain` | available | Explains a flow, architecture or concept as a local HTML page with archify diagrams, opened in the browser and indexed so later sessions can find it. Questions about code use the pinned [poteto/how](https://github.com/poteto/how) method: parallel explorers, a synthesis and, on request, a multi-model architecture critique. |
-| `archify` | available, third-party | Draws validated, explorable architecture, workflow, sequence, data-flow and lifecycle diagrams. Pinned copy of [tt-a1i/archify](https://github.com/tt-a1i/archify); explain uses it. |
-| `grill` | planned | Interviews you until a task has no open questions. |
-| `distill` | planned | Turns a conversation, thread or note into tickets or a PRD with checkable acceptance criteria. |
-| `domain-model` | planned | Keeps the ubiquitous-language glossary and decision records. |
-| `implement` | planned | Takes one ticket or a whole feature. For a feature it creates the feature branch and works through the ticket graph, running the inner loop for every unblocked ticket. |
-| `code` | planned | Writes the code and tests for one ticket. The inner loop runs it; you rarely type it. |
-| `diagnose` | planned | Finds the cause of a bug by building a feedback loop first. |
-| `verify` | planned | Runs the contract's checks and records a receipt for the commit. |
-| `evidence` | planned | Runs the app and captures proof that a change works. |
-| `review` | planned | Reviews a diff with fresh-context agents and validates each finding. |
-| `pull-request` | planned | Opens a pull request once verify and evidence hold for the current commit. |
-| `address-review` | planned | Applies, declines or escalates each review comment. |
-| `component-design`, `testing`, `codebase-design`, `improve-architecture`, `writing` | planned | Knowledge skills that apply automatically. |
+| Step | Skill | From | What it does |
+|---|---|---|---|
+| Connect a repo | `onboard` | devflow | Writes or audits the private contract and reports what blocks autonomous work. |
+| Define | `grilling`, `grill-with-docs` | Pocock | Interview until a plan has no open questions; the second also writes the glossary and decision records. |
+| Specify | `to-spec` | Pocock | Turns the conversation into a spec in the tracker. |
+| Plan | `to-tickets`, `wayfinder` | Pocock | Tracer-bullet tickets with blocking edges; a decision map for work bigger than one session. |
+| Build | `implement`, `implement-spec`, `tdd`, `prototype` | Pocock | One ticket, or a whole spec on an integration branch with implementer subagents in worktrees. |
+| Verify | `verify` | devflow | Runs the contract's checks and keeps a receipt per commit; the merge gate. |
+| Prove | `evidence` | devflow | Screenshots and before/after output for the pull request, stored outside the repo. |
+| Review | `code-review` | Pocock | Standards and spec review in parallel subagents. Reads devflow's standards too. |
+| Ship | `pr` | Pocock | Pull request body with summary, evidence and merge danger. |
+| Learn | `diagnosing-bugs`, `retro` | Pocock | Find the cause of a bug; look back at a session. |
+| Design | `component-design` | devflow | UI component APIs: composition, naming, accessibility, tests. |
+| Design | `codebase-design`, `domain-modeling`, `improve-codebase-architecture` | Pocock | Deep modules, glossary and decision records, architecture improvements. |
+| Explain | `explain`, `archify` | devflow, tt-a1i | Local HTML explanations with diagrams, indexed for later sessions. |
+| Other | `triage`, `handoff`, `writing-for-agents` | Pocock | Issue triage, session handoff, writing skills and agent docs. |
+
+## Standards
+
+`plugins/devflow/standards/` holds personal coding standards that `code-review`, `tdd` and `implement` read through the session context. A repository's own documented standards win on conflict.
+
+- `testing.md`: what makes a test trustworthy, kept to the rules that measurably changed results.
+- `review.md`: what blocks a merge and what is only recommended, distilled from past reviews.
+
+Add your own in `~/.config/devflow/standards/*.md`; the hook lists them too.
 
 ## Developing
 
@@ -74,6 +83,7 @@ Only `version` and `verify.full` are required. The schema documents every field,
 claude --plugin-dir plugins/devflow      # try changes without reinstalling
 python3 -m unittest discover -s tests              # script tests
 python3 scripts/lint_skills.py                     # skill checks
+python3 scripts/vendor_sync.py check               # pinned third-party skills behind upstream?
 claude plugin validate plugins/devflow    # manifest checks
 claude plugin eval plugins/devflow --scaffold   # evals, costs tokens
 ```

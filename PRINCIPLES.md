@@ -22,9 +22,9 @@ A skill does one thing and leaves something you can check: a contract, a verify 
 
 Skills never call the next skill. Each one ends by naming the next step. Chaining the whole cycle belongs in a workflow that calls skills in order, never in a bigger skill.
 
-## Side effects need a person
+## Side effects need a person, at the moment they happen
 
-Skills that write outside the conversation, such as creating tickets, pushing, opening pull requests or replying to reviews, set `disable-model-invocation: true`, so they only run when someone types them. Knowledge skills trigger on their own from their description.
+A skill may start on its own from its description; what needs a person is the side effect, not the skill. Skills that only write outside the repository (a private contract, a receipt, an explanation page) run without asking. Skills that publish (create tickets on a shared tracker, push, open or update a pull request, reply to a review) confirm right before publishing when a person is available, and stop with a report when nobody is. Merging into the base branch is never done by an agent. Third-party skills keep their own `disable-model-invocation` setting.
 
 ## Small context
 
