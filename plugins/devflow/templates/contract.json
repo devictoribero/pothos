@@ -24,10 +24,12 @@
     "kind": "none",
     "path": "",
     "project": "",
-    "skill": ""
+    "skill": "",
+    "labels": {}
   },
   "review": {
-    "skills": []
+    "skills": [],
+    "standards": []
   },
   "pr": {
     "base": "main",

@@ -170,14 +170,17 @@ def schema_errors(value, schema, where="contract"):
 def path_errors(data, root):
     errors = []
     real_root = os.path.realpath(root)
-    for field in PATH_FIELDS + CREATED_LATER_FIELDS:
-        rel = lookup(data, field)
+    checks = [(field, lookup(data, field)) for field in PATH_FIELDS + CREATED_LATER_FIELDS]
+    standards = lookup(data, "review.standards")
+    if isinstance(standards, list):
+        checks += [(f"review.standards[{i}]", rel) for i, rel in enumerate(standards)]
+    for field, rel in checks:
         if not isinstance(rel, str):
             continue
         target = os.path.realpath(os.path.join(root, rel))
         if os.path.isabs(rel) or not (target == real_root or target.startswith(real_root + os.sep)):
             errors.append(f"contract.{field}: '{rel}' must be a path inside the repository")
-        elif field in PATH_FIELDS and not os.path.exists(target):
+        elif field not in CREATED_LATER_FIELDS and not os.path.exists(target):
             errors.append(f"contract.{field}: path '{rel}' does not exist in {root}")
     return errors
 

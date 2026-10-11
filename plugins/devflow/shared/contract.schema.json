@@ -41,7 +41,7 @@
           "minLength": 1
         },
         "full": {
-          "description": "Everything CI checks before merge. pull-request requires a green run of this on the current commit.",
+          "description": "Everything CI checks before merge. verify runs it, and nothing merges without a green run on the current commit.",
           "type": "string",
           "minLength": 1
         },
@@ -133,14 +133,14 @@
           "minLength": 1
         },
         "prd": {
-          "description": "Directory where distill writes product requirement documents.",
+          "description": "Directory where to-spec writes specs when the tracker is local.",
           "type": "string",
           "minLength": 1
         }
       }
     },
     "tracker": {
-      "description": "Where work items live. distill writes there; implement reads from there.",
+      "description": "Where specs and tickets live. to-spec and to-tickets write there; implement and implement-spec read from there. The SessionStart adapter hands it to every skill.",
       "type": "object",
       "required": [
         "kind"
@@ -153,6 +153,7 @@
             "none",
             "local",
             "github",
+            "gitlab",
             "jira",
             "linear"
           ]
@@ -163,7 +164,7 @@
           "minLength": 1
         },
         "skill": {
-          "description": "Repository skill that knows the tracker's fields and templates. When set, distill delegates ticket creation to it.",
+          "description": "Repository skill that knows the tracker's fields and templates. When set, every tracker operation goes through it.",
           "type": "string",
           "minLength": 1
         },
@@ -171,15 +172,51 @@
           "description": "For kind local: directory holding one folder per feature with spec.md and issues/NN-slug.md files. Usually .scratch.",
           "type": "string",
           "minLength": 1
+        },
+        "labels": {
+          "description": "Label strings this tracker uses for the five triage roles, when they differ from the role names.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "needs-triage": {
+              "type": "string",
+              "minLength": 1
+            },
+            "needs-info": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ready-for-agent": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ready-for-human": {
+              "type": "string",
+              "minLength": 1
+            },
+            "wontfix": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
         }
       }
     },
     "review": {
-      "description": "Repository skills that review adds to its generic pass.",
+      "description": "Extra review inputs. code-review reads the standards as documented coding standards; the skills run after it.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "skills": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "standards": {
+          "description": "Repository files that document coding standards beyond the ones code-review finds on its own, e.g. docs/conventions.md.",
           "type": "array",
           "items": {
             "type": "string",

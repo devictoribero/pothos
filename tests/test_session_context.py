@@ -1,0 +1,149 @@
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import unittest
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRIPT = os.path.join(ROOT, "plugins", "devflow", "shared", "session_context.py")
+
+
+def context(cwd, stdin=None, args=None, env=None):
+    result = subprocess.run([sys.executable, SCRIPT, *(args or [])], cwd=cwd, capture_output=True, text=True,
+                            input=stdin, env={**os.environ, **(env or {})})
+    assert result.returncode == 0, result.stderr
+    if not result.stdout.strip():
+        return None
+    payload = json.loads(result.stdout)
+    assert payload["hookSpecificOutput"]["hookEventName"] == "SessionStart"
+    return payload["hookSpecificOutput"]["additionalContext"]
+
+
+class SessionContextTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.repo = os.path.join(self.tmp.name, "repo")
+        self.home = os.path.join(self.tmp.name, "devflow-home")
+        subprocess.run(["git", "init", "-q", self.repo], check=True)
+        subprocess.run(["git", "-C", self.repo, "remote", "add", "origin", "https://github.com/acme/shop.git"], check=True)
+        self.env = {"DEVFLOW_HOME": self.home}
+        self.path = os.path.join(self.home, "contracts", "github.com", "acme", "shop.json")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def write(self, data):
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
+        with open(self.path, "w") as fh:
+            fh.write(data if isinstance(data, str) else json.dumps(data))
+
+    def ctx(self, **kwargs):
+        return context(self.repo, env=self.env, stdin="", **kwargs)
+
+    def test_outside_a_git_repository_prints_nothing(self):
+        outside = os.path.join(self.tmp.name, "plain")
+        os.makedirs(outside)
+        self.assertIsNone(context(outside, env=self.env, stdin=""))
+
+    def test_without_a_contract_suggests_onboard_and_forbids_pocock_setup(self):
+        text = self.ctx()
+        self.assertIn("/devflow:onboard", text)
+        self.assertIn("Never run `/setup-matt-pocock-skills`", text)
+
+    def test_reads_the_session_directory_from_the_hook_event(self):
+        self.write({"version": 1, "verify": {"full": "npm test"}})
+        elsewhere = os.path.join(self.tmp.name, "elsewhere")
+        os.makedirs(elsewhere)
+        text = context(elsewhere, env=self.env, stdin=json.dumps({"cwd": self.repo, "hook_event_name": "SessionStart"}))
+        self.assertIn("`full`: `npm test`", text)
+
+    def test_repo_workflow_steps_aside(self):
+        self.write({"version": 1, "workflow": "repo"})
+        text = self.ctx()
+        self.assertIn("follows its own development workflow", text)
+        self.assertNotIn("Issue tracker", text)
+
+    def test_local_tracker_uses_the_contract_path(self):
+        self.write({"version": 1, "verify": {"full": "npm test"}, "tracker": {"kind": "local", "path": "work"}})
+        text = self.ctx()
+        self.assertIn("`work/<feature-slug>/spec.md`", text)
+        self.assertNotIn(".scratch/", text)
+
+    def test_no_tracker_falls_back_to_local_markdown_and_says_so(self):
+        self.write({"version": 1, "verify": {"full": "npm test"}})
+        text = self.ctx()
+        self.assertIn(".scratch/<feature-slug>/", text)
+        self.assertIn("names no tracker", text)
+
+    def test_github_tracker_uses_the_gh_template(self):
+        self.write({"version": 1, "verify": {"full": "npm test"}, "tracker": {"kind": "github"}})
+        self.assertIn("gh issue create", self.ctx())
+
+    def test_jira_tracker_delegates_to_the_repository_skill(self):
+        self.write({"version": 1, "verify": {"full": "npm test"},
+                    "tracker": {"kind": "jira", "project": "SHOP", "skill": "to-jira"}})
+        text = self.ctx()
+        self.assertIn("Jira project `SHOP`", text)
+        self.assertIn("repository skill `to-jira`", text)
+
+    def test_jira_without_a_skill_asks_before_writing(self):
+        self.write({"version": 1, "verify": {"full": "npm test"}, "tracker": {"kind": "jira"}})
+        self.assertIn("ask how to reach the tracker", self.ctx())
+
+    def test_label_overrides_replace_role_names(self):
+        self.write({"version": 1, "verify": {"full": "npm test"},
+                    "tracker": {"kind": "github", "labels": {"needs-triage": "bug:triage"}}})
+        text = self.ctx()
+        self.assertIn("| `needs-triage` | `bug:triage` |", text)
+        self.assertIn("| `wontfix` | `wontfix` |", text)
+
+    def test_renamed_glossary_and_decisions_are_pointed_out(self):
+        self.write({"version": 1, "verify": {"full": "npm test"},
+                    "docs": {"glossary": "CONTEXT.md", "decisions": "docs/decisions"}})
+        text = self.ctx()
+        self.assertIn("The glossary is `CONTEXT.md`", text)
+        self.assertIn("Decision records live in `docs/decisions`", text)
+
+    def test_verify_commands_and_missing_e2e(self):
+        self.write({"version": 1, "verify": {"fast": "npm run lint", "full": "npm test"}})
+        text = self.ctx()
+        self.assertIn("`fast`: `npm run lint`", text)
+        self.assertIn("no end-to-end command", text)
+
+    def test_environments_are_listed_without_a_default(self):
+        self.write({"version": 1, "verify": {"full": "npm test"},
+                    "run": {"dev": "npm start", "environments": [{"name": "dev", "dev": "npm run dev:dev"},
+                                                                  {"name": "demo", "dev": "npm run dev:demo", "e2e": "npm run e2e:demo"}]}})
+        text = self.ctx()
+        self.assertIn("never pick one yourself", text)
+        self.assertIn("`demo`: `npm run dev:demo`; end-to-end: `npm run e2e:demo`", text)
+
+    def test_standards_list_repository_and_personal_files(self):
+        os.makedirs(os.path.join(self.home, "standards"))
+        open(os.path.join(self.home, "standards", "mine.md"), "w").close()
+        self.write({"version": 1, "verify": {"full": "npm test"}, "review": {"standards": ["docs/style.md"], "skills": ["i18n-review"]}})
+        text = self.ctx()
+        self.assertIn("- `docs/style.md`", text)
+        self.assertIn(os.path.join(self.home, "standards", "mine.md"), text)
+        self.assertIn("the repository wins", text)
+        self.assertIn("`i18n-review`", text)
+
+    def test_unreadable_contract_suggests_repair(self):
+        self.write("{not json")
+        self.assertIn("could not be read", self.ctx())
+
+    def test_schema_errors_are_reported_but_context_still_printed(self):
+        self.write({"version": 1, "verify": {"full": "npm test"}, "tracker": {"kind": "trello"}})
+        text = self.ctx()
+        self.assertIn("The contract has problems", text)
+        self.assertIn("### Verification", text)
+
+    def test_explicit_directory_argument_wins(self):
+        self.write({"version": 1, "verify": {"full": "make check"}})
+        text = context(self.tmp.name, env=self.env, stdin="", args=[self.repo])
+        self.assertIn("`make check`", text)
+
+
+if __name__ == "__main__":
+    unittest.main()
