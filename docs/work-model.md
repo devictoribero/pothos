@@ -85,7 +85,7 @@ Why not one pull request per ticket: it adds a review surface nobody reads, it w
 |---|---|---|
 | 1. Manual | You | One session per ticket with `implement`, then `verify` and merge yourself. |
 | 2. Assisted | `implement-spec` | One session builds the whole spec with parallel implementers; you watch and answer questions. |
-| 3. Unattended | `scripts/devflow-run` | Starts `implement-spec` headless in a fresh session for a spec, logs to a file, and stops at the draft pull request or at `needs-replan`. |
+| 3. Unattended | `plugins/devflow/scripts/devflow-run.py` | Creates a worktree and branch, runs `run.setup`, starts `implement-spec` (or `implement` for one ticket) headless, logs under `~/.config/devflow/runs/`, and stops at a pull request body, or at a draft pull request with `--open-pr`. `status` lists the runs. |
 
 ## Example: a new booking flow
 
