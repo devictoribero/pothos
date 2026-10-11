@@ -1,0 +1,1 @@
+Fixed evaluation for this skill. `evals.json` holds the prompts; `rubric.md` holds how outputs are scored and how two versions are compared. Change the skill, rerun the same prompts, compare the scores; never compare runs made with different prompts.

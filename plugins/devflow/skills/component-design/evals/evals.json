@@ -1,0 +1,32 @@
+{
+ "skill_name": "component-design",
+ "purpose": "Fixed eval set. Run it before and after every change to the skill and compare rubric scores. Never change the prompts between runs being compared.",
+ "runs_per_eval": 3,
+ "evals": [
+  {
+   "id": "chat-message",
+   "prompt": "Design and build a chat message component for a conversation with several participants (a group chat): who sent each message, their avatar, when, the content, the reader's own messages vs others', consecutive messages from the same person, and anything else you think it needs. There is no existing project; build it as a reusable React + TypeScript component (web). Save the component, styles, contract, tests, an example consumer, a static preview.html and NOTES.md.",
+   "business_words": "sender,customer,participant"
+  },
+  {
+   "id": "workbench",
+   "prompt": "Design and build a Workbench layout: a list of items on the left, an optional toolbar, the main content, and a panel (aside) on the right. Think about what the user can do with each region (selecting items, resizing or collapsing the panel, narrow screens). There is no existing project; build it as a reusable React + TypeScript component (web). Save the component, styles, contract, tests, an example consumer, a static preview.html and NOTES.md.",
+   "business_words": "ticket,customer,invoice"
+  },
+  {
+   "id": "sticky-table",
+   "prompt": "Design and build a data table where the right-most columns can be sticky (pinned to the right edge while the table scrolls horizontally). All columns size to their content and align to the left; leftover width stays empty on the right. The header is sticky too. There is no existing project; build it as a reusable React + TypeScript component (web). Save the component, styles, contract, tests, an example consumer, a static preview.html and NOTES.md.",
+   "business_words": "invoice,order,customer,amount"
+  },
+  {
+   "id": "house-card",
+   "prompt": "Design and build a card for a house listing: its photo, the address, features such as bedrooms, bathrooms and square meters, and whatever else a listing card needs. There is no existing project; build it as a reusable React + TypeScript component (web). Save the component, styles, contract, tests, an example consumer, a static preview.html and NOTES.md.",
+   "business_words": "listing,price,bedroom,bathroom,property"
+  },
+  {
+   "id": "cart",
+   "prompt": "Design and build a shopping cart: the items with their quantity and price, the total, a checkout button, and whatever else a cart needs. Simulate it with realistic data. There is no existing project; build it as React + TypeScript (web). Save the components, styles, contracts, tests, the simulated usage, a static preview.html and NOTES.md.",
+   "business_words": "price,cart,product,checkout"
+  }
+ ]
+}
