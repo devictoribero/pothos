@@ -1,5 +1,5 @@
 {
-  "_comment": "Third-party skills copied into this plugin at a pinned commit. scripts/vendor_sync.py checks and updates them; never edit these folders by hand.",
+  "_comment": "Third-party skills copied into this plugin at a pinned commit. scripts/vendor_sync.py checks and updates them; never edit these folders by hand. Matt Pocock's skills are vendored one entry per skill; his setup skill is left out because it writes configuration into the repository, and only its templates are kept (shared/vendor/pocock-setup) for the SessionStart adapter.",
   "archify": {
     "source": "https://github.com/tt-a1i/archify",
     "upstream_path": "archify",
@@ -18,5 +18,206 @@
     "commit": "b1ef42969ea7a2bb50aa26c2480274828a0385e7",
     "license": "MIT",
     "exclude": []
+  },
+  "code-review": {
+    "source": "https://github.com/mattpocock/skills",
+    "upstream_path": "skills/engineering/code-review",
+    "local_path": "skills/code-review",
+    "commit": "49dd158d1076134a641b33efb035946536778336",
+    "license": "MIT",
+    "exclude": [
+      "agents"
+    ]
+  },
+  "codebase-design": {
+    "source": "https://github.com/mattpocock/skills",
+    "upstream_path": "skills/engineering/codebase-design",
+    "local_path": "skills/codebase-design",
+    "commit": "49dd158d1076134a641b33efb035946536778336",
+    "license": "MIT",
+    "exclude": [
+      "agents"
+    ]
+  },
+  "diagnosing-bugs": {
+    "source": "https://github.com/mattpocock/skills",
+    "upstream_path": "skills/engineering/diagnosing-bugs",
+    "local_path": "skills/diagnosing-bugs",
+    "commit": "49dd158d1076134a641b33efb035946536778336",
+    "license": "MIT",
+    "exclude": [
+      "agents"
+    ]
+  },
+  "domain-modeling": {
+    "source": "https://github.com/mattpocock/skills",
+    "upstream_path": "skills/engineering/domain-modeling",
+    "local_path": "skills/domain-modeling",
+    "commit": "49dd158d1076134a641b33efb035946536778336",
+    "license": "MIT",
+    "exclude": [
+      "agents"
+    ]
+  },
+  "grill-with-docs": {
+    "source": "https://github.com/mattpocock/skills",
+    "upstream_path": "skills/engineering/grill-with-docs",
+    "local_path": "skills/grill-with-docs",
+    "commit": "49dd158d1076134a641b33efb035946536778336",
+    "license": "MIT",
+    "exclude": [
+      "agents"
+    ]
+  },
+  "implement": {
+    "source": "https://github.com/mattpocock/skills",
+    "upstream_path": "skills/engineering/implement",
+    "local_path": "skills/implement",
+    "commit": "49dd158d1076134a641b33efb035946536778336",
+    "license": "MIT",
+    "exclude": [
+      "agents"
+    ]
+  },
+  "implement-spec": {
+    "source": "https://github.com/mattpocock/skills",
+    "upstream_path": "skills/engineering/implement-spec",
+    "local_path": "skills/implement-spec",
+    "commit": "49dd158d1076134a641b33efb035946536778336",
+    "license": "MIT",
+    "exclude": [
+      "agents"
+    ]
+  },
+  "improve-codebase-architecture": {
+    "source": "https://github.com/mattpocock/skills",
+    "upstream_path": "skills/engineering/improve-codebase-architecture",
+    "local_path": "skills/improve-codebase-architecture",
+    "commit": "49dd158d1076134a641b33efb035946536778336",
+    "license": "MIT",
+    "exclude": [
+      "agents"
+    ]
+  },
+  "pr": {
+    "source": "https://github.com/mattpocock/skills",
+    "upstream_path": "skills/engineering/pr",
+    "local_path": "skills/pr",
+    "commit": "49dd158d1076134a641b33efb035946536778336",
+    "license": "MIT",
+    "exclude": [
+      "agents"
+    ]
+  },
+  "prototype": {
+    "source": "https://github.com/mattpocock/skills",
+    "upstream_path": "skills/engineering/prototype",
+    "local_path": "skills/prototype",
+    "commit": "49dd158d1076134a641b33efb035946536778336",
+    "license": "MIT",
+    "exclude": [
+      "agents"
+    ]
+  },
+  "retro": {
+    "source": "https://github.com/mattpocock/skills",
+    "upstream_path": "skills/engineering/retro",
+    "local_path": "skills/retro",
+    "commit": "49dd158d1076134a641b33efb035946536778336",
+    "license": "MIT",
+    "exclude": [
+      "agents"
+    ]
+  },
+  "tdd": {
+    "source": "https://github.com/mattpocock/skills",
+    "upstream_path": "skills/engineering/tdd",
+    "local_path": "skills/tdd",
+    "commit": "49dd158d1076134a641b33efb035946536778336",
+    "license": "MIT",
+    "exclude": [
+      "agents"
+    ]
+  },
+  "to-spec": {
+    "source": "https://github.com/mattpocock/skills",
+    "upstream_path": "skills/engineering/to-spec",
+    "local_path": "skills/to-spec",
+    "commit": "49dd158d1076134a641b33efb035946536778336",
+    "license": "MIT",
+    "exclude": [
+      "agents"
+    ]
+  },
+  "to-tickets": {
+    "source": "https://github.com/mattpocock/skills",
+    "upstream_path": "skills/engineering/to-tickets",
+    "local_path": "skills/to-tickets",
+    "commit": "49dd158d1076134a641b33efb035946536778336",
+    "license": "MIT",
+    "exclude": [
+      "agents"
+    ]
+  },
+  "triage": {
+    "source": "https://github.com/mattpocock/skills",
+    "upstream_path": "skills/engineering/triage",
+    "local_path": "skills/triage",
+    "commit": "49dd158d1076134a641b33efb035946536778336",
+    "license": "MIT",
+    "exclude": [
+      "agents"
+    ]
+  },
+  "wayfinder": {
+    "source": "https://github.com/mattpocock/skills",
+    "upstream_path": "skills/engineering/wayfinder",
+    "local_path": "skills/wayfinder",
+    "commit": "49dd158d1076134a641b33efb035946536778336",
+    "license": "MIT",
+    "exclude": [
+      "agents"
+    ]
+  },
+  "grilling": {
+    "source": "https://github.com/mattpocock/skills",
+    "upstream_path": "skills/productivity/grilling",
+    "local_path": "skills/grilling",
+    "commit": "49dd158d1076134a641b33efb035946536778336",
+    "license": "MIT",
+    "exclude": [
+      "agents"
+    ]
+  },
+  "handoff": {
+    "source": "https://github.com/mattpocock/skills",
+    "upstream_path": "skills/productivity/handoff",
+    "local_path": "skills/handoff",
+    "commit": "49dd158d1076134a641b33efb035946536778336",
+    "license": "MIT",
+    "exclude": [
+      "agents"
+    ]
+  },
+  "writing-for-agents": {
+    "source": "https://github.com/mattpocock/skills",
+    "upstream_path": "skills/productivity/writing-for-agents",
+    "local_path": "skills/writing-for-agents",
+    "commit": "49dd158d1076134a641b33efb035946536778336",
+    "license": "MIT",
+    "exclude": [
+      "agents"
+    ]
+  },
+  "pocock-setup-templates": {
+    "source": "https://github.com/mattpocock/skills",
+    "upstream_path": "skills/engineering/setup-matt-pocock-skills",
+    "local_path": "shared/vendor/pocock-setup",
+    "commit": "49dd158d1076134a641b33efb035946536778336",
+    "license": "MIT",
+    "exclude": [
+      "agents",
+      "SKILL.md"
+    ]
   }
 }

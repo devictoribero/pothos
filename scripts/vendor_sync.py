@@ -27,21 +27,44 @@ def load():
     return {k: v for k, v in data.items() if not k.startswith("_")}, data
 
 
-def path_changes(entry):
+class Clones:
+    """One clone per upstream source for the whole run; several entries often share a source."""
+
+    def __init__(self, full):
+        self.full = full
+        self.tmp = tempfile.TemporaryDirectory()
+        self.paths = {}
+
+    def get(self, source):
+        if source not in self.paths:
+            path = os.path.join(self.tmp.name, str(len(self.paths)))
+            args = ["--filter=blob:none", "--no-checkout"] if not self.full else ["--depth", "1"]
+            subprocess.run(["git", "clone", "-q", *args, source, path], check=True)
+            self.paths[source] = path
+        return self.paths[source]
+
+    def head(self, source):
+        return subprocess.run(["git", "-C", self.get(source), "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
+
+    def close(self):
+        self.tmp.cleanup()
+
+
+def path_changes(clones, entry):
     """Commits on upstream HEAD since the pinned one that touch the vendored folder (newest first)."""
-    with tempfile.TemporaryDirectory() as tmp:
-        subprocess.run(["git", "clone", "-q", "--filter=blob:none", "--no-checkout", entry["source"], tmp], check=True)
-        head = subprocess.run(["git", "-C", tmp, "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
-        log = subprocess.run(["git", "-C", tmp, "log", "--format=%H %s", f"{entry['commit']}..{head}", "--", entry["upstream_path"]],
-                             capture_output=True, text=True, check=True).stdout.strip()
+    repo = clones.get(entry["source"])
+    head = clones.head(entry["source"])
+    log = subprocess.run(["git", "-C", repo, "log", "--format=%H %s", f"{entry['commit']}..{head}", "--", entry["upstream_path"]],
+                         capture_output=True, text=True, check=True).stdout.strip()
     return head, [line for line in log.splitlines() if line]
 
 
 def check():
     entries, _ = load()
     stale = False
+    clones = Clones(full=False)
     for name, entry in entries.items():
-        head, commits = path_changes(entry)
+        head, commits = path_changes(clones, entry)
         if not commits:
             print(f"{name}: current (no change to {entry['upstream_path']} since {entry['commit'][:12]})")
             continue
@@ -50,27 +73,34 @@ def check():
         for line in commits[:20]:
             print(f"  - {line[:12]} {line[41:]}")
         print(f"  {entry['source']}/compare/{entry['commit'][:12]}...{head[:12]}")
+    clones.close()
     return 10 if stale else 0
 
 
 def update(names):
     entries, raw = load()
+    unknown = [n for n in names if n not in entries]
+    if unknown:
+        print(f"unknown entry: {', '.join(unknown)}", file=sys.stderr)
+        return 64
     targets = names or list(entries)
+    clones = Clones(full=True)
     for name in targets:
         entry = entries[name]
-        with tempfile.TemporaryDirectory() as tmp:
-            subprocess.run(["git", "clone", "-q", "--depth", "1", entry["source"], tmp], check=True)
-            head = subprocess.run(["git", "-C", tmp, "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
-            src = os.path.join(tmp, entry["upstream_path"]) + "/"
-            dst = os.path.join(PLUGIN, entry["local_path"]) + "/"
-            excludes = [arg for pattern in entry.get("exclude", []) for arg in ("--exclude", pattern)]
-            subprocess.run(["rsync", "-a", "--delete", *excludes, src, dst], check=True)
-            license_src = os.path.join(tmp, "LICENSE")
-            if not os.path.exists(os.path.join(dst, "LICENSE")) and os.path.exists(license_src):
-                shutil.copy(license_src, os.path.join(dst, "LICENSE"))
+        tmp = clones.get(entry["source"])
+        head = clones.head(entry["source"])
+        src = os.path.join(tmp, entry["upstream_path"]) + "/"
+        dst = os.path.join(PLUGIN, entry["local_path"]) + "/"
+        os.makedirs(dst, exist_ok=True)
+        excludes = [arg for pattern in entry.get("exclude", []) for arg in ("--exclude", pattern)]
+        subprocess.run(["rsync", "-a", "--delete", "--exclude", "LICENSE", *excludes, src, dst], check=True)
+        license_src = os.path.join(tmp, "LICENSE")
+        if os.path.exists(license_src):
+            shutil.copy(license_src, os.path.join(dst, "LICENSE"))
         old = entry["commit"]
         raw[name]["commit"] = head
-        print(f"{name}: {old[:12]} -> {head[:12]}")
+        print(f"{name}: {old[:12] or 'new'} -> {head[:12]}")
+    clones.close()
     with open(MANIFEST, "w", encoding="utf-8") as fh:
         json.dump(raw, fh, indent=2)
         fh.write("\n")
