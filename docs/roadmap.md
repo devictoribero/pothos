@@ -7,9 +7,22 @@ Status of each phase, newest decisions first. Phase 2 was rewritten on 2026-10-1
 | 0 | Hygiene: revoke leaked tokens, remove the old personal agent and duplicate skills | done except revoking tokens, which only the owner can do |
 | 1 | Skeleton, private contract, `onboard`, `explain`, `archify` | done |
 | 2 | The full cycle, built on Matt Pocock's skills | done (0.2.0) |
-| 3 | Pilot on a side project | after phase 2 |
+| 3 | Pilot on a side project | running on Lifetails, see below |
 | 4 | Work repositories, once the pilot holds | later |
 | 5 | Remaining repositories and more autonomy | later |
+
+## Phase 3: pilot on Lifetails
+
+The pilot built phase 0 of a real plan (two tickets, the second blocked by the first) with `to-tickets` and then `implement-spec` headless, on an integration branch, without pushing.
+
+What it found in devflow, all fixed:
+
+- **Fresh worktrees could not run the checks.** The generated database client and the env file were missing. The contract gained `run.setup`, which every worktree runs first.
+- **Shared test databases leak between worktrees.** Migrations from unmerged branches polluted the shared test database. The contract's `full` command now points each worktree at its own database. The repository itself is unchanged.
+- **A slow suite killed the run silently.** An implementer started the full suite as a background command; it outlived the ten-minute command limit, died with the subagent, and the orchestrator waited forever. `verify` now runs the checks detached and returns exit 4 with a `wait` command, and the session context forbids background suites.
+- **`disable-model-invocation` skills need a slash command in headless runs.** `devflow-run.py` already starts sessions that way.
+
+Phase 4 starts only after the owner reviews the pilot's branch.
 
 ## Phase 2: devflow on top of Matt Pocock's skills
 
