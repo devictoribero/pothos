@@ -2,19 +2,26 @@
 """Run the contract's checks and keep a receipt per commit, outside the repository.
 
 Usage:
-  verify.py run LEVEL [--env NAME]   LEVEL is fast, full, e2e or all (full, then e2e when configured)
+  verify.py run LEVEL [--env NAME] [--wait SECONDS]
+                                     LEVEL is fast, full, e2e or all (full, then e2e when configured)
+  verify.py wait [--wait SECONDS]    keep waiting for HEAD's run that is still going
   verify.py check [--no-e2e]         exit 0 when HEAD has a passing full receipt (and e2e, when configured)
   verify.py show                     print HEAD's receipts as JSON
 
 Receipts live in $DEVFLOW_HOME/receipts/<host>/<owner>/<repo>/<commit>/<level>.json with the full log next
 to them. A run on a dirty working tree is recorded but never counts as a pass: commit first.
 
+The checks run in a detached process, so a slow suite outlives the caller. `run` waits up to --wait
+seconds (default 540, under an agent's ten-minute command limit) and exits 4 when the run is still
+going; `wait` picks it up again. Starting `run` while one is going for the same commit attaches to it.
+
 Exit codes: 0 passed (or skipped because the level is not configured), 1 failed or no valid receipt,
-2 no contract, 3 the contract or the environment is unusable, 64 usage.
+2 no contract, 3 the contract or the environment is unusable, 4 still running, 64 usage.
 """
 import datetime
 import json
 import os
+import shlex
 import subprocess
 import sys
 import time
@@ -25,6 +32,7 @@ import contract  # noqa: E402
 
 LEVELS = ("fast", "full", "e2e")
 TAIL = 60
+WAIT = 540
 
 
 def head(root):
@@ -160,6 +168,109 @@ def command_for_any_e2e(data):
     return any(e.get("e2e") for e in ((data.get("run") or {}).get("environments") or []))
 
 
+def option(argv, name):
+    return argv[argv.index(name) + 1] if name in argv and argv.index(name) + 1 < len(argv) else None
+
+
+def budget(argv):
+    value = option(argv, "--wait")
+    return float(value) if value else WAIT
+
+
+def execute(root, data, level, env):
+    """The checks themselves, run inside the detached process."""
+    if level != "all":
+        return run_level(root, data, level, env)
+    status = run_level(root, data, "full", env)
+    if status:
+        return status
+    if command_for_any_e2e(data):
+        return run_level(root, data, "e2e", env)
+    print("e2e: skipped (not configured)")
+    return 0
+
+
+def marker_paths(root):
+    folder = receipt_dir(root, head(root))
+    return folder, os.path.join(folder, "run.json")
+
+
+def alive(pid):
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def start(root, data, level, env, seconds):
+    commit = head(root)
+    if not commit:
+        print("no commit yet; commit before verifying", file=sys.stderr)
+        return 3
+    for one in (("full", "e2e") if level == "all" else (level,)):
+        if one != "e2e" or level == "e2e" or command_for_any_e2e(data):
+            command_for(data, one, env)  # exits 3 on an unusable environment, before anything starts
+    folder, marker = marker_paths(root)
+    if os.path.isfile(marker):
+        with open(marker, encoding="utf-8") as fh:
+            running = json.load(fh)
+        if alive(running["pid"]):
+            print(f"a {running['level']} run is already going for {commit[:12]}; waiting for it", flush=True)
+            return attach(root, None, seconds)
+    os.makedirs(folder, exist_ok=True)
+    out = os.path.join(folder, "run.out")
+    args = [sys.executable, os.path.abspath(__file__), "_exec", level] + (["--env", env] if env else [])
+    script = (f"{' '.join(shlex.quote(a) for a in args)} > {shlex.quote(out)} 2>&1; "
+              f"echo $? > {shlex.quote(os.path.join(folder, 'run.exit'))}; rm -f {shlex.quote(marker)}")
+    for stale in ("run.exit",):
+        if os.path.exists(os.path.join(folder, stale)):
+            os.remove(os.path.join(folder, stale))
+    proc = subprocess.Popen(["/bin/sh", "-c", script], cwd=root, start_new_session=True,
+                            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    with open(marker, "w", encoding="utf-8") as fh:
+        json.dump({"pid": proc.pid, "level": level, "env": env, "out": out}, fh)
+    return attach(root, proc, seconds)
+
+
+def attach(root, proc, seconds):
+    folder, marker = marker_paths(root)
+    exit_path = os.path.join(folder, "run.exit")
+    if not os.path.isfile(marker) and not os.path.isfile(exit_path):
+        print("no run for this commit; start one with run")
+        return 1
+    pid = None
+    if os.path.isfile(marker):
+        with open(marker, encoding="utf-8") as fh:
+            pid = json.load(fh)["pid"]
+    deadline = time.monotonic() + seconds
+    while True:
+        if proc is not None:
+            done = proc.poll() is not None
+        else:
+            done = not os.path.isfile(marker) or not alive(pid)
+        if done:
+            break
+        if time.monotonic() >= deadline:
+            print(f"still running (pid {pid}); output so far in {os.path.join(folder, 'run.out')}. "
+                  "Run `verify.py wait` to keep waiting. Do not start another run.")
+            return 4
+        time.sleep(1)
+    out = os.path.join(folder, "run.out")
+    if os.path.isfile(out):
+        with open(out, encoding="utf-8", errors="replace") as fh:
+            sys.stdout.write(fh.read())
+    if not os.path.isfile(exit_path):
+        print("the run stopped without finishing; start it again")
+        if os.path.isfile(marker):
+            os.remove(marker)
+        return 1
+    with open(exit_path, encoding="utf-8") as fh:
+        return int(fh.read().strip() or 1)
+
+
 def main(argv):
     if not argv or argv[0] in ("-h", "--help"):
         print(__doc__.strip())
@@ -168,19 +279,16 @@ def main(argv):
     cmd = argv[0]
     if cmd == "run":
         if len(argv) < 2 or argv[1] not in LEVELS + ("all",):
-            print("usage: verify.py run fast|full|e2e|all [--env NAME]", file=sys.stderr)
+            print("usage: verify.py run fast|full|e2e|all [--env NAME] [--wait SECONDS]", file=sys.stderr)
             return 64
-        env = argv[argv.index("--env") + 1] if "--env" in argv and argv.index("--env") + 1 < len(argv) else None
         data = load_contract(root)
-        if argv[1] != "all":
-            return run_level(root, data, argv[1], env)
-        status = run_level(root, data, "full", env)
-        if status:
-            return status
-        if command_for_any_e2e(data):
-            return run_level(root, data, "e2e", env)
-        print("e2e: skipped (not configured)")
-        return 0
+        return start(root, data, argv[1], option(argv, "--env"), budget(argv))
+    if cmd == "_exec":
+        data = load_contract(root)
+        return execute(root, data, argv[1], option(argv, "--env"))
+    if cmd == "wait":
+        load_contract(root)
+        return attach(root, None, budget(argv))
     if cmd == "check":
         data = load_contract(root)
         return check(root, data, "--no-e2e" not in argv)

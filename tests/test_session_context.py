@@ -110,6 +110,7 @@ class SessionContextTest(unittest.TestCase):
         text = self.ctx()
         self.assertIn("`fast`: `npm run lint`", text)
         self.assertIn("no end-to-end command", text)
+        self.assertIn("only through verify, in the foreground", text)
 
     def test_setup_command_runs_first_in_every_worktree(self):
         self.write({"version": 1, "verify": {"full": "npm test"}, "run": {"setup": "npm ci && npm run codegen"}})

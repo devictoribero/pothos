@@ -68,6 +68,17 @@ Only `version` and `verify.full` are required. The schema documents every field,
 | Explain | `explain`, `archify` | devflow, tt-a1i | Local HTML explanations with diagrams, indexed for later sessions. |
 | Other | `triage`, `handoff`, `writing-for-agents` | Pocock | Issue triage, session handoff, writing skills and agent docs. |
 
+## Running unattended
+
+```bash
+cd your-repo
+python3 ~/path/to/devflow/plugins/devflow/scripts/devflow-run.py spec .scratch/<feature>/issues          # whole spec
+python3 ~/path/to/devflow/plugins/devflow/scripts/devflow-run.py ticket .scratch/<feature>/issues/01-x.md  # one ticket
+python3 ~/path/to/devflow/plugins/devflow/scripts/devflow-run.py status
+```
+
+Each run gets a worktree and branch next to the repository, runs the contract's `run.setup`, and starts a headless session that builds, verifies, reviews and writes the pull request body. Logs and results go to `~/.config/devflow/runs/`. Add `--open-pr` to let it push and open a draft pull request; nothing ever merges into the base branch.
+
 ## Standards
 
 `plugins/devflow/standards/` holds personal coding standards that `code-review`, `tdd` and `implement` read through the session context. A repository's own documented standards win on conflict.

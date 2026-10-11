@@ -99,7 +99,10 @@ def verify_section(data):
             "before a pull request leaves draft; it runs these commands and records a receipt for the commit. "
             "With `implement-spec`, the merger subagent runs `verify run all` on the integration branch after each merge and "
             "hands a red result back to an implementer instead of moving on. "
-            "Run the `fast` command yourself while working.\n\n" + "\n".join(rows))
+            "Run the `fast` command yourself while working. Run `full` and `e2e` only through verify, in the foreground: "
+            "a background command dies when your turn or subagent ends and nobody is notified. verify keeps slow checks "
+            "alive in a detached process; when it exits 4 they are still going, so run `verify.py wait` until it returns "
+            "another code.\n\n" + "\n".join(rows))
     if not verify.get("e2e"):
         text += "\n\nThis repository has no end-to-end command; skip that step and say so in the pull request."
     return text

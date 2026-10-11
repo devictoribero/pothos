@@ -28,6 +28,8 @@ A level the contract does not configure is recorded as skipped and does not bloc
    python3 "${CLAUDE_SKILL_DIR}/scripts/verify.py" run all [--env NAME]
    ```
    This runs `full` and then `e2e` when configured. Use `run fast` while iterating.
+
+   Run it in the foreground, never as a background command: a background command dies when your turn or your subagent ends, and nobody gets notified. The checks run in a detached process, and `run` returns within about nine minutes. Exit `4` means they are still going: run `verify.py wait` (also in the foreground) until it returns another code. Never start a second run for the same commit; `run` attaches to the one in progress anyway.
 4. **On failure**, read the tail the script prints, then open the log it names if you need more. Fix the cause, commit, and run again. Never weaken, skip or delete a check to get a pass. If the failure is unrelated to the change and also fails on the base branch, say so with evidence (the base commit's receipt) and stop. Do not paper over it.
 5. **Gate.** Before merging or marking a pull request ready:
    ```bash
@@ -41,4 +43,4 @@ State the level, the commit and the result in one line each. Quote the script's 
 
 ## Exit codes
 
-`0` passed or skipped, `1` failed or not verified, `2` no contract (suggest `/devflow:onboard`), `3` the contract or environment is unusable (the message says which), `64` usage.
+`0` passed or skipped, `1` failed or not verified, `2` no contract (suggest `/devflow:onboard`), `3` the contract or environment is unusable (the message says which), `4` still running (run `wait`), `64` usage.

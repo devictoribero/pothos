@@ -116,6 +116,30 @@ class VerifyTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(self.run_script("show").stdout)["receipts"]["e2e"]["env"], "demo")
 
+    def test_a_slow_run_outlives_the_caller_and_wait_picks_it_up(self):
+        self.contract({"verify": {"full": "sleep 3 && echo slow but fine"}})
+        first = self.run_script("run", "full", "--wait", "1")
+        self.assertEqual(first.returncode, 4, first.stdout)
+        self.assertIn("verify.py wait", first.stdout)
+        again = self.run_script("run", "full", "--wait", "0")
+        self.assertIn("already going", again.stdout)
+        self.assertEqual(again.returncode, 4)
+        waited = self.run_script("wait", "--wait", "30")
+        self.assertEqual(waited.returncode, 0, waited.stdout)
+        self.assertIn("full: passed", waited.stdout)
+        self.assertEqual(self.run_script("check").returncode, 0)
+
+    def test_wait_reports_a_failed_background_run(self):
+        self.contract({"verify": {"full": "sleep 2 && exit 5"}})
+        self.assertEqual(self.run_script("run", "full", "--wait", "0").returncode, 4)
+        waited = self.run_script("wait", "--wait", "30")
+        self.assertEqual(waited.returncode, 1)
+        self.assertIn("full: failed", waited.stdout)
+
+    def test_wait_without_a_run_exits_1(self):
+        self.contract({"verify": {"full": "true"}})
+        self.assertEqual(self.run_script("wait").returncode, 1)
+
     def test_usage_errors_exit_64(self):
         self.assertEqual(self.run_script("run").returncode, 64)
         self.assertEqual(self.run_script("frobnicate").returncode, 64)
