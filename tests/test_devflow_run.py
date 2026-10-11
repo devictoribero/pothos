@@ -112,7 +112,7 @@ class DevflowRunTest(unittest.TestCase):
         self.assertEqual(self.calls(), 2)
         with open(self.log) as fh:
             self.assertIn("s-1", fh.read())
-        self.assertIn("done $3.00", self.run_script("status").stdout)
+        self.assertIn("done $1.50", self.run_script("status").stdout)
 
     def test_a_session_that_never_reports_fails_after_the_resume_budget(self):
         self.contract({"verify": {"full": "true"}})

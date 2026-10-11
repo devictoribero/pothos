@@ -148,12 +148,11 @@ def start(kind, args):
             print(f"run.setup failed; see {run}/setup.log", file=sys.stderr)
             return 1
     report = os.path.join(run, "report.md")
-    total, attempt, session_id = 0.0, 0, None
+    attempt, session_id = 0, None
     while True:
         with open(os.path.join(run, "session.jsonl"), "a") as out, open(os.path.join(run, "session.err"), "a") as err:
             session = subprocess.run(command, cwd=worktree, stdout=out, stderr=err)
         result, cost, session_id = final_result(os.path.join(run, "session.jsonl"), session_id)
-        total += cost or 0
         if os.path.isfile(report) or session.returncode or not session_id or attempt >= resumes:
             break
         attempt += 1
@@ -161,7 +160,7 @@ def start(kind, args):
     with open(os.path.join(run, "result.md"), "w", encoding="utf-8") as fh:
         fh.write(result or "(the session ended without a result message)\n")
     state = "done" if os.path.isfile(report) else "failed"
-    write_meta(run, {**meta, "state": state, "exit": session.returncode, "cost_usd": round(total, 2) or None,
+    write_meta(run, {**meta, "state": state, "exit": session.returncode, "cost_usd": cost,
                      "resumes": attempt, "finished": datetime.datetime.now().strftime("%Y%m%d-%H%M%S")})
     print(f"{state}: {run}/result.md")
     return 0 if state == "done" else 1
@@ -174,7 +173,7 @@ def write_meta(run, meta):
 
 
 def final_result(path, session_id=None):
-    """The last result message, the cost of the last session segment and the session id."""
+    """The last result message, its cost (cumulative across resumes of one session) and the session id."""
     result, cost = None, None
     with open(path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
