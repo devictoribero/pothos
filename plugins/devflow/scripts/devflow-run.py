@@ -2,10 +2,10 @@
 """Run devflow's inner loop unattended: one headless Claude Code session in a fresh worktree.
 
 Usage:
-  devflow-run.py spec TICKETS [--slug SLUG] [--base BRANCH] [--open-pr] [--model MODEL] [--dry-run]
+  devflow-run.py spec TICKETS [--slug SLUG] [--base BRANCH] [--open-pr] [--model MODEL] [--resumes N] [--dry-run]
       Build every ticket under TICKETS (a local tracker folder, or a tracker reference) with
       /devflow:implement-spec on a new integration branch feature/<slug>.
-  devflow-run.py ticket TICKET [--slug SLUG] [--base BRANCH] [--open-pr] [--model MODEL] [--dry-run]
+  devflow-run.py ticket TICKET [--slug SLUG] [--base BRANCH] [--open-pr] [--model MODEL] [--resumes N] [--dry-run]
       Build one ticket with /devflow:implement on a new branch ticket/<slug>.
   devflow-run.py status
       List this repository's runs, newest first, with their state and final line.
@@ -13,6 +13,11 @@ Usage:
 Run it from inside the repository. Each run gets its own worktree next to the repository
 (<repo>-devflow/<slug>), runs the contract's run.setup there, and logs to
 $DEVFLOW_HOME/runs/<host>/<owner>/<repo>/<timestamp>-<slug>/ (session.jsonl, result.md, meta.json).
+
+A headless session ends when its turn ends, and that kills its background commands and subagents.
+The prompt forbids ending the turn while work is pending, and the run counts as finished only when
+the session writes report.md to the run folder. Until then the script resumes the session, at most
+--resumes times (default 5).
 
 Without --open-pr the run never pushes: it writes the pull request body to result folder's
 pr-body.md and stops. With --open-pr it pushes the branch and opens a draft pull request.
@@ -46,13 +51,23 @@ PROMPTS = {
         "When the work is committed, run /devflow:verify and fix until verify check passes. {publish}"
     ),
 }
+HEADLESS = (
+    "This is a headless session: when your turn ends, the run ends and every background command and subagent "
+    "still running is killed. Never end your turn to wait for something. Run subagents and long commands in the "
+    "foreground and wait for them inside this turn. "
+)
+RESUME = (
+    "Your turn ended before the run was finished, and that killed anything still running in the background. "
+    "Continue from where you are: check the tracker and the branch, redo any lost work in the foreground, and "
+    "carry on with the original instructions. {finish}"
+)
+FINISH = "Finish by writing your report (what you did, the commits, the verify line, anything you could not do) to {run}/report.md."
 PUBLISH = {
     False: ("Do not push and do not open a pull request. When everything is merged, reviewed and verified, use the pr "
-            "skill to write the pull request body, with evidence from /devflow:evidence, to {run}/pr-body.md. Then stop "
-            "and report what you did, the commits, the verify line and anything you could not do."),
+            "skill to write the pull request body, with evidence from /devflow:evidence, to {run}/pr-body.md. " + FINISH),
     True: ("When everything is merged, reviewed and verified, push {branch} and open a draft pull request into {base} "
            "with the pr skill's body and evidence from /devflow:evidence. Never mark it ready and never merge it. "
-           "Then stop and report the pull request URL, the commits, the verify line and anything you could not do."),
+           + FINISH + " Include the pull request URL."),
 }
 
 
@@ -99,11 +114,13 @@ def start(kind, args):
     run = os.path.join(runs_dir(root), f"{stamp}-{slug}")
     worktree = os.path.join(os.path.dirname(root), os.path.basename(root) + "-devflow", slug)
     open_pr = "--open-pr" in args
-    prompt = PROMPTS[kind].format(target=target, branch=branch, base=base,
-                                  publish=PUBLISH[open_pr].format(run=run, branch=branch, base=base))
-    command = ["claude", "-p", prompt, "--permission-mode", "bypassPermissions", "--output-format", "stream-json", "--verbose"]
+    prompt = HEADLESS + PROMPTS[kind].format(target=target, branch=branch, base=base,
+                                             publish=PUBLISH[open_pr].format(run=run, branch=branch, base=base))
+    options = ["--permission-mode", "bypassPermissions", "--output-format", "stream-json", "--verbose"]
     if flag(args, "--model"):
-        command += ["--model", flag(args, "--model")]
+        options += ["--model", flag(args, "--model")]
+    command = ["claude", "-p", prompt, *options]
+    resumes = int(flag(args, "--resumes") or 5)
     setup = (data.get("run") or {}).get("setup")
     plan = {"kind": kind, "target": target, "branch": branch, "base": base, "worktree": worktree, "run": run,
             "setup": setup, "open_pr": open_pr, "command": " ".join(shlex.quote(c) for c in command)}
@@ -130,14 +147,22 @@ def start(kind, args):
             write_meta(run, {**meta, "state": "setup-failed"})
             print(f"run.setup failed; see {run}/setup.log", file=sys.stderr)
             return 1
-    with open(os.path.join(run, "session.jsonl"), "w") as out, open(os.path.join(run, "session.err"), "w") as err:
-        session = subprocess.run(command, cwd=worktree, stdout=out, stderr=err)
-    result, cost = final_result(os.path.join(run, "session.jsonl"))
+    report = os.path.join(run, "report.md")
+    total, attempt, session_id = 0.0, 0, None
+    while True:
+        with open(os.path.join(run, "session.jsonl"), "a") as out, open(os.path.join(run, "session.err"), "a") as err:
+            session = subprocess.run(command, cwd=worktree, stdout=out, stderr=err)
+        result, cost, session_id = final_result(os.path.join(run, "session.jsonl"), session_id)
+        total += cost or 0
+        if os.path.isfile(report) or session.returncode or not session_id or attempt >= resumes:
+            break
+        attempt += 1
+        command = ["claude", "-p", RESUME.format(finish=FINISH.format(run=run)), "--resume", session_id, *options]
     with open(os.path.join(run, "result.md"), "w", encoding="utf-8") as fh:
         fh.write(result or "(the session ended without a result message)\n")
-    state = "done" if session.returncode == 0 and result else "failed"
-    write_meta(run, {**meta, "state": state, "exit": session.returncode, "cost_usd": cost,
-                     "finished": datetime.datetime.now().strftime("%Y%m%d-%H%M%S")})
+    state = "done" if os.path.isfile(report) else "failed"
+    write_meta(run, {**meta, "state": state, "exit": session.returncode, "cost_usd": round(total, 2) or None,
+                     "resumes": attempt, "finished": datetime.datetime.now().strftime("%Y%m%d-%H%M%S")})
     print(f"{state}: {run}/result.md")
     return 0 if state == "done" else 1
 
@@ -148,7 +173,8 @@ def write_meta(run, meta):
         fh.write("\n")
 
 
-def final_result(path):
+def final_result(path, session_id=None):
+    """The last result message, the cost of the last session segment and the session id."""
     result, cost = None, None
     with open(path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
@@ -156,9 +182,10 @@ def final_result(path):
                 event = json.loads(line)
             except ValueError:
                 continue
+            session_id = event.get("session_id") or session_id
             if event.get("type") == "result":
                 result, cost = event.get("result"), event.get("total_cost_usd")
-    return result, cost
+    return result, cost, session_id
 
 
 def status():
@@ -174,7 +201,9 @@ def status():
         with open(meta_path, encoding="utf-8") as fh:
             meta = json.load(fh)
         last = ""
-        result = os.path.join(folder, name, "result.md")
+        result = os.path.join(folder, name, "report.md")
+        if not os.path.isfile(result):
+            result = os.path.join(folder, name, "result.md")
         if os.path.isfile(result):
             with open(result, encoding="utf-8") as fh:
                 lines = [l.strip() for l in fh if l.strip()]

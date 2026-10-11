@@ -20,6 +20,7 @@ What it found in devflow, all fixed:
 - **Fresh worktrees could not run the checks.** The generated database client and the env file were missing. The contract gained `run.setup`, which every worktree runs first.
 - **Shared test databases leak between worktrees.** Migrations from unmerged branches polluted the shared test database. The contract's `full` command now points each worktree at its own database. The repository itself is unchanged.
 - **A slow suite killed the run silently.** An implementer started the full suite as a background command; it outlived the ten-minute command limit, died with the subagent, and the orchestrator waited forever. `verify` now runs the checks detached and returns exit 4 with a `wait` command, and the session context forbids background suites.
+- **A headless orchestrator ended its turn to wait for its reviewers.** In `claude -p` that ends the process and kills the subagents. `devflow-run.py` now tells the session never to end its turn to wait, and resumes it until it writes `report.md`.
 - **`disable-model-invocation` skills need a slash command in headless runs.** `devflow-run.py` already starts sessions that way.
 
 Phase 4 starts only after the owner reviews the pilot's branch.

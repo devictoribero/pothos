@@ -10,10 +10,16 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT = os.path.join(ROOT, "plugins", "devflow", "scripts", "devflow-run.py")
 
 FAKE_CLAUDE = """#!/bin/sh
-# Stands in for claude -p: records its arguments and directory, prints one result event.
+# Stands in for claude -p: records its arguments and directory, prints one result event, and writes the
+# report when FAKE_REPORT says so: always, on-resume (only when called with --resume) or never.
 pwd > "$FAKE_LOG"
 printf '%s\\n' "$@" >> "$FAKE_LOG"
-echo '{"type":"result","result":"built 2 tickets; verified: full passed","total_cost_usd":1.5}'
+echo x >> "$FAKE_LOG.calls"
+report=$(printf '%s' "$2" | sed -n 's/.* to \\([^ ]*\\/report\\.md\\).*/\\1/p')
+case "$FAKE_REPORT:$3" in
+  always:*|on-resume:--resume) echo "built 2 tickets; verified: full passed" > "$report" ;;
+esac
+echo '{"type":"result","result":"built 2 tickets; verified: full passed","total_cost_usd":1.5,"session_id":"s-1"}'
 """
 
 
@@ -34,7 +40,7 @@ class DevflowRunTest(unittest.TestCase):
         self.git("remote", "add", "origin", "https://github.com/acme/shop.git")
         self.git("commit", "-q", "--allow-empty", "-m", "init")
         os.makedirs(os.path.join(self.repo, ".scratch", "reminders", "issues"))
-        self.env = {**os.environ, "DEVFLOW_HOME": self.home, "FAKE_LOG": self.log, "PATH": self.bin + os.pathsep + os.environ["PATH"]}
+        self.env = {**os.environ, "DEVFLOW_HOME": self.home, "FAKE_LOG": self.log, "FAKE_REPORT": "always", "PATH": self.bin + os.pathsep + os.environ["PATH"]}
 
     def tearDown(self):
         subprocess.run(["git", "-C", self.repo, "worktree", "prune"], capture_output=True)
@@ -87,6 +93,34 @@ class DevflowRunTest(unittest.TestCase):
         self.assertIn("/devflow:implement-spec", logged)
         status = self.run_script("status").stdout
         self.assertIn("done $1.50  feature/reminders  built 2 tickets; verified: full passed", status)
+
+    def calls(self):
+        with open(self.log + ".calls") as fh:
+            return len(fh.read().split())
+
+    def test_the_prompt_forbids_ending_the_turn_to_wait(self):
+        self.contract({"verify": {"full": "true"}})
+        plan = json.loads(self.run_script("spec", ".scratch/reminders/issues", "--dry-run").stdout)
+        self.assertIn("Never end your turn to wait", plan["command"])
+        self.assertIn("/report.md", plan["command"])
+
+    def test_a_session_that_stops_before_its_report_is_resumed(self):
+        self.contract({"verify": {"full": "true"}})
+        self.env["FAKE_REPORT"] = "on-resume"
+        result = self.run_script("spec", ".scratch/reminders/issues")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.calls(), 2)
+        with open(self.log) as fh:
+            self.assertIn("s-1", fh.read())
+        self.assertIn("done $3.00", self.run_script("status").stdout)
+
+    def test_a_session_that_never_reports_fails_after_the_resume_budget(self):
+        self.contract({"verify": {"full": "true"}})
+        self.env["FAKE_REPORT"] = "never"
+        result = self.run_script("spec", ".scratch/reminders/issues", "--resumes", "2")
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(self.calls(), 3)
+        self.assertIn("failed", self.run_script("status").stdout)
 
     def test_failed_setup_stops_before_the_session(self):
         self.contract({"verify": {"full": "true"}, "run": {"setup": "exit 7"}})
