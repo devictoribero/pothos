@@ -9,7 +9,7 @@ A local copy drifts from the shared one and teaches the next reader, human or ag
 
 ### 2. Use design tokens and the primitive's typed props instead of raw values
 Yellow. Generic.
-Raw sizes, colors and breakpoints land between the scale's steps and break theming. If a raw value is truly needed, leave a comment saying why so nobody "fixes" it later.
+Raw sizes, colors and breakpoints land between the scale's steps and break theming. If a raw value is truly needed, leave a comment saying why so nobody "fixes" it later. For components, the `component-design` skill has the full rules.
 
 ### 3. Keep vendor and infrastructure details out of the domain and application layers
 Red. Generic.
@@ -86,18 +86,11 @@ Run it on a device, in a browser with client side navigation, or through the loc
 
 ### 15. Pair every fix and behavior with a test that fails without it
 Yellow. Generic.
-Prove the test by reverting the fix or mutating the code. Assert what must change, such as an update timestamp, not only what stays the same.
+The test is seen failing without the fix, and a fix also guards its neighbours. How: `standards/testing.md`, rules 1 and 2.
 
 ### 16. Build test data from shared factories with neutral defaults
 Yellow. Generic.
-Defaults describe a freshly created object. Each test overrides only the fields it cares about, so the setup reads as the scenario.
-
-```ts
-// before
-const order = { id: "1", status: "paid", updatedAt: new Date() };
-// after
-const order = anOrder({ status: "paid" });
-```
+One small builder per domain type, fixed neutral defaults, each test overrides only what it is about. How: `standards/testing.md`, rule 7.
 
 ### 17. Finish a rule, rename or cleanup everywhere it applies
 Red when left halfway. Generic.
@@ -132,11 +125,11 @@ Every state you can enter must be visible, listable and recoverable. Do not leav
 
 ### 23. Test through the public or accessible surface, at the right layer
 Yellow. Generic.
-Query by role and text, not by class names or DOM structure. Do not couple tests to framework module internals. Keep each test next to the layer it exercises.
+Query by role and text, assert what a person sees or a caller gets, and keep each test next to the layer it exercises. How: `standards/testing.md`, rules 5 and 6.
 
 ### 24. Meet basic accessibility
 Red for text contrast below the normal minimum, yellow otherwise. Generic.
-Clickable rows need keyboard support and a visible focus ring. Focus must land somewhere sensible when content unmounts.
+Clickable rows need keyboard support and a visible focus ring. Focus must land somewhere sensible when content unmounts. For components, `component-design` decides accessibility with the API; see its `references/accessibility.md`.
 
 ### 25. Give each intention its own command and avoid boolean or null switches
 Yellow. Generic.

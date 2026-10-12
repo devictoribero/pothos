@@ -34,6 +34,10 @@ A skill may start on its own from its description; what needs a person is the si
 
 A skill's description says what it does and when to use it, in the words a user would type. It decides whether the skill fires, so it is tested like code.
 
+## Standards are rules, skills are methods, and each rule has one owner
+
+A standard is a rule that applies to every change: do this, avoid that, and why. Implementers read the standards before writing code, and `code-review` passes them to its reviewer subagent. A skill is a method for one kind of work, with steps, references and scripts, loaded only when that work comes up. A rule lives in exactly one place. Another file may state it in one line, so a reviewer that never loads the skill still checks it, and then points to the owner instead of repeating the explanation.
+
 ## Every skill has evals
 
 Each skill ships cases under `evals/` with deterministic graders where possible and an LLM grader only for judgement. Check what the agent did, not what it says it did: a grader that reads `package.json` to confirm it is unchanged beats a judge asked whether the report claims changes. LLM judges also miss content at the end of long messages, so anything a regex can find goes to a regex. Run the evals before each release:

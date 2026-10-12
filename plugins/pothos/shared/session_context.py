@@ -170,6 +170,8 @@ def standards_section(data, repo_workflow=False):
         lines += ["", "Personal (outside the repository):"] + [f"- `{path}`" for path in personal]
     lines += ["", "Before writing code that creates or changes UI components, load the `component-design` skill"
               + (" and follow it unless the repository's own component skills say otherwise." if repo_workflow else ".")]
+    lines += ["When reviewing a diff that creates or changes UI components, also run `component-design`'s audit on those "
+              "components and report its findings next to `code-review`'s."]
     if build_skills:
         lines += ["Also load these repository skills before writing code: " + ", ".join(f"`{s}`" for s in build_skills) + "."]
     return "\n".join(lines)

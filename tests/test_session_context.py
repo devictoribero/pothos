@@ -157,6 +157,10 @@ class SessionContextTest(unittest.TestCase):
         self.assertIn("Read these before writing code", text)
         self.assertIn("load the `component-design` skill", text)
 
+    def test_ui_changes_get_the_component_design_audit_in_review(self):
+        self.write({"version": 1, "verify": {"full": "npm test"}})
+        self.assertIn("also run `component-design`'s audit", self.ctx())
+
     def test_build_skills_load_before_writing_code(self):
         self.write({"version": 1, "verify": {"full": "npm test"}, "build": {"skills": ["ui-primitives"]}})
         self.assertIn("Also load these repository skills before writing code: `ui-primitives`", self.ctx())
