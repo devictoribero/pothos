@@ -1,5 +1,5 @@
 {
-  "_comment": "Third-party skills copied into this plugin at a pinned commit. scripts/vendor_sync.py checks and updates them; never edit these folders by hand. Matt Pocock's skills are vendored one entry per skill; his setup skill is left out because it writes configuration into the repository, and only its templates are kept (shared/vendor/pocock-setup) for the SessionStart adapter.",
+  "_comment": "Third-party skills copied into this plugin at a pinned commit. scripts/vendor_sync.py checks and updates them; never edit these folders by hand. Matt Pocock's skills are vendored one entry per skill; his setup skill is left out because it writes configuration into the repository, and only its templates are kept (shared/vendor/pocock-setup) for the SessionStart adapter. Entries with model_invocable or triggers get those frontmatter changes re-applied after every update (scripts/vendor_sync.py), so every step of the cycle can start from plain language; the skill bodies stay exactly as upstream wrote them.",
   "archify": {
     "source": "https://github.com/tt-a1i/archify",
     "upstream_path": "archify",
@@ -67,7 +67,9 @@
     "license": "MIT",
     "exclude": [
       "agents"
-    ]
+    ],
+    "model_invocable": true,
+    "triggers": "Use when the user brings an idea, a feature or a change to define (help me define X, I have an idea for Y) and no spec exists yet."
   },
   "implement": {
     "source": "https://github.com/mattpocock/skills",
@@ -77,7 +79,9 @@
     "license": "MIT",
     "exclude": [
       "agents"
-    ]
+    ],
+    "model_invocable": true,
+    "triggers": "Use when the user asks to build, implement or fix one ticket or a small piece of work."
   },
   "implement-spec": {
     "source": "https://github.com/mattpocock/skills",
@@ -87,7 +91,9 @@
     "license": "MIT",
     "exclude": [
       "agents"
-    ]
+    ],
+    "model_invocable": true,
+    "triggers": "Use when the user asks to build a whole spec, a feature's tickets or everything on the frontier."
   },
   "improve-codebase-architecture": {
     "source": "https://github.com/mattpocock/skills",
@@ -97,7 +103,9 @@
     "license": "MIT",
     "exclude": [
       "agents"
-    ]
+    ],
+    "model_invocable": true,
+    "triggers": "Use when the user asks to look for improvements, refactors or design problems in the codebase or in one area of it."
   },
   "pr": {
     "source": "https://github.com/mattpocock/skills",
@@ -127,7 +135,9 @@
     "license": "MIT",
     "exclude": [
       "agents"
-    ]
+    ],
+    "model_invocable": true,
+    "triggers": "Use when the user asks for a retrospective or a post-mortem of a session or a run, or what to improve after it."
   },
   "tdd": {
     "source": "https://github.com/mattpocock/skills",
@@ -147,7 +157,9 @@
     "license": "MIT",
     "exclude": [
       "agents"
-    ]
+    ],
+    "model_invocable": true,
+    "triggers": "Use when the user asks to write the spec or the PRD, or when a definition interview has settled the plan."
   },
   "to-tickets": {
     "source": "https://github.com/mattpocock/skills",
@@ -157,7 +169,9 @@
     "license": "MIT",
     "exclude": [
       "agents"
-    ]
+    ],
+    "model_invocable": true,
+    "triggers": "Use when the user asks to split work into tickets, issues or tasks, or to plan how a spec gets built."
   },
   "triage": {
     "source": "https://github.com/mattpocock/skills",
@@ -167,7 +181,9 @@
     "license": "MIT",
     "exclude": [
       "agents"
-    ]
+    ],
+    "model_invocable": true,
+    "triggers": "Use when the user asks to triage, sort, classify or label incoming issues or pull requests."
   },
   "wayfinder": {
     "source": "https://github.com/mattpocock/skills",
@@ -177,7 +193,9 @@
     "license": "MIT",
     "exclude": [
       "agents"
-    ]
+    ],
+    "model_invocable": true,
+    "triggers": "Use when the user has a large goal that is still too vague to specify."
   },
   "grilling": {
     "source": "https://github.com/mattpocock/skills",
@@ -197,7 +215,9 @@
     "license": "MIT",
     "exclude": [
       "agents"
-    ]
+    ],
+    "model_invocable": true,
+    "triggers": "Use when the user wants to continue in another session or hand the work to another agent."
   },
   "writing-for-agents": {
     "source": "https://github.com/mattpocock/skills",

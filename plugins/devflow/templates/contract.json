@@ -32,6 +32,9 @@
     "skills": [],
     "standards": []
   },
+  "build": {
+    "skills": []
+  },
   "pr": {
     "base": "main",
     "template": "",

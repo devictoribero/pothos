@@ -1,7 +1,6 @@
 ---
 name: implement-spec
-description: "Implement the result of /to-spec and /to-tickets in code."
-disable-model-invocation: true
+description: "Implement the result of /to-spec and /to-tickets in code. Use when the user asks to build a whole spec, a feature's tickets or everything on the frontier."
 ---
 
 You have been provided a spec. This spec should have tickets associated with it, describing how to implement the spec.

@@ -55,6 +55,10 @@ If the repository already has Matt Pocock's setup output (`docs/agents/issue-tra
 - `skills`: repository skills whose description says they review conventions, such as design-system primitives, i18n or specs. Leave out generic review skills, because `code-review` already does that.
 - `standards`: repository files that document how code should be written but that `code-review` would not find by name, such as `docs/conventions.md` or a style guide under `docs/`. Leave out `CODING_STANDARDS.md` and `CONTRIBUTING.md`, which it always reads.
 
+## build
+
+- `skills`: repository skills that guide how code is written rather than checked afterwards, such as design-system or component rules whose description says to use them when creating or editing files. A skill can be in both `build.skills` and `review.skills`.
+
 ## pr
 
 - `base`: `default_branch`. When it is null, ask; without a user, use `main` only if that branch exists and list it as an assumption.

@@ -21,6 +21,8 @@ import contract  # noqa: E402
 TEMPLATES = os.path.join(HERE, "vendor", "pocock-setup")
 PLUGIN = os.path.dirname(HERE)
 ROLES = ["needs-triage", "needs-info", "ready-for-agent", "ready-for-human", "wontfix"]
+COMPETING_SKILLS = ("grill-with-docs, to-spec, to-tickets, wayfinder, triage, implement, implement-spec, code-review, pr, "
+                    "verify, evidence")
 CYCLE_SKILLS = ("grilling, grill-with-docs, to-spec, to-tickets, wayfinder, triage, implement, implement-spec, "
                 "tdd, code-review, pr, prototype, diagnosing-bugs, retro, verify, evidence")
 
@@ -131,21 +133,27 @@ def run_section(data):
     return "### Running the app\n\n" + "\n".join(lines) if lines else None
 
 
-def standards_section(data):
-    repo_files = list(((data.get("review") or {}).get("standards")) or [])
+def standards_section(data, repo_workflow=False):
+    repo_files = [] if repo_workflow else list(((data.get("review") or {}).get("standards")) or [])
     personal = sorted(glob.glob(os.path.join(PLUGIN, "standards", "*.md")))
     personal += sorted(glob.glob(os.path.join(contract.devflow_home(), "standards", "*.md")))
-    if not repo_files and not personal:
-        return None
-    lines = ["### Coding standards",
-             "",
-             "`code-review` treats these as documented coding standards, together with whatever the repository documents. "
-             "`implement`, `implement-spec` and `tdd` follow them while writing code. When a repository file and a personal "
-             "file disagree, the repository wins."]
+    build_skills = [] if repo_workflow else list(((data.get("build") or {}).get("skills")) or [])
+    if repo_workflow:
+        intro = ("The owner's personal coding standards still apply when you write code here, below everything the "
+                 "repository documents: where they disagree with the repository's conventions or skills, the repository wins.")
+    else:
+        intro = ("Read these before writing code and follow them while you write it: `implement`, `implement-spec`'s "
+                 "implementers and `tdd` read them first. `code-review` checks the diff against them afterwards, together with "
+                 "whatever the repository documents. When a repository file and a personal file disagree, the repository wins.")
+    lines = ["### Coding standards", "", intro]
     if repo_files:
         lines += ["", "Repository:"] + [f"- `{path}`" for path in repo_files]
     if personal:
         lines += ["", "Personal (outside the repository):"] + [f"- `{path}`" for path in personal]
+    lines += ["", "Before writing code that creates or changes UI components, load the `component-design` skill"
+              + (" and follow it unless the repository's own component skills say otherwise." if repo_workflow else ".")]
+    if build_skills:
+        lines += ["Also load these repository skills before writing code: " + ", ".join(f"`{s}`" for s in build_skills) + "."]
     return "\n".join(lines)
 
 
@@ -187,8 +195,10 @@ def build(start):
         return f"## devflow\n\nThe contract at `{path}` could not be read ({exc}). Suggest `/devflow:onboard` to repair it."
     if data.get("workflow") == "repo":
         return ("## devflow\n\nThis repository follows its own development workflow: its own skills, CLAUDE.md and conventions. "
-                "Do not use devflow's cycle skills here (" + CYCLE_SKILLS + ") unless the user names one explicitly. "
-                "`explain` and `archify` are fine.")
+                "Do not use the devflow skills that would compete with it (" + COMPETING_SKILLS + ") unless the user names one "
+                "explicitly; use the repository's own skills for tickets, implementation, verification, review and pull requests. "
+                "Skills that do not own a step of the workflow are fine: grilling, diagnosing-bugs, prototype, tdd, codebase-design, "
+                "domain-modeling, component-design, retro, explain and archify.\n\n" + standards_section(data, repo_workflow=True))
     errors = contract.check(data, start, strict=False)
     sections = [
         "## devflow: this repository's contract",

@@ -231,6 +231,21 @@
         }
       }
     },
+    "build": {
+      "description": "Inputs for writing code. Implementers load these repository skills before they write code (design rules, component conventions); review skills stay under review.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "skills": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
     "pr": {
       "description": "Pull request conventions.",
       "type": "object",

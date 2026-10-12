@@ -24,7 +24,7 @@ Skills never call the next skill. Each one ends by naming the next step. Chainin
 
 ## Side effects need a person, at the moment they happen
 
-A skill may start on its own from its description; what needs a person is the side effect, not the skill. Skills that only write outside the repository (a private contract, a receipt, an explanation page) run without asking. Skills that publish (create tickets on a shared tracker, push, open or update a pull request, reply to a review) confirm right before publishing when a person is available, and stop with a report when nobody is. Merging into the base branch is never done by an agent. Third-party skills keep their own `disable-model-invocation` setting.
+A skill may start on its own from its description; what needs a person is the side effect, not the skill. Skills that only write outside the repository (a private contract, a receipt, an explanation page) run without asking. Skills that publish (create tickets on a shared tracker, push, open or update a pull request, reply to a review) confirm right before publishing when a person is available, and stop with a report when nobody is. Merging into the base branch is never done by an agent. Every step of the cycle can start from plain language: where a third-party skill sets `disable-model-invocation`, `vendor.json` removes it and adds a trigger sentence to the description, and the skill body stays as upstream wrote it.
 
 ## Small context
 

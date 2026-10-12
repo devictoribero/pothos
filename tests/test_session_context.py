@@ -62,6 +62,8 @@ class SessionContextTest(unittest.TestCase):
         self.write({"version": 1, "workflow": "repo"})
         text = self.ctx()
         self.assertIn("follows its own development workflow", text)
+        self.assertIn("compete with it (grill-with-docs, to-spec", text)
+        self.assertIn("are fine: grilling, diagnosing-bugs", text)
         self.assertNotIn("Issue tracker", text)
 
     def test_local_tracker_uses_the_contract_path(self):
@@ -135,6 +137,25 @@ class SessionContextTest(unittest.TestCase):
         self.assertIn(os.path.join(self.home, "standards", "mine.md"), text)
         self.assertIn("the repository wins", text)
         self.assertIn("`i18n-review`", text)
+
+    def test_standards_are_read_before_writing_code(self):
+        self.write({"version": 1, "verify": {"full": "npm test"}})
+        text = self.ctx()
+        self.assertIn("Read these before writing code", text)
+        self.assertIn("load the `component-design` skill", text)
+
+    def test_build_skills_load_before_writing_code(self):
+        self.write({"version": 1, "verify": {"full": "npm test"}, "build": {"skills": ["ui-primitives"]}})
+        self.assertIn("Also load these repository skills before writing code: `ui-primitives`", self.ctx())
+
+    def test_repo_workflow_keeps_personal_standards_below_the_repository(self):
+        os.makedirs(os.path.join(self.home, "standards"))
+        open(os.path.join(self.home, "standards", "mine.md"), "w").close()
+        self.write({"version": 1, "workflow": "repo"})
+        text = self.ctx()
+        self.assertIn(os.path.join(self.home, "standards", "mine.md"), text)
+        self.assertIn("the repository wins", text)
+        self.assertIn("unless the repository's own component skills say otherwise", text)
 
     def test_unreadable_contract_suggests_repair(self):
         self.write("{not json")

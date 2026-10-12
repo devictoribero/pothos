@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Every step of the cycle starts from plain language: `vendor.json` can mark a vendored skill `model_invocable` and append `triggers` to its description, re-applied on every update.
+- Coding standards are read before writing code, not only in review; UI work loads `component-design` first; the contract's new `build.skills` lists repository skills to load before writing code.
+- Repositories with `workflow: repo` still get the owner's personal standards, below the repository's own, and only the skills that compete with their workflow are off limits.
+- `verify` runs slow checks detached (exit 4, `verify wait`); `devflow-run.py` resumes headless sessions until they write `report.md`.
+
 ## 0.2.0
 
 - devflow now runs the cycle with Matt Pocock's skills, vendored unchanged at a pinned commit: `grilling`, `grill-with-docs`, `to-spec`, `to-tickets`, `wayfinder`, `triage`, `implement`, `implement-spec`, `tdd`, `code-review`, `pr`, `prototype`, `diagnosing-bugs`, `retro`, `domain-modeling`, `codebase-design`, `improve-codebase-architecture`, `handoff`, `writing-for-agents`. His setup skill is left out because it writes into the repository; its templates are kept as shared data.
