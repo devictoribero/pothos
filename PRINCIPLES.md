@@ -2,13 +2,13 @@
 
 How this plugin is built. Every skill and script, and every hook once there are any, follows these rules, and the checks in `scripts/` enforce the ones a script can check.
 
-The rules for the code agents produce will live in the plugin itself, in `plugins/devflow/shared/engineering.md`, because agents load that file while they work. This file is for people and agents changing the plugin.
+The rules for the code agents produce will live in the plugin itself, in `plugins/pothos/shared/engineering.md`, because agents load that file while they work. This file is for people and agents changing the plugin.
 
 ## The plugin knows how you work. The repository knows the project.
 
 No skill names a project, a company, a person, a tracker key or a path on someone's machine. Everything project-specific reaches a skill through the repository's contract or through a skill that lives in that repository.
 
-Contracts are private. They live in `~/.config/devflow/contracts/`, keyed by the repository's remote, never inside the repository, so using devflow changes nothing a teammate can see. `scripts/lint_skills.py` fails the build on known project terms.
+Contracts are private. They live in `~/.config/pothos/contracts/`, keyed by the repository's remote, never inside the repository, so using Pothos changes nothing a teammate can see. `scripts/lint_skills.py` fails the build on known project terms.
 
 When a plugin default and a repository convention disagree, the repository wins.
 
@@ -39,7 +39,7 @@ A skill's description says what it does and when to use it, in the words a user 
 Each skill ships cases under `evals/` with deterministic graders where possible and an LLM grader only for judgement. Check what the agent did, not what it says it did: a grader that reads `package.json` to confirm it is unchanged beats a judge asked whether the report claims changes. LLM judges also miss content at the end of long messages, so anything a regex can find goes to a regex. Run the evals before each release:
 
 ```bash
-claude plugin eval plugins/devflow --scaffold
+claude plugin eval plugins/pothos --scaffold
 ```
 
 ## Easy to change
@@ -50,11 +50,11 @@ Skills are small and versioned. `CHANGELOG.md` records every release, and the co
 
 Repositories differ. One has no end-to-end suite, another cannot run without a real backend. When the contract does not declare a capability, skills skip that step and say so in their report. They never invent a substitute command or set up tooling on their own: that is a decision for the person, and the gap shows up in onboard's readiness report.
 
-A repository can also declare that it follows its own workflow (`"workflow": "repo"`). devflow's cycle skills then stand aside there and point to the repository's process; only the knowledge skills apply.
+A repository can also declare that it follows its own workflow (`"workflow": "repo"`). Pothos's cycle skills then stand aside there and point to the repository's process; only the knowledge skills apply.
 
 ## Third-party skills are pinned
 
-Skills from other authors are copied into the plugin at a known commit, with source, commit and license recorded in `plugins/devflow/vendor.json`. Never edit them by hand. They never update on their own: `.github/workflows/vendor-sync.yml` runs `scripts/vendor_sync.py` every week and, when upstream moved, opens a pull request with the new copy; a person reviews the diff, runs the evals and decides. Updates arrive without surprises, and the evals always describe what actually runs.
+Skills from other authors are copied into the plugin at a known commit, with source, commit and license recorded in `plugins/pothos/vendor.json`. Never edit them by hand. They never update on their own: `.github/workflows/vendor-sync.yml` runs `scripts/vendor_sync.py` every week and, when upstream moved, opens a pull request with the new copy; a person reviews the diff, runs the evals and decides. Updates arrive without surprises, and the evals always describe what actually runs.
 
 ## Portable
 

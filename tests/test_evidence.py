@@ -7,7 +7,7 @@ import tempfile
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCRIPT = os.path.join(ROOT, "plugins", "devflow", "skills", "evidence", "scripts", "evidence.py")
+SCRIPT = os.path.join(ROOT, "plugins", "pothos", "skills", "evidence", "scripts", "evidence.py")
 
 
 def free_port():
@@ -23,7 +23,7 @@ class EvidenceTest(unittest.TestCase):
         self.home = os.path.join(self.tmp.name, "home")
         subprocess.run(["git", "init", "-q", "-b", "feature/login", self.repo], check=True)
         subprocess.run(["git", "-C", self.repo, "remote", "add", "origin", "https://github.com/acme/shop.git"], check=True)
-        self.env = {**os.environ, "DEVFLOW_HOME": self.home}
+        self.env = {**os.environ, "POTHOS_HOME": self.home}
 
     def tearDown(self):
         self.tmp.cleanup()

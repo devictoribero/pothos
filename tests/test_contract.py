@@ -6,8 +6,8 @@ import tempfile
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCRIPT = os.path.join(ROOT, "plugins", "devflow", "shared", "contract.py")
-TEMPLATE = os.path.join(ROOT, "plugins", "devflow", "templates", "contract.json")
+SCRIPT = os.path.join(ROOT, "plugins", "pothos", "shared", "contract.py")
+TEMPLATE = os.path.join(ROOT, "plugins", "pothos", "templates", "contract.json")
 
 
 def run(args, cwd, stdin=None):
@@ -18,14 +18,14 @@ class ContractTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.repo = os.path.join(self.tmp.name, "repo")
-        self.home = os.path.join(self.tmp.name, "devflow-home")
+        self.home = os.path.join(self.tmp.name, "pothos-home")
         subprocess.run(["git", "init", "-q", self.repo], check=True)
         subprocess.run(["git", "-C", self.repo, "remote", "add", "origin", "git@github.com-work:acme/shop.git"], check=True)
-        os.environ["DEVFLOW_HOME"] = self.home
+        os.environ["POTHOS_HOME"] = self.home
         self.expected = os.path.join(self.home, "contracts", "github.com", "acme", "shop.json")
 
     def tearDown(self):
-        os.environ.pop("DEVFLOW_HOME", None)
+        os.environ.pop("POTHOS_HOME", None)
         self.tmp.cleanup()
 
     def write(self, data):
@@ -113,7 +113,7 @@ class ContractTest(unittest.TestCase):
         self.write({"version": 1, "workflow": "repo"})
         self.assertEqual(run(["validate", "--strict"], self.repo).returncode, 0)
 
-    def test_devflow_workflow_requires_verify(self):
+    def test_pothos_workflow_requires_verify(self):
         self.write({"version": 1})
         result = run(["validate"], self.repo)
         self.assertEqual(result.returncode, 1)
@@ -166,7 +166,7 @@ class ContractTest(unittest.TestCase):
     def test_template_has_every_schema_field(self):
         with open(TEMPLATE) as fh:
             template = json.load(fh)
-        schema_path = os.path.join(ROOT, "plugins", "devflow", "shared", "contract.schema.json")
+        schema_path = os.path.join(ROOT, "plugins", "pothos", "shared", "contract.schema.json")
         with open(schema_path) as fh:
             schema = json.load(fh)
         self.assertEqual(set(template) - {"$schema"}, set(schema["properties"]) - {"$schema"})

@@ -1,0 +1,13 @@
+{
+  "name": "pothos",
+  "version": "0.2.0",
+  "description": "A portable development workflow for Claude Code: specify, implement, verify, review and ship, driven by a small per-repository contract.",
+  "author": {
+    "name": "Victor Ribero",
+    "url": "https://github.com/devictoribero"
+  },
+  "homepage": "https://github.com/devictoribero/pothos",
+  "repository": "https://github.com/devictoribero/pothos",
+  "license": "MIT",
+  "keywords": ["workflow", "agents", "verification", "contract", "skills"]
+}

@@ -1,8 +1,8 @@
 # Work model
 
-How devflow turns an idea into merged code: the artifacts, the two loops, and who runs each step. Skills follow this document; when a skill and this document disagree, fix one of them.
+How Pothos turns an idea into merged code: the artifacts, the two loops, and who runs each step. Skills follow this document; when a skill and this document disagree, fix one of them.
 
-Most steps run Matt Pocock's skills, vendored unchanged. The vocabulary is his: spec, ticket, blocked by, frontier, tracer bullet, integration branch, glossary. devflow adds the private contract, `verify`, `evidence`, `explain` and the standards.
+Most steps run Matt Pocock's skills, vendored unchanged. The vocabulary is his: spec, ticket, blocked by, frontier, tracer bullet, integration branch, glossary. Pothos adds the private contract, `verify`, `evidence`, `explain` and the standards.
 
 ## Artifacts
 
@@ -12,8 +12,8 @@ Most steps run Matt Pocock's skills, vendored unchanged. The vocabulary is his: 
 | **Spec** | What problem, for whom, and why; what is out of scope | The work needs more than one ticket, or the why is not obvious. A PRD is a spec. | Tracker parent issue, or `spec.md` in the local tracker |
 | **Plan** | How the work splits and in which order | More than one ticket | The tickets themselves plus their `Blocked by` edges |
 | **Ticket** | One change and how to check it is done | Always | Tracker issue, or `issues/NN-slug.md` in the local tracker |
-| **Verify receipt** | Did this exact commit pass the checks? | Before every merge | `~/.config/devflow/receipts/`, outside the repository |
-| **Evidence** | Does it work, shown rather than claimed? | Before the pull request leaves draft | `~/.config/devflow/evidence/`, outside the repository |
+| **Verify receipt** | Did this exact commit pass the checks? | Before every merge | `~/.config/pothos/receipts/`, outside the repository |
+| **Evidence** | Does it work, shown rather than claimed? | Before the pull request leaves draft | `~/.config/pothos/evidence/`, outside the repository |
 | **Feature pull request** | The whole spec, ready for the base branch | One per spec | Code host, integration branch into the base branch |
 
 Rules:
@@ -85,7 +85,7 @@ Why not one pull request per ticket: it adds a review surface nobody reads, it w
 |---|---|---|
 | 1. Manual | You | One session per ticket with `implement`, then `verify` and merge yourself. |
 | 2. Assisted | `implement-spec` | One session builds the whole spec with parallel implementers; you watch and answer questions. |
-| 3. Unattended | `plugins/devflow/scripts/devflow-run.py` | Creates a worktree and branch, runs `run.setup`, starts `implement-spec` (or `implement` for one ticket) headless, logs under `~/.config/devflow/runs/`, and stops at a pull request body, or at a draft pull request with `--open-pr`. A headless session dies when its turn ends, so the run counts as finished only when the session writes `report.md`; until then the script resumes it. `status` lists the runs. |
+| 3. Unattended | `plugins/pothos/scripts/pothos-run.py` | Creates a worktree and branch, runs `run.setup`, starts `implement-spec` (or `implement` for one ticket) headless, logs under `~/.config/pothos/runs/`, and stops at a pull request body, or at a draft pull request with `--open-pr`. A headless session dies when its turn ends, so the run counts as finished only when the session writes `report.md`; until then the script resumes it. `status` lists the runs. |
 
 ## Example: a new booking flow
 

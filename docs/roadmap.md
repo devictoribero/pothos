@@ -15,27 +15,27 @@ Status of each phase, newest decisions first. Phase 2 was rewritten on 2026-10-1
 
 The pilot built phase 0 of a real plan (two tickets, the second blocked by the first) with `to-tickets` and then `implement-spec` headless, on an integration branch, without pushing.
 
-What it found in devflow, all fixed:
+What it found in Pothos, all fixed:
 
 - **Fresh worktrees could not run the checks.** The generated database client and the env file were missing. The contract gained `run.setup`, which every worktree runs first.
 - **Shared test databases leak between worktrees.** Migrations from unmerged branches polluted the shared test database. The contract's `full` command now points each worktree at its own database. The repository itself is unchanged.
 - **A slow suite killed the run silently.** An implementer started the full suite as a background command; it outlived the ten-minute command limit, died with the subagent, and the orchestrator waited forever. `verify` now runs the checks detached and returns exit 4 with a `wait` command, and the session context forbids background suites.
-- **A headless orchestrator ended its turn to wait for its reviewers.** In `claude -p` that ends the process and kills the subagents. `devflow-run.py` now tells the session never to end its turn to wait, and resumes it until it writes `report.md`.
-- **`disable-model-invocation` skills need a slash command in headless runs.** `devflow-run.py` already starts sessions that way.
+- **A headless orchestrator ended its turn to wait for its reviewers.** In `claude -p` that ends the process and kills the subagents. `pothos-run.py` now tells the session never to end its turn to wait, and resumes it until it writes `report.md`.
+- **`disable-model-invocation` skills need a slash command in headless runs.** `pothos-run.py` already starts sessions that way.
 
 Phase 4 starts only after the owner reviews the pilot's branch.
 
-## Phase 2: devflow on top of Matt Pocock's skills
+## Phase 2: Pothos on top of Matt Pocock's skills
 
 ### Why the change
 
-The first plan had devflow writing nine skills of its own: grill, distill, implement, code, verify, evidence, review, pull-request and address-review. [mattpocock/skills](https://github.com/mattpocock/skills) (MIT) already covers most of that cycle, and its `implement-spec` runs the same model this repo describes in [work-model.md](work-model.md): a task graph, a frontier, implementer subagents in worktrees and one integration branch. Writing our own copies would mean maintaining them against a project that improves every week.
+The first plan had Pothos writing nine skills of its own: grill, distill, implement, code, verify, evidence, review, pull-request and address-review. [mattpocock/skills](https://github.com/mattpocock/skills) (MIT) already covers most of that cycle, and its `implement-spec` runs the same model this repo describes in [work-model.md](work-model.md): a task graph, a frontier, implementer subagents in worktrees and one integration branch. Writing our own copies would mean maintaining them against a project that improves every week.
 
-So devflow stops being the cycle and becomes a thin layer around it. It vendors Pocock's skills unchanged and adds only what they don't have.
+So Pothos stops being the cycle and becomes a thin layer around it. It vendors Pocock's skills unchanged and adds only what they don't have.
 
 ### What comes from Pocock
 
-Vendored into `plugins/devflow/skills/` at a pinned commit, through `vendor.json` and the weekly sync, never edited by hand.
+Vendored into `plugins/pothos/skills/` at a pinned commit, through `vendor.json` and the weekly sync, never edited by hand.
 
 | Our step | Pocock skill |
 |---|---|
@@ -53,7 +53,7 @@ Left out: `setup-matt-pocock-skills`, because it writes configuration into the r
 
 The planned names `grill`, `distill`, `implement`, `code`, `review`, `pull-request` and `domain-model` are dropped. We use Pocock's names so his docs and newsletter apply as written.
 
-### What devflow adds
+### What Pothos adds
 
 1. **Contract adapter.** This is a `SessionStart` hook that reads the private contract and injects it as context: the issue tracker, the domain docs, the verify commands, the run environments and the standards files. Pocock's skills say "the issue tracker should have been provided to you", so they work unchanged and the repository stays untouched.
 2. **`verify`.** It runs the contract's `fast`, `full` and optional `e2e` checks, asks which run environment to use, and records a receipt tied to the commit. It is the gate before any merge into the integration branch.

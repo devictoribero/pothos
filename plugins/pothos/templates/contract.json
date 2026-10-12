@@ -1,0 +1,45 @@
+{
+  "$schema": "https://raw.githubusercontent.com/devictoribero/pothos/main/plugins/pothos/shared/contract.schema.json",
+  "version": 1,
+  "workflow": "pothos",
+  "verify": {
+    "fast": "",
+    "full": "",
+    "e2e": ""
+  },
+  "run": {
+    "setup": "",
+    "dev": "",
+    "url": "",
+    "mocked": false,
+    "login": "",
+    "screenshots": "none",
+    "environments": [],
+    "apps": []
+  },
+  "docs": {
+    "glossary": "",
+    "decisions": "",
+    "specs": "",
+    "prd": ""
+  },
+  "tracker": {
+    "kind": "none",
+    "path": "",
+    "project": "",
+    "skill": "",
+    "labels": {}
+  },
+  "review": {
+    "skills": [],
+    "standards": []
+  },
+  "build": {
+    "skills": []
+  },
+  "pr": {
+    "base": "main",
+    "template": "",
+    "evidence": ""
+  }
+}

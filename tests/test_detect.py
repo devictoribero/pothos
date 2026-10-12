@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCRIPT = os.path.join(ROOT, "plugins", "devflow", "skills", "onboard", "scripts", "detect.py")
+SCRIPT = os.path.join(ROOT, "plugins", "pothos", "skills", "onboard", "scripts", "detect.py")
 
 
 def detect(repo):
@@ -21,7 +21,7 @@ class DetectTest(unittest.TestCase):
         subprocess.run(["git", "init", "-q", "-b", "main", self.repo], check=True)
 
     def tearDown(self):
-        os.environ.pop("DEVFLOW_HOME", None)
+        os.environ.pop("POTHOS_HOME", None)
         self.tmp.cleanup()
 
     def write(self, rel, content):
@@ -121,8 +121,8 @@ class DetectTest(unittest.TestCase):
         self.write("docs/decisions/0001.md", "x")
         self.write("AGENTS.md", "We track work in Jira, e.g. ABC-12.")
         os.symlink("AGENTS.md", os.path.join(self.repo, "CLAUDE.md"))
-        home = os.path.join(self.tmp.name, "devflow-home")
-        os.environ["DEVFLOW_HOME"] = home
+        home = os.path.join(self.tmp.name, "pothos-home")
+        os.environ["POTHOS_HOME"] = home
         subprocess.run(["git", "-C", self.repo, "remote", "add", "origin", "https://github.com/acme/pets.git"], check=True)
         contract = os.path.join(home, "contracts", "github.com", "acme", "pets.json")
         os.makedirs(os.path.dirname(contract))

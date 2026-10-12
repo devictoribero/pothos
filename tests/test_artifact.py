@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCRIPT = os.path.join(ROOT, "plugins", "devflow", "skills", "explain", "scripts", "artifact.py")
+SCRIPT = os.path.join(ROOT, "plugins", "pothos", "skills", "explain", "scripts", "artifact.py")
 
 
 def run(args, cwd):
@@ -22,13 +22,13 @@ class ArtifactTest(unittest.TestCase):
         self.home = os.path.join(self.tmp.name, "home")
         subprocess.run(["git", "init", "-q", self.repo], check=True)
         subprocess.run(["git", "-C", self.repo, "remote", "add", "origin", "git@github.com:acme/shop.git"], check=True)
-        os.environ["DEVFLOW_HOME"] = self.home
-        os.environ["DEVFLOW_NO_OPEN"] = "1"
+        os.environ["POTHOS_HOME"] = self.home
+        os.environ["POTHOS_NO_OPEN"] = "1"
         self.base = os.path.join(self.home, "artifacts", "github.com", "acme", "shop")
 
     def tearDown(self):
-        os.environ.pop("DEVFLOW_HOME", None)
-        os.environ.pop("DEVFLOW_NO_OPEN", None)
+        os.environ.pop("POTHOS_HOME", None)
+        os.environ.pop("POTHOS_NO_OPEN", None)
         self.tmp.cleanup()
 
     def finish(self, folder):
@@ -36,7 +36,7 @@ class ArtifactTest(unittest.TestCase):
         with open(path) as fh:
             text = fh.read()
         with open(path, "w") as fh:
-            fh.write(re.sub(r"\s*<p class=\"callout\" data-devflow-placeholder>.*?</p>", "", text))
+            fh.write(re.sub(r"\s*<p class=\"callout\" data-pothos-placeholder>.*?</p>", "", text))
 
     def new(self, slug="checkout-flow", title="Checkout flow"):
         result = run(["new", "--slug", slug, "--title", title], self.repo)
@@ -50,7 +50,7 @@ class ArtifactTest(unittest.TestCase):
         self.assertIn("<title>Checkout flow</title>", page)
         self.assertIn('data-theme="light"', page)
         self.assertIn('id="theme-toggle"', page)
-        self.assertIn("data-devflow-placeholder", page)
+        self.assertIn("data-pothos-placeholder", page)
         self.assertTrue(os.path.isdir(os.path.join(folder, "diagrams")))
         self.assertEqual(os.listdir(self.repo), [".git"])
 
@@ -99,7 +99,7 @@ class ArtifactTest(unittest.TestCase):
         self.assertEqual(os.listdir(self.repo), [".git"])
 
     def test_light_works_on_real_archify_output_and_refuses_unknown_pages(self):
-        examples = os.path.join(ROOT, "plugins", "devflow", "skills", "archify", "examples")
+        examples = os.path.join(ROOT, "plugins", "pothos", "skills", "archify", "examples")
         real = next(os.path.join(examples, f) for f in sorted(os.listdir(examples)) if f.endswith(".html"))
         copy = os.path.join(self.tmp.name, "real.html")
         with open(real) as src, open(copy, "w") as dst:
@@ -151,7 +151,7 @@ class ArtifactTest(unittest.TestCase):
         self.assertIn('<html lang="en"', open(os.path.join(folder, "index.html")).read())
 
     def test_sidebar_lists_every_page_with_nesting(self):
-        parent = self.new("devflow-overview", "devflow overview")
+        parent = self.new("pothos-overview", "pothos overview")
         child = run(["new", "--slug", "work-model", "--title", "Work model", "--parent", os.path.basename(parent)], self.repo).stdout.strip()
         for folder in (parent, child):
             self.finish(folder)
@@ -159,7 +159,7 @@ class ArtifactTest(unittest.TestCase):
                 fh.write("x\n")
             self.assertEqual(run(["register", folder], self.repo).returncode, 0)
         nav = open(os.path.join(self.base, "nav.js")).read()
-        data = json.loads(nav.split("window.DEVFLOW_NAV = ", 1)[1].split(";\n", 1)[0])
+        data = json.loads(nav.split("window.POTHOS_NAV = ", 1)[1].split(";\n", 1)[0])
         by_folder = {p["folder"]: p for p in data}
         self.assertIsNone(by_folder[os.path.basename(parent)]["parent"])
         self.assertEqual(by_folder[os.path.basename(child)]["parent"], os.path.basename(parent))

@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCRIPT = os.path.join(ROOT, "plugins", "devflow", "skills", "verify", "scripts", "verify.py")
+SCRIPT = os.path.join(ROOT, "plugins", "pothos", "skills", "verify", "scripts", "verify.py")
 
 
 class VerifyTest(unittest.TestCase):
@@ -17,7 +17,7 @@ class VerifyTest(unittest.TestCase):
         subprocess.run(["git", "init", "-q", "-b", "main", self.repo], check=True)
         self.git("remote", "add", "origin", "https://github.com/acme/shop.git")
         self.commit("first")
-        self.env = {**os.environ, "DEVFLOW_HOME": self.home}
+        self.env = {**os.environ, "POTHOS_HOME": self.home}
 
     def tearDown(self):
         self.tmp.cleanup()

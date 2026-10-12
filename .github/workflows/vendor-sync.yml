@@ -45,4 +45,4 @@ jobs:
           title: "chore(vendor): update pinned third-party skills"
           commit-message: "chore(vendor): update pinned third-party skills"
           body-path: check.txt
-          add-paths: plugins/devflow
+          add-paths: plugins/pothos

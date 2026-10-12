@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCRIPT = os.path.join(ROOT, "plugins", "devflow", "shared", "session_context.py")
+SCRIPT = os.path.join(ROOT, "plugins", "pothos", "shared", "session_context.py")
 
 
 def context(cwd, stdin=None, args=None, env=None):
@@ -24,10 +24,10 @@ class SessionContextTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.repo = os.path.join(self.tmp.name, "repo")
-        self.home = os.path.join(self.tmp.name, "devflow-home")
+        self.home = os.path.join(self.tmp.name, "pothos-home")
         subprocess.run(["git", "init", "-q", self.repo], check=True)
         subprocess.run(["git", "-C", self.repo, "remote", "add", "origin", "https://github.com/acme/shop.git"], check=True)
-        self.env = {"DEVFLOW_HOME": self.home}
+        self.env = {"POTHOS_HOME": self.home}
         self.path = os.path.join(self.home, "contracts", "github.com", "acme", "shop.json")
 
     def tearDown(self):
@@ -48,7 +48,7 @@ class SessionContextTest(unittest.TestCase):
 
     def test_without_a_contract_suggests_onboard_and_forbids_pocock_setup(self):
         text = self.ctx()
-        self.assertIn("/devflow:onboard", text)
+        self.assertIn("/pothos:onboard", text)
         self.assertIn("Never run `/setup-matt-pocock-skills`", text)
 
     def test_reads_the_session_directory_from_the_hook_event(self):

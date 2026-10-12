@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check and update the third-party skills pinned in plugins/devflow/vendor.json.
+"""Check and update the third-party skills pinned in plugins/pothos/vendor.json.
 
 Usage:
   vendor_sync.py check            compare each pinned commit with upstream HEAD
@@ -22,7 +22,7 @@ import sys
 import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PLUGIN = os.path.join(ROOT, "plugins", "devflow")
+PLUGIN = os.path.join(ROOT, "plugins", "pothos")
 MANIFEST = os.path.join(PLUGIN, "vendor.json")
 
 
