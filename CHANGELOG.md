@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `onboard` is now `plant` (`/pothos:plant`); asking to onboard a repository still starts it.
 - Renamed from devflow to Pothos: commands are `/pothos:<skill>`, the home folder is `~/.config/pothos` (`POTHOS_HOME`), the contract's default workflow value is `pothos`, and the unattended runner is `pothos-run.py`.
 - Every step of the cycle starts from plain language: `vendor.json` can mark a vendored skill `model_invocable` and append `triggers` to its description, re-applied on every update.
 - Coding standards are read before writing code, not only in review; UI work loads `component-design` first; the contract's new `build.skills` lists repository skills to load before writing code.

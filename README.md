@@ -14,7 +14,7 @@ A portable development workflow for Claude Code. It carries how you work from re
 Then, in each repository:
 
 ```
-/pothos:onboard
+/pothos:plant
 ```
 
 ## How it fits together
@@ -53,7 +53,7 @@ Only `version` and `verify.full` are required. The schema documents every field,
 
 | Step | Skill | From | What it does |
 |---|---|---|---|
-| Connect a repo | `onboard` | Pothos | Writes or audits the private contract and reports what blocks autonomous work. |
+| Connect a repo | `plant` | Pothos | Writes or audits the private contract and reports what blocks autonomous work. |
 | Define | `grilling`, `grill-with-docs` | Pocock | Interview until a plan has no open questions; the second also writes the glossary and decision records. |
 | Specify | `to-spec` | Pocock | Turns the conversation into a spec in the tracker. |
 | Plan | `to-tickets`, `wayfinder` | Pocock | Tracer-bullet tickets with blocking edges; a decision map for work bigger than one session. |

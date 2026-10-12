@@ -205,12 +205,12 @@ def build(start):
         return f"## pothos\n\nCould not resolve this repository's contract: {exc}"
     if not path:
         return ("## pothos\n\nThis repository has no pothos contract yet. Skills that need an issue tracker, verify commands "
-                "or a run command (" + CYCLE_SKILLS + ") should run `/pothos:onboard` first (it shows the draft contract to the user before saving). "
+                "or a run command (" + CYCLE_SKILLS + ") should run `/pothos:plant` first (it shows the draft contract to the user before saving). "
                 "Never run `/setup-matt-pocock-skills`: pothos keeps that configuration out of the repository.")
     try:
         data = contract.load(path)
     except (OSError, json.JSONDecodeError) as exc:
-        return f"## pothos\n\nThe contract at `{path}` could not be read ({exc}). Suggest `/pothos:onboard` to repair it."
+        return f"## pothos\n\nThe contract at `{path}` could not be read ({exc}). Suggest `/pothos:plant` to repair it."
     if data.get("workflow") == "repo":
         return ("## pothos\n\nThis repository follows its own development workflow: its own skills, CLAUDE.md and conventions. "
                 "Do not use the pothos skills that would compete with it (" + COMPETING_SKILLS + ") unless the user names one "
@@ -225,7 +225,7 @@ def build(start):
         "and never write `docs/agents/` files or an `## Agent skills` block into the repository.",
     ]
     if errors:
-        sections.append("The contract has problems; mention them and suggest `/pothos:onboard`:\n" + "\n".join(f"- {e}" for e in errors))
+        sections.append("The contract has problems; mention them and suggest `/pothos:plant`:\n" + "\n".join(f"- {e}" for e in errors))
     sections.append(tracker_section(data, start))
     for part in (labels_section, domain_section, verify_section, run_section,
                  standards_section, review_section, pr_section):

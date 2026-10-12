@@ -15,7 +15,7 @@ Run `python3 "${CLAUDE_SKILL_DIR}/scripts/evidence.py" plan` first. It prints on
 
 - `web` or `ios-simulator`: take screenshots that way, as described below. In a monorepo, start the app with `serve --app <name>`.
 - `none`: do not start the app or try a screenshot. Use test output and real calls, and write "Not shown: screenshots, not supported in this app" in evidence.md.
-- `unknown`: try once. If it fails, fall back to test output and tell the user to set `screenshots` with `/pothos:onboard audit`, so the next run does not try again.
+- `unknown`: try once. If it fails, fall back to test output and tell the user to set `screenshots` with `/pothos:plant audit`, so the next run does not try again.
 
 ## Pick the kind of proof
 

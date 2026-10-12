@@ -5,7 +5,7 @@ Status of each phase.
 | Phase | Goal | State |
 |---|---|---|
 | 0 | Hygiene: revoke leaked tokens, remove the old personal agent and duplicate skills | done except revoking tokens, which only the owner can do |
-| 1 | Skeleton, private contract, `onboard`, `explain`, `archify` | done |
+| 1 | Skeleton, private contract, `plant`, `explain`, `archify` | done |
 | 2 | The full cycle, built on Matt Pocock's skills | done (0.2.0) |
 | 3 | Pilot on a side project | running on Lifetails, see below |
 | 4 | Work repositories, once the pilot holds | later |
@@ -50,7 +50,7 @@ Vendored into `plugins/pothos/skills/` at a pinned commit, through `vendor.json`
 
 Left out:
 
-- `setup-matt-pocock-skills`, because it writes configuration into the repository (`docs/agents/*.md` and a block in `CLAUDE.md`). `onboard` replaces it.
+- `setup-matt-pocock-skills`, because it writes configuration into the repository (`docs/agents/*.md` and a block in `CLAUDE.md`). `plant` replaces it.
 - `ask-matt`, whose router points at the excluded setup skill.
 - `research`, which writes into the repository; `explain` covers it.
 - `wizard`, `grill-me`, `teach`, `to-questionnaire` and `wait-what`, which are niche or covered.
@@ -61,7 +61,7 @@ Left out:
 1. **Contract adapter.** A `SessionStart` hook reads the private contract and injects it as context: the issue tracker, the domain docs, the verify commands, the run environments and apps, and the standards files. Pocock's skills say "the issue tracker should have been provided to you", so they work unchanged and the repository stays untouched.
 2. **`verify`.** It runs the contract's `fast`, `full` and optional `e2e` checks, asks which run environment to use, and records a receipt tied to the commit. It is the gate before any merge into the integration branch.
 3. **`evidence`.** It runs the app and captures before-and-after proof, within what the contract says each app supports. Its output fills the Evidence section of Pocock's `pr` template.
-4. **`onboard`, `explain`, `archify`.**
+4. **`plant`, `explain`, `archify`.**
 5. **Judgment.** These encode how the owner decides, not how the process runs:
    - `component-design`, a skill loaded before UI work and used again in review.
    - `standards/testing.md`. A blind comparison (4 fixtures, 2 runs each) scored no skill 11.9/14, Pocock's `tdd` 11.5 and a dedicated testing skill 11.6, at 1.15, 1.50 and 2.85 dollars per task. Only fake clocks and settling before negative assertions clearly helped; those and the bug-neighbour rule are the standard.

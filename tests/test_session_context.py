@@ -46,9 +46,9 @@ class SessionContextTest(unittest.TestCase):
         os.makedirs(outside)
         self.assertIsNone(context(outside, env=self.env, stdin=""))
 
-    def test_without_a_contract_suggests_onboard_and_forbids_pocock_setup(self):
+    def test_without_a_contract_suggests_plant_and_forbids_pocock_setup(self):
         text = self.ctx()
-        self.assertIn("/pothos:onboard", text)
+        self.assertIn("/pothos:plant", text)
         self.assertIn("Never run `/setup-matt-pocock-skills`", text)
 
     def test_reads_the_session_directory_from_the_hook_event(self):

@@ -4,7 +4,7 @@ Each folder is one case for `claude plugin eval`: `case.yaml` sets the run, `pro
 
 ```bash
 claude plugin eval plugins/pothos --scaffold --allow-tools Bash Write Edit
-claude plugin eval plugins/pothos --scaffold --allow-tools Bash Write Edit --case 'onboard-*' --runs 1
+claude plugin eval plugins/pothos --scaffold --allow-tools Bash Write Edit --case 'plant-*' --runs 1
 ```
 
 `--scaffold` runs the seed scripts, which only write files inside the case workspace.

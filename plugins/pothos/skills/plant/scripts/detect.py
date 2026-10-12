@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inspect a repository and print what onboard needs to draft a contract, as JSON.
+"""Inspect a repository and print what plant needs to draft a contract, as JSON.
 
 Usage: detect.py [REPO_DIR]
 

@@ -54,7 +54,7 @@ def folder(root):
 def load(root):
     path = contract.locate(root)
     if not path:
-        print("no pothos contract for this repository; run /pothos:onboard", file=sys.stderr)
+        print("no pothos contract for this repository; run /pothos:plant", file=sys.stderr)
         sys.exit(2)
     return contract.load(path)
 
@@ -95,7 +95,7 @@ def plan(root, args):
             return 0
     for app in targets:
         shots = app.get("screenshots") or "unknown"
-        hint = "  (unset: try once; if it fails, suggest setting it with /pothos:onboard audit)" if shots == "unknown" else ""
+        hint = "  (unset: try once; if it fails, suggest setting it with /pothos:plant audit)" if shots == "unknown" else ""
         print(f"app={app['name']} screenshots={shots} dev={app.get('dev') or '-'} url={app.get('url') or '-'}{hint}")
     return 0
 

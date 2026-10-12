@@ -1,10 +1,10 @@
 schema_version: "1.1"
-name: onboard-from-ci
+name: plant-from-ci
 description: >
   An npm repo with no aggregate verify script. CI runs lint, type-check and test:unit in that order.
-  onboard must compose verify.full from the CI scripts in CI order, keep lint:fix out of it, use
+  plant must compose verify.full from the CI scripts in CI order, keep lint:fix out of it, use
   type-check:fast for verify.fast, save the contract privately, and leave AGENTS.md and the rest of the repo untouched.
-tags: [onboard, create]
+tags: [plant, create]
 runs: 3
 expected_outcome: Valid private contract with verify.full chained from CI scripts; AGENTS.md and the rest of the repo unchanged.
 execution:

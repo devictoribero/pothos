@@ -95,7 +95,7 @@ def start(kind, args):
     root = contract.repo_root(os.getcwd())
     path = contract.locate(root)
     if not path:
-        print("no pothos contract for this repository; run /pothos:onboard first", file=sys.stderr)
+        print("no pothos contract for this repository; run /pothos:plant first", file=sys.stderr)
         return 2
     data = contract.load(path)
     if data.get("workflow") == "repo":

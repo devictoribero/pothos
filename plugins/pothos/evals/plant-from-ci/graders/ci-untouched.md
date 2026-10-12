@@ -5,4 +5,4 @@ pattern: 'run: npm run lint\n\s*- run: npm run type-check\n\s*- run: npm run tes
 weight: 2
 ---
 
-onboard did not change CI.
+plant did not change CI.

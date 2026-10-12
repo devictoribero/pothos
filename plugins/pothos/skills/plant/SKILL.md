@@ -1,12 +1,12 @@
 ---
-name: onboard
-description: Connect a repository to Pothos by writing its private agent contract, which tells the other skills how the repo is verified, run, documented and shipped. The contract lives outside the repository, so the repo and its team see no change. Use it the first time Pothos works in a repo, when the session context says the repository has no contract and the task needs one, or with "audit" to check an existing contract for drift.
+name: plant
+description: Connect a repository to Pothos by writing its private agent contract, which tells the other skills how the repo is verified, run, documented and shipped. The contract lives outside the repository, so the repo and its team see no change. Use it the first time Pothos works in a repo, when the session context says the repository has no contract and the task needs one, when asked to onboard, connect or set up a repository for Pothos, or with "audit" to check an existing contract for drift.
 argument-hint: "[audit]"
 ---
 
-# onboard
+# plant
 
-Write or audit the repository's agent contract, the only place where Pothos learns project specifics. Every other skill reads the contract; none of them hardcode a command, path or tracker.
+Plant Pothos in a repository: write or audit the repository's agent contract, the only place where Pothos learns project specifics. Every other skill reads the contract; none of them hardcode a command, path or tracker.
 
 The contract is private. It lives under `~/.config/pothos/contracts/`, keyed by the repository's origin remote, so every clone and worktree of the repo shares it. `shared/contract.py` decides the location; never write the file yourself.
 

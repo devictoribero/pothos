@@ -43,4 +43,4 @@ State the level, the commit and the result in one line each. Quote the script's 
 
 ## Exit codes
 
-`0` passed or skipped, `1` failed or not verified, `2` no contract (suggest `/pothos:onboard`), `3` the contract or environment is unusable (the message says which), `4` still running (run `wait`), `64` usage.
+`0` passed or skipped, `1` failed or not verified, `2` no contract (suggest `/pothos:plant`), `3` the contract or environment is unusable (the message says which), `4` still running (run `wait`), `64` usage.

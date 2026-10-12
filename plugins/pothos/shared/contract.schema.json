@@ -13,7 +13,7 @@
       "type": "string"
     },
     "version": {
-      "description": "Contract format version. Bumped only on breaking changes. Migrating older contracts is planned for onboard's audit mode.",
+      "description": "Contract format version. Bumped only on breaking changes. Migrating older contracts is planned for plant's audit mode.",
       "type": "integer",
       "enum": [
         1

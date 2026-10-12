@@ -44,11 +44,11 @@ claude plugin eval plugins/pothos --scaffold
 
 ## Easy to change
 
-Skills are small and versioned. `CHANGELOG.md` records every release, and the contract carries a `version` so a breaking change can be migrated (planned for onboard's audit mode) instead of breaking repositories.
+Skills are small and versioned. `CHANGELOG.md` records every release, and the contract carries a `version` so a breaking change can be migrated (planned for plant's audit mode) instead of breaking repositories.
 
 ## Missing capabilities are skipped, never improvised
 
-Repositories differ. One has no end-to-end suite, another cannot run without a real backend. When the contract does not declare a capability, skills skip that step and say so in their report. They never invent a substitute command or set up tooling on their own: that is a decision for the person, and the gap shows up in onboard's readiness report.
+Repositories differ. One has no end-to-end suite, another cannot run without a real backend. When the contract does not declare a capability, skills skip that step and say so in their report. They never invent a substitute command or set up tooling on their own: that is a decision for the person, and the gap shows up in plant's readiness report.
 
 A repository can also declare that it follows its own workflow (`"workflow": "repo"`). Pothos's cycle skills then stand aside there and point to the repository's process; only the knowledge skills apply.
 

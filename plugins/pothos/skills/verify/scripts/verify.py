@@ -56,7 +56,7 @@ def receipt_dir(root, commit):
 def load_contract(root):
     path = contract.locate(root)
     if not path:
-        print("no pothos contract for this repository; run /pothos:onboard", file=sys.stderr)
+        print("no pothos contract for this repository; run /pothos:plant", file=sys.stderr)
         sys.exit(2)
     data = contract.load(path)
     if data.get("workflow") == "repo":

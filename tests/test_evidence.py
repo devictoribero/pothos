@@ -94,7 +94,7 @@ class EvidenceTest(unittest.TestCase):
         self.contract({"run": {"dev": "true"}})
         out = self.run_script("plan").stdout
         self.assertIn("app=(repository) screenshots=unknown", out)
-        self.assertIn("onboard audit", out)
+        self.assertIn("plant audit", out)
 
     def test_serve_unknown_app_exits_3(self):
         self.contract({"run": {"apps": [{"name": "web", "path": "apps/web"}]}})
