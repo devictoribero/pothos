@@ -80,6 +80,23 @@ class DetectTest(unittest.TestCase):
         self.assertEqual(report["e2e_tools"], ["playwright"])
         self.assertEqual(report["e2e_config_paths"], ["apps/web/playwright.config.ts"])
 
+    def test_monorepo_apps_with_start_commands_and_kind(self):
+        self.write("pnpm-lock.yaml", "")
+        self.write("pnpm-workspace.yaml", "packages:\n  - 'apps/*'\n")
+        self.write("package.json", '{"scripts": {}}')
+        self.write("apps/web/package.json", '{"name": "@acme/web", "scripts": {"dev": "next dev"}, "dependencies": {"next": "1"}}')
+        self.write("apps/mobile/package.json", '{"name": "@acme/mobile", "scripts": {"start": "expo start"}, "dependencies": {"expo": "1"}}')
+        self.write("apps/api/package.json", '{"name": "@acme/api", "scripts": {"dev": "nest start"}}')
+        apps = {a["path"]: a for a in detect(self.repo)["apps"]}
+        self.assertEqual(apps["apps/web"]["kind"], "web")
+        self.assertEqual(apps["apps/mobile"]["kind"], "mobile")
+        self.assertEqual(apps["apps/api"]["kind"], "other")
+        self.assertEqual(apps["apps/web"]["dev_scripts"][0]["command"], "pnpm --filter @acme/web dev")
+
+    def test_single_package_repo_has_no_apps(self):
+        self.write("package.json", '{"scripts": {"dev": "vite"}}')
+        self.assertEqual(detect(self.repo)["apps"], [])
+
     def test_yarn_runner_has_no_run_keyword(self):
         self.write("yarn.lock", "")
         self.write("package.json", json.dumps({"scripts": {"test": "vitest"}}))

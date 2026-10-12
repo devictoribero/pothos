@@ -114,6 +114,61 @@
               }
             }
           }
+        },
+        "screenshots": {
+          "description": "Which screenshots evidence can take of the running app. web: a headless browser at run.url. ios-simulator: the booted iOS simulator. none: no screenshots; evidence goes straight to test output and real calls without trying. Unset means unknown: evidence tries once and suggests setting this field.",
+          "type": "string",
+          "enum": [
+            "web",
+            "ios-simulator",
+            "none"
+          ]
+        },
+        "apps": {
+          "description": "Monorepos only: one entry per app a change can touch, with how to start it and show it. verify and run.setup stay at the top level because they cover the whole repository. evidence uses the entries whose path the change touches.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "path"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "description": "Repository-relative folder of the app.",
+                "type": "string",
+                "minLength": 1
+              },
+              "dev": {
+                "description": "Command, run from the repository root, that starts this app.",
+                "type": "string",
+                "minLength": 1
+              },
+              "url": {
+                "description": "Where this app answers when it runs.",
+                "type": "string",
+                "minLength": 1
+              },
+              "mocked": {
+                "description": "true when dev works without a real backend or secrets.",
+                "type": "boolean"
+              },
+              "screenshots": {
+                "description": "Same as run.screenshots, for this app.",
+                "type": "string",
+                "enum": [
+                  "web",
+                  "ios-simulator",
+                  "none"
+                ]
+              }
+            }
+          }
         }
       }
     },

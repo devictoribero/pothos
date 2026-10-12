@@ -3,7 +3,9 @@
 
 Usage:
   evidence.py dir                                  print (and create) this branch's evidence folder
-  evidence.py serve [--env NAME] [--timeout SECS]  start the contract's dev command, wait for run.url
+  evidence.py plan [--base BRANCH]                 which apps the branch touches and which screenshots each allows
+  evidence.py serve [--app NAME] [--env NAME] [--timeout SECS]
+                                                   start the contract's dev command, wait for its URL
   evidence.py stop PID                             stop a server started by serve
   evidence.py shot URL NAME [--width W] [--height H] [--wait MS]
                                                    headless browser screenshot into the evidence folder
@@ -67,9 +69,47 @@ def answers(url):
         return False
 
 
+def changed_files(root, base):
+    merge_base = contract.git(["merge-base", "HEAD", base], root) or contract.git(["merge-base", "HEAD", "origin/" + base], root)
+    committed = contract.git(["diff", "--name-only", merge_base, "HEAD"], root) if merge_base else ""
+    pending = subprocess.run(["git", "-C", root, "status", "--porcelain", "--untracked-files=all"],
+                             capture_output=True, text=True).stdout
+    files = set(filter(None, (committed or "").splitlines()))
+    files |= {line[3:].split(" -> ")[-1] for line in pending.splitlines() if len(line) > 3}
+    return files
+
+
+def plan(root, args):
+    """One line per app the branch touches: name, screenshots mode, start command and URL."""
+    data = load(root)
+    run = data.get("run") or {}
+    base = flag(args, "--base") or (data.get("pr") or {}).get("base") or "main"
+    apps = run.get("apps") or []
+    if not apps:
+        targets = [{"name": "(repository)", **run}]
+    else:
+        files = changed_files(root, base)
+        targets = [a for a in apps if any(f == a["path"].rstrip("/") or f.startswith(a["path"].rstrip("/") + "/") for f in files)]
+        if not targets:
+            print(f"the branch touches no app listed in run.apps (compared with {base}); prove it with test output")
+            return 0
+    for app in targets:
+        shots = app.get("screenshots") or "unknown"
+        hint = "  (unset: try once; if it fails, suggest setting it with /devflow:onboard audit)" if shots == "unknown" else ""
+        print(f"app={app['name']} screenshots={shots} dev={app.get('dev') or '-'} url={app.get('url') or '-'}{hint}")
+    return 0
+
+
 def serve(root, args):
     data = load(root)
     run = data.get("run") or {}
+    app_name = flag(args, "--app")
+    if app_name:
+        apps = {a["name"]: a for a in run.get("apps") or []}
+        if app_name not in apps:
+            print(f"unknown app '{app_name}'; the contract lists: {', '.join(apps) or 'none'}", file=sys.stderr)
+            return 3
+        run = {**run, "dev": apps[app_name].get("dev"), "url": apps[app_name].get("url")}
     env_name = flag(args, "--env")
     command = run.get("dev")
     if env_name:
@@ -80,7 +120,7 @@ def serve(root, args):
         command = envs[env_name]["dev"]
     url = run.get("url")
     if not command or not url:
-        print("the contract needs run.dev (or an environment) and run.url to serve the app", file=sys.stderr)
+        print("the contract needs a dev command (run.dev, an environment or the app's dev) and its URL to serve the app", file=sys.stderr)
         return 3
     if answers(url):
         print(f"already-running url={url}")
@@ -164,6 +204,8 @@ def main(argv):
     if cmd == "dir":
         print(folder(root))
         return 0
+    if cmd == "plan":
+        return plan(root, rest)
     if cmd == "serve":
         return serve(root, rest)
     if cmd == "stop" and len(rest) == 1 and rest[0].isdigit():

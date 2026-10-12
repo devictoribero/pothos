@@ -110,6 +110,13 @@ def verify_section(data):
     return text
 
 
+SCREENSHOTS = {
+    "web": "headless browser",
+    "ios-simulator": "booted iOS simulator",
+    "none": "not supported; prove the change with test output and real calls, and do not try to capture any",
+}
+
+
 def run_section(data):
     run = data.get("run") or {}
     if not run:
@@ -123,6 +130,17 @@ def run_section(data):
         lines.append(f"- Start the app: `{run['dev']}`{mocked}" + (f", served at {run['url']}" if run.get("url") else ""))
     if run.get("login"):
         lines.append(f"- How to log in: see `{run['login']}`")
+    if run.get("screenshots"):
+        lines.append(f"- Screenshots for evidence: {SCREENSHOTS[run['screenshots']]}")
+    apps = run.get("apps") or []
+    if apps:
+        lines.append("- Apps in this monorepo (verify and setup above cover all of them; evidence uses the apps the change touches):")
+        for app in apps:
+            start = f"start `{app['dev']}`" if app.get("dev") else "no start command"
+            served = f" at {app['url']}" if app.get("url") else ""
+            mocked = ", mocked backend" if app.get("mocked") else ""
+            shots = f"; screenshots: {SCREENSHOTS[app['screenshots']]}" if app.get("screenshots") else ""
+            lines.append(f"  - `{app['name']}` in `{app['path']}`: {start}{served}{mocked}{shots}")
     envs = run.get("environments") or []
     if envs:
         lines.append("- Backend environments (ask the user which one to use at the start of a feature; never pick one yourself):")

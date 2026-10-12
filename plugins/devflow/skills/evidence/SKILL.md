@@ -9,6 +9,14 @@ A reviewer should not have to run the branch to believe it works. This skill pro
 
 Mechanics go through `"${CLAUDE_SKILL_DIR}/scripts/evidence.py"`. Run it from inside the repository. `evidence.py dir` prints the folder.
 
+## Check what this repository can show
+
+Run `python3 "${CLAUDE_SKILL_DIR}/scripts/evidence.py" plan` first. It prints one line per app the branch touches (in a monorepo, the `run.apps` entries whose folder changed) with its `screenshots` setting:
+
+- `web` or `ios-simulator`: take screenshots that way, as described below. In a monorepo, start the app with `serve --app <name>`.
+- `none`: do not start the app or try a screenshot. Use test output and real calls, and write "Not shown: screenshots, not supported in this app" in evidence.md.
+- `unknown`: try once. If it fails, fall back to test output and tell the user to set `screenshots` with `/devflow:onboard audit`, so the next run does not try again.
+
 ## Pick the kind of proof
 
 Use the strongest proof the change allows, and more than one when they show different things.
@@ -23,7 +31,7 @@ Use the strongest proof the change allows, and more than one when they show diff
 
 ## Web screenshots
 
-1. Start the app: `python3 "${CLAUDE_SKILL_DIR}/scripts/evidence.py" serve [--env NAME]`. It runs the contract's dev command and waits until `run.url` answers. It prints `pid=…`, or `already-running` when something already serves the URL. If the session context lists backend environments, use the one the user chose for this feature.
+1. Start the app: `python3 "${CLAUDE_SKILL_DIR}/scripts/evidence.py" serve [--app NAME] [--env NAME]`. It runs the contract's dev command and waits until `run.url` answers. It prints `pid=…`, or `already-running` when something already serves the URL. If the session context lists backend environments, use the one the user chose for this feature.
 2. Shoot each state: `evidence.py shot "<url>/<path>" <name> [--width 390 --height 844 for mobile web]`. Name files `before-<state>` and `after-<state>`. Take the before shots on the base branch, in a separate worktree or before your first commit.
 3. Pages behind a login: when the contract has `run.mocked: true`, the mocked backend needs no credentials. Otherwise follow `run.login` if set. If you can't reach the page, say so and fall back to test output. Never type real credentials.
 4. Open each screenshot with the Read tool and check it shows what you claim. A blank page, an error overlay or a login wall is not evidence.

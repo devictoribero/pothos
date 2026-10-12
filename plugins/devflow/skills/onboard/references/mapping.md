@@ -36,6 +36,8 @@ Use the first `candidates.e2e` script, preferring a headless variant. `e2e_tools
 - `run.environments`: when `environment_variants` lists two or more backends a person would work against (such as dev and demo, not prod), add one entry per backend with its `dev` command, and ask the user what `note` each should carry, such as who works on it. Leave production out. Never pick a default: implement asks which one to use when work starts.
 - `run.url`: only when the script body or the docs state the port.
 - `run.login`: only when a doc explains how to sign in as a test user.
+- `run.screenshots`: whether evidence can take screenshots of the running app: `web` (headless browser at `run.url`), `ios-simulator` or `none`. Detection cannot settle this, so always ask, with a proposal: `web` for a web app with `run.dev` and `run.url`, `none` for a backend or library, and ask without proposing for a mobile app. Without a user, leave it out and list it as an assumption.
+- `run.apps`: only when `monorepo` is true. One entry per folder in `apps` that a change can touch and that someone would look at running (skip shared packages): `name`, `path`, and its own `dev`, `url`, `mocked` and `screenshots`, with the same rules as the top-level fields. `dev` runs from the repository root, so use a filtered command such as `pnpm --filter <package> dev`. Leave `run.dev` and `run.url` at the top level for the app most changes touch, or out when no app clearly dominates. `verify` and `run.setup` stay at the top level: they cover the whole repository.
 
 ## docs
 

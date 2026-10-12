@@ -91,6 +91,64 @@ def find_upwards_of_depth(root, names, depth=2):
     return sorted(found)
 
 
+def workspace_globs(root, pkg):
+    globs = []
+    text = read(os.path.join(root, "pnpm-workspace.yaml")) or ""
+    in_packages = False
+    for line in text.splitlines():
+        if re.match(r"^packages:\s*$", line):
+            in_packages = True
+        elif in_packages and re.match(r"^\s*-\s*", line):
+            globs.append(re.sub(r"^\s*-\s*", "", line).strip().strip("'\""))
+        elif in_packages and line.strip() and not line.startswith(" "):
+            in_packages = False
+    workspaces = (pkg or {}).get("workspaces")
+    if isinstance(workspaces, dict):
+        workspaces = workspaces.get("packages")
+    globs += [g for g in workspaces or [] if isinstance(g, str)]
+    return [g for g in globs if not g.startswith("!")]
+
+
+def app_kind(manifest):
+    """A hint for the screenshots question, from the app's dependencies. The user decides."""
+    deps = {**(manifest.get("dependencies") or {}), **(manifest.get("devDependencies") or {})}
+    if deps.keys() & {"expo", "react-native"}:
+        return "mobile"
+    if deps.keys() & {"next", "vite", "react-dom", "astro", "@remix-run/react", "nuxt", "@sveltejs/kit", "@angular/core"}:
+        return "web"
+    return "other"
+
+
+def workspace_command(pm, name, rel, script):
+    """A command run from the repository root that starts one workspace package's script."""
+    return {"pnpm": f"pnpm --filter {name} {script}", "yarn": f"yarn workspace {name} {script}",
+            "bun": f"bun run --filter {name} {script}"}.get(pm, f"npm run {script} --workspace {rel}")
+
+
+def workspace_apps(root, pkg, pm):
+    """Every workspace package with a package.json: its folder, name, start scripts and kind."""
+    apps = []
+    for pattern in workspace_globs(root, pkg):
+        base = pattern.rstrip("/").removesuffix("/*").removesuffix("/**")
+        folders = [base] if base == pattern.rstrip("/") else [
+            os.path.join(base, d) for d in sorted(os.listdir(os.path.join(root, base))) if os.path.isdir(os.path.join(root, base, d))
+        ] if os.path.isdir(os.path.join(root, base)) else []
+        for rel in folders:
+            text = read(os.path.join(root, rel, "package.json"))
+            try:
+                manifest = json.loads(text) if text else None
+            except ValueError:
+                manifest = None
+            if not isinstance(manifest, dict):
+                continue
+            name = manifest.get("name") or os.path.basename(rel)
+            scripts = manifest.get("scripts") or {}
+            dev = [n for n in ROLES["dev_mocked"] + ROLES["dev"] if n in scripts]
+            apps.append({"path": rel, "package": name, "kind": app_kind(manifest),
+                         "dev_scripts": [{"script": n, "command": workspace_command(pm, name, rel, n), "body": scripts[n]} for n in dev]})
+    return apps
+
+
 def default_branch(root):
     head = run(["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"], root)
     if head and "/" in head:
@@ -140,6 +198,7 @@ def detect(root):
     report["candidates"] = candidates
     # Same app started against different backends: local:dev, local:demo, start:staging...
     env_scripts = [n for n in scripts if re.match(r"^(local|dev|start|serve):[a-z][\w-]*$", n) and not re.search(r"mock|seed", n)]
+    report["apps"] = workspace_apps(root, pkg, pm) if report["monorepo"] else []
     report["environment_variants"] = [{"script": n, "name": n.split(":", 1)[1], "command": f"{prefix} {n}"} for n in env_scripts]
     report["other_build_files"] = [f for f in ["Makefile", "justfile", "Taskfile.yml", "pyproject.toml", "go.mod", "Cargo.toml"] if exists(f)]
 

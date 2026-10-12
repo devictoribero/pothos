@@ -13,7 +13,9 @@
     "url": "",
     "mocked": false,
     "login": "",
-    "environments": []
+    "screenshots": "none",
+    "environments": [],
+    "apps": []
   },
   "docs": {
     "glossary": "",

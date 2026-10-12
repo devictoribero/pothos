@@ -128,6 +128,19 @@ class SessionContextTest(unittest.TestCase):
         self.assertIn("never pick one yourself", text)
         self.assertIn("`demo`: `npm run dev:demo`; end-to-end: `npm run e2e:demo`", text)
 
+    def test_screenshots_none_tells_evidence_not_to_try(self):
+        self.write({"version": 1, "verify": {"full": "npm test"}, "run": {"dev": "npm start", "screenshots": "none"}})
+        self.assertIn("Screenshots for evidence: not supported", self.ctx())
+
+    def test_monorepo_apps_are_listed(self):
+        os.makedirs(os.path.join(self.repo, "apps", "web"))
+        self.write({"version": 1, "verify": {"full": "npm test"}, "run": {"apps": [
+            {"name": "web", "path": "apps/web", "dev": "pnpm --filter web dev", "url": "http://localhost:3000", "screenshots": "web"},
+            {"name": "mobile", "path": "apps/mobile", "screenshots": "none"}]}})
+        text = self.ctx()
+        self.assertIn("`web` in `apps/web`: start `pnpm --filter web dev` at http://localhost:3000; screenshots: headless browser", text)
+        self.assertIn("`mobile` in `apps/mobile`: no start command; screenshots: not supported", text)
+
     def test_standards_list_repository_and_personal_files(self):
         os.makedirs(os.path.join(self.home, "standards"))
         open(os.path.join(self.home, "standards", "mine.md"), "w").close()

@@ -174,6 +174,9 @@ def path_errors(data, root):
     standards = lookup(data, "review.standards")
     if isinstance(standards, list):
         checks += [(f"review.standards[{i}]", rel) for i, rel in enumerate(standards)]
+    apps = lookup(data, "run.apps")
+    if isinstance(apps, list):
+        checks += [(f"run.apps[{i}].path", app.get("path")) for i, app in enumerate(apps) if isinstance(app, dict)]
     for field, rel in checks:
         if not isinstance(rel, str):
             continue

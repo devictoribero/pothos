@@ -71,6 +71,35 @@ class EvidenceTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("exited with 4", result.stderr)
 
+    def commit(self, rel):
+        path = os.path.join(self.repo, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        open(path, "w").close()
+        git = ["git", "-C", self.repo, "-c", "user.name=t", "-c", "user.email=t@t"]
+        subprocess.run([*git, "add", "-A"], check=True)
+        subprocess.run([*git, "commit", "-q", "-m", rel], check=True)
+
+    def test_plan_lists_only_the_apps_the_branch_touches(self):
+        self.commit("README.md")
+        subprocess.run(["git", "-C", self.repo, "branch", "main"], check=True)
+        self.commit("apps/mobile/screen.tsx")
+        self.contract({"run": {"apps": [{"name": "web", "path": "apps/web", "screenshots": "web"},
+                                        {"name": "mobile", "path": "apps/mobile", "screenshots": "none"}]},
+                       "pr": {"base": "main"}})
+        out = self.run_script("plan").stdout
+        self.assertIn("app=mobile screenshots=none", out)
+        self.assertNotIn("app=web", out)
+
+    def test_plan_without_apps_reports_the_repository_and_flags_unknown(self):
+        self.contract({"run": {"dev": "true"}})
+        out = self.run_script("plan").stdout
+        self.assertIn("app=(repository) screenshots=unknown", out)
+        self.assertIn("onboard audit", out)
+
+    def test_serve_unknown_app_exits_3(self):
+        self.contract({"run": {"apps": [{"name": "web", "path": "apps/web"}]}})
+        self.assertEqual(self.run_script("serve", "--app", "admin").returncode, 3)
+
     def test_usage_errors_exit_64(self):
         self.assertEqual(self.run_script().returncode, 64)
         self.assertEqual(self.run_script("shot", "http://x").returncode, 64)

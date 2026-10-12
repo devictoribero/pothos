@@ -125,6 +125,15 @@ class ContractTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("run.environments[1]: missing required field 'dev'", result.stdout)
 
+    def test_screenshots_and_apps_are_validated(self):
+        self.write({"version": 1, "verify": {"full": "x"}, "run": {"screenshots": "android", "apps": [{"name": "web", "path": "apps/web"}, {"name": "api"}]}})
+        result = run(["validate"], self.repo)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("run.screenshots: 'android' is not one of", result.stdout)
+        self.assertIn("run.apps[1]: missing required field 'path'", result.stdout)
+        strict = run(["validate", "--strict"], self.repo)
+        self.assertIn("run.apps[0].path: path 'apps/web' does not exist", strict.stdout)
+
     def test_remote_key_edge_cases(self):
         sys.path.insert(0, os.path.dirname(SCRIPT))
         import contract
