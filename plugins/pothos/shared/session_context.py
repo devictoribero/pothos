@@ -198,9 +198,36 @@ def pr_section(data):
     return "\n".join(lines)
 
 
+def artifacts_section(start):
+    """Point the session at this repository's explanation pages, so earlier work is reused instead of redone.
+    The rule lives here rather than in a user's CLAUDE.md because the pages are only useful if every session knows
+    they exist."""
+    try:
+        folder = os.path.join(contract.pothos_home(), "artifacts", contract.key_for(start, "artifacts"))
+    except ValueError:
+        return None
+    index = os.path.join(folder, "INDEX.md")
+    if not os.path.isfile(index):
+        return None
+    with open(index, encoding="utf-8") as fh:
+        count = sum(1 for line in fh if line.startswith("- "))
+    if not count:
+        return None
+    pages = "1 explanation page" if count == 1 else f"{count} explanation pages"
+    return (f"### Earlier explanations\n\nThis repository has {pages} written by `/pothos:explain` under `{folder}`. "
+            f"Before explaining, mapping or investigating an area of this code, read `{index}` and the `summary.md` of any "
+            "page that covers it: it holds the answer, the key facts and the sources in a few lines. When the user asks for "
+            "an explanation or a visual of something a page already covers, update that page instead of writing a new one.")
+
+
 def build(start):
     if not contract.git(["rev-parse", "--git-dir"], start):
         return None
+    text = contract_section(start)
+    return "\n\n".join(part for part in (text, artifacts_section(start)) if part)
+
+
+def contract_section(start):
     try:
         path = contract.locate(start)
     except ValueError as exc:

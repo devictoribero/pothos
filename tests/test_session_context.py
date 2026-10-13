@@ -51,6 +51,32 @@ class SessionContextTest(unittest.TestCase):
         self.assertIn("/pothos:plant", text)
         self.assertIn("Never run `/setup-matt-pocock-skills`", text)
 
+    def artifacts_index(self, lines):
+        folder = os.path.join(self.home, "artifacts", "github.com", "acme", "shop")
+        os.makedirs(folder, exist_ok=True)
+        with open(os.path.join(folder, "INDEX.md"), "w") as fh:
+            fh.write("# Explanations\n\n" + "".join(f"- [{title}]({title}/index.html) · summary: {title}/summary.md\n" for title in lines))
+        return os.path.join(folder, "INDEX.md")
+
+    def test_points_at_earlier_explanations_with_or_without_a_contract(self):
+        self.assertNotIn("Earlier explanations", self.ctx())
+        index = self.artifacts_index(["checkout", "refunds"])
+        text = self.ctx()
+        self.assertIn("### Earlier explanations", text)
+        self.assertIn("2 explanation pages", text)
+        self.assertIn(f"read `{index}`", text)
+        self.assertIn("/pothos:plant", text)  # still no contract
+        self.write({"version": 1, "verify": {"full": "npm test"}})
+        text = self.ctx()
+        self.assertIn("`full`: `npm test`", text)
+        self.assertIn("2 explanation pages", text)
+        self.write({"version": 1, "workflow": "repo"})
+        self.assertIn("Earlier explanations", self.ctx())
+
+    def test_an_empty_artifacts_index_is_ignored(self):
+        self.artifacts_index([])
+        self.assertNotIn("Earlier explanations", self.ctx())
+
     def test_reads_the_session_directory_from_the_hook_event(self):
         self.write({"version": 1, "verify": {"full": "npm test"}})
         elsewhere = os.path.join(self.tmp.name, "elsewhere")

@@ -14,9 +14,10 @@ Usage:
   artifact.py parent FOLDER PARENT|none                     change where a page sits in the sidebar
   artifact.py put FOLDER RELPATH                            write stdin to FOLDER/RELPATH (the only way skills write pages)
   artifact.py light FILE...                                 make archify diagrams open in the light theme by default
-  artifact.py register DIR                                  add or refresh DIR's line in INDEX.md (needs summary.md)
-                                                            rebuild the sidebar for every page of the repository, and
-                                                            point <repo folder>/latest at this page
+  artifact.py register DIR                                  add or refresh DIR's line in INDEX.md (needs summary.md),
+                                                            drop archify's receipt files from DIR/diagrams, rebuild the
+                                                            sidebar for every page of the repository, and point
+                                                            <repo folder>/latest at this page
   artifact.py nav [--repo DIR]                              rebuild the sidebar (nav.js) for this repository
   artifact.py list [--repo DIR]                             print INDEX.md for this repository
   artifact.py open PATH                                     open in Brave, falling back to the default browser
@@ -144,6 +145,28 @@ def first_line(path):
     return ""
 
 
+RECEIPT_SUFFIXES = (".finalize.json", ".finalize-summary.json", ".browser-check.json", ".delivery.json")
+RECEIPT_FOLDERS = (".old-receipts",)
+
+
+def clean_receipts(folder):
+    """Remove archify's gate receipts under folder/diagrams. They are evidence for the run that produced a
+    diagram, not part of the page, and they weigh more than the candidate JSON. Diagram HTML and candidates stay."""
+    removed = 0
+    diagrams = os.path.join(folder, "diagrams")
+    for root, dirs, files in os.walk(diagrams):
+        for name in list(dirs):
+            if name in RECEIPT_FOLDERS:
+                shutil.rmtree(os.path.join(root, name))
+                dirs.remove(name)
+                removed += 1
+        for name in files:
+            if name.endswith(RECEIPT_SUFFIXES):
+                os.remove(os.path.join(root, name))
+                removed += 1
+    return removed
+
+
 def cmd_register(args):
     if len(args) != 1:
         print("usage: artifact.py register DIR", file=sys.stderr)
@@ -172,6 +195,7 @@ def cmd_register(args):
     lines = sorted([line] + lines, key=date_of, reverse=True)
     with open(index, "w", encoding="utf-8") as fh:
         fh.write("# Explanations\n\nNewest first. Read summary.md before opening the HTML.\n\n" + "\n".join(l for l in lines if l.startswith("- ")) + "\n")
+    receipts = clean_receipts(folder)
     build_nav(os.path.dirname(folder))
     latest = os.path.join(os.path.dirname(folder), "latest")
     if os.path.islink(latest) or not os.path.exists(latest):
@@ -180,7 +204,7 @@ def cmd_register(args):
             os.remove(tmp)
         os.symlink(name, tmp)
         os.replace(tmp, latest)
-    print(f"registered in {index}")
+    print(f"registered in {index}" + (f"; removed {receipts} archify receipt file(s)" if receipts else ""))
     return 0
 
 

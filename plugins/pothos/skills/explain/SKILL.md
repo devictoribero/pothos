@@ -1,6 +1,6 @@
 ---
 name: explain
-description: Explain a flow, an architecture, a codebase area, a plan or a concept as a local HTML page that opens in the browser and stays available to later sessions and other agents. Light theme by default with a dark toggle, diagrams drawn with the archify skill. Questions about how code works are investigated with the pinned poteto/how method (parallel explorers, synthesis, optional multi-model architecture critique). Use when the user asks to explain, visualize, map, diagram, critique the architecture of, or help them understand something ("explícame", "ayúdame a entender", "cómo funciona", "critica el diseño de", "how does X work", "show me the architecture", "make me a visual of the plan"). Also use it to find an earlier explanation before writing a new one.
+description: Explain a flow, an architecture, a codebase area, a plan or a concept as a local HTML page with diagrams that stays available to later sessions. Use when the user asks to explain, visualize, map, diagram, critique the architecture of, or help them understand something ("explícame", "ayúdame a entender", "cómo funciona", "critica el diseño de", "how does X work", "show me the architecture", "make me a visual of the plan"). Also use it to find an earlier explanation before writing a new one.
 argument-hint: "[topic]"
 ---
 
@@ -31,9 +31,9 @@ Every command below calls `"${CLAUDE_SKILL_DIR}/scripts/artifact.py"`. Write tha
 4. **Draw the diagrams.** For each picture the explanation needs, invoke the `pothos:archify` skill. Write its candidate JSON with `put` into `<folder>/diagrams/`, run archify's commands from inside the artifact folder so its working files stay there, and set its output to `diagrams/<name>.html`. Then run `python3 "${CLAUDE_SKILL_DIR}/scripts/artifact.py" light <folder>/diagrams/*.html` so they open in the light theme. Choose the archify type by the question: architecture for parts, workflow for steps, sequence for back-and-forth, dataflow for where data goes, lifecycle for states.
 5. **Write the page.** Remove the `data-pothos-placeholder` notice: it is only there so a page opened too early does not look empty. Read the template the folder already has, then `put` the filled `index.html`, following `references/writing.md`: the answer first, then sections, each diagram in a figure with its caption.
 6. **Write `summary.md`** with `put`. First line: the answer in one sentence. Then at most fifteen lines of key facts, names and decisions, and the sources. This is what other agents read, so it must stand alone.
-7. **Register and open.** `python3 "${CLAUDE_SKILL_DIR}/scripts/artifact.py" register <folder>`, then `python3 "${CLAUDE_SKILL_DIR}/scripts/artifact.py" open <folder>/index.html`.
+7. **Register and open.** `python3 "${CLAUDE_SKILL_DIR}/scripts/artifact.py" register <folder>` (it also removes archify's receipt files from `diagrams/`; the diagrams themselves stay), then `python3 "${CLAUDE_SKILL_DIR}/scripts/artifact.py" open <folder>/index.html`.
 8. **Reply** with the page path, the one-sentence answer and anything you could not verify.
 
 ## Reading earlier pages
 
-Any skill or agent that needs earlier context can run `python3 "${CLAUDE_SKILL_DIR}/scripts/artifact.py" list` and read the relevant `summary.md`. Open the HTML only when the summary is not enough.
+The session hook tells every session, at start, where this repository's `INDEX.md` is and to read the relevant `summary.md` before investigating a covered area. Inside this skill, `python3 "${CLAUDE_SKILL_DIR}/scripts/artifact.py" list` prints the same index. Open the HTML only when the summary is not enough.

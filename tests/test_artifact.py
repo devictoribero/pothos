@@ -87,6 +87,25 @@ class ArtifactTest(unittest.TestCase):
         self.assertIn("Checkout charges the card after stock is reserved.", index)
         self.assertIn("Checkout flow", run(["list"], self.repo).stdout)
 
+    def test_register_removes_archify_receipts_but_keeps_diagrams(self):
+        folder = self.new()
+        self.finish(folder)
+        with open(os.path.join(folder, "summary.md"), "w") as fh:
+            fh.write("# Answer.\n")
+        diagrams = os.path.join(folder, "diagrams")
+        os.makedirs(os.path.join(diagrams, ".old-receipts"))
+        os.makedirs(os.path.join(diagrams, "review-2"))
+        for name in ("flow.json", "flow.html", "flow.finalize.json", "flow.finalize-summary.json", "flow.browser-check.json",
+                     "flow.delivery.json", "review-2/flow.html", "review-2/flow.finalize.json", ".old-receipts/old.json"):
+            with open(os.path.join(diagrams, name), "w") as fh:
+                fh.write("{}")
+        result = run(["register", folder], self.repo)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("removed 6 archify receipt file(s)", result.stdout)
+        left = sorted(os.path.relpath(os.path.join(r, f), diagrams) for r, _, fs in os.walk(diagrams) for f in fs)
+        self.assertEqual(left, ["flow.html", "flow.json", "review-2/flow.html"])
+        self.assertNotIn("removed", run(["register", folder], self.repo).stdout)
+
     def test_put_writes_inside_the_folder_only(self):
         folder = self.new()
         ok = subprocess.run([sys.executable, SCRIPT, "put", folder, "summary.md"], input="# Hi\n", capture_output=True, text=True)
