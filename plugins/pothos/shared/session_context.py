@@ -151,25 +151,38 @@ def run_section(data):
     return "### Running the app\n\n" + "\n".join(lines) if lines else None
 
 
-def ui_lines(data):
-    """The repository's UI building blocks, from the contract's ui section. Unset fields stay unsaid."""
-    ui = data.get("ui") or {}
+def ui_facts(ui):
     quote = lambda items: ", ".join(f"`{item}`" for item in items)
     facts = []
     if ui.get("components"):
-        facts.append(f"- Shared components: {quote(ui['components'])}. Search them before creating a component, and reuse or extend what fits.")
+        facts.append(f"Shared components: {quote(ui['components'])}. Search them before creating a component, and reuse or extend what fits.")
     if ui.get("tokens"):
-        facts.append(f"- Design tokens and theme: {quote(ui['tokens'])}. Use these values instead of raw colors, sizes or breakpoints.")
+        facts.append(f"Design tokens and theme: {quote(ui['tokens'])}. Use these values instead of raw colors, sizes or breakpoints.")
     if ui.get("icons"):
-        facts.append(f"- Icons come from `{ui['icons']}`; do not add another icon set.")
+        facts.append(f"Icons come from `{ui['icons']}`; do not add another icon set.")
     preview = ui.get("preview") or {}
     if preview.get("command"):
         served = f", answering at {preview['url']}" if preview.get("url") else ""
-        facts.append(f"- Component preview: `{preview['command']}`{served}.")
-    if not facts:
+        facts.append(f"Component preview: `{preview['command']}`{served}.")
+    return facts
+
+
+def ui_lines(data):
+    """The repository's UI building blocks, from the contract's ui sections. Unset fields stay unsaid."""
+    lines = [f"- {fact}" for fact in ui_facts(data.get("ui") or {})]
+    for app in ((data.get("run") or {}).get("apps") or []):
+        facts = ui_facts((app.get("ui") or {}) if isinstance(app, dict) else {})
+        if facts:
+            lines.append(f"- In `{app.get('path')}` (`{app.get('name')}`), instead of the above:")
+            lines += [f"  - {fact}" for fact in facts]
+    if not lines:
         return []
+    checker = os.path.join(PLUGIN, "shared", "ui_check.py")
     return ["", "This repository's UI building blocks (from the contract; anything not listed is unconfirmed, so find it in the code "
-            "and never assume a library or path):"] + facts
+            "and never assume a library or path):"] + lines + [
+            f"- Before `verify` on a change that touches UI, run `python3 \"{checker}\"`. It flags raw colors, new fonts and "
+            "other icon sets on the lines the branch adds. Fix each finding, or keep the value with a `ui-ok: <why>` comment on "
+            "that line. `code-review` reports what remains as yellow findings."]
 
 
 def standards_section(data, repo_workflow=False):

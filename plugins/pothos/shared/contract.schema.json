@@ -166,6 +166,56 @@
                   "ios-simulator",
                   "none"
                 ]
+              },
+              "ui": {
+                "description": "This app's UI building blocks, same fields as the top-level ui. In a monorepo it replaces the top-level ui for files under the app's path.",
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "components": {
+                    "description": "Repository-relative folders that hold the shared components (design-system primitives, common UI). Look here before creating a component.",
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "uniqueItems": true
+                  },
+                  "tokens": {
+                    "description": "Repository-relative files or folders that define design tokens or the theme: colors, spacing, type scale, breakpoints.",
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "uniqueItems": true
+                  },
+                  "icons": {
+                    "description": "Package new code takes icons from, e.g. lucide-react. Set only when one icon set is the convention.",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "preview": {
+                    "description": "Where components render in isolation, such as Storybook.",
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "command"
+                    ],
+                    "properties": {
+                      "command": {
+                        "description": "Command that starts the preview, taken from a declared script.",
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "url": {
+                        "description": "Where the preview answers when it runs.",
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  }
+                }
               }
             }
           }
@@ -302,7 +352,7 @@
       }
     },
     "ui": {
-      "description": "Where this repository's UI building blocks live. Sessions get it before UI work, so new code reuses what exists instead of adding a second button or a raw color. Every field is optional; a missing field means nobody confirmed it, and skills skip what depends on it instead of guessing.",
+      "description": "Where this repository's UI building blocks live. Sessions get it before UI work, so new code reuses what exists instead of adding a second button or a raw color. Every field is optional; a missing field means nobody confirmed it, and skills skip what depends on it instead of guessing. In a monorepo, put each app's own ui in its run.apps entry; the top-level ui then covers the rest of the repository.",
       "type": "object",
       "additionalProperties": false,
       "properties": {

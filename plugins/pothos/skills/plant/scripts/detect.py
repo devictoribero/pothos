@@ -13,6 +13,9 @@ import re
 import subprocess
 import sys
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "shared"))
+import ui_check  # noqa: E402
+
 LOCKFILES = [
     ("pnpm-lock.yaml", "pnpm"),
     ("yarn.lock", "yarn"),
@@ -161,11 +164,8 @@ COMPONENT_DIR_NAMES = {"components", "ui", "primitives", "design-system", "desig
 COMPONENT_EXTS = (".tsx", ".jsx", ".vue", ".svelte")
 TOKEN_FILE = re.compile(r"^(tokens?|design-tokens|theme|themes|variables|colors|palette)(\.[\w-]+)*\.(css|scss|ts|tsx|js|mjs|json)$|"
                         r"^tailwind\.config\.(js|cjs|mjs|ts)$|\.tokens\.json$", re.I)
-ICON_PACKAGES = [
-    "lucide-react", "lucide-react-native", "@heroicons/react", "react-icons", "@tabler/icons-react", "@phosphor-icons/react",
-    "phosphor-react-native", "@radix-ui/react-icons", "@expo/vector-icons", "react-native-vector-icons", "@mui/icons-material",
-    "@fortawesome/react-fontawesome", "@iconify/react", "react-feather", "@remixicon/react", "lucide-vue-next", "@heroicons/vue",
-]
+ICON_PACKAGES = ui_check.ICON_PACKAGES
+TOKEN_DIR_NAMES = {"tokens", "design-tokens", "theme", "themes"}
 # A components folder below one of these belongs to one feature or route, not to the shared UI.
 FEATURE_SCOPE = re.compile(r"(^|/)(features?|modules|domains|pages|routes|screens|views)/[^/]+/", re.I)
 CUSTOM_PROPERTY = re.compile(r"^\s*--[\w-]+\s*:", re.M)
@@ -203,6 +203,8 @@ def ui_facts(root, pkg, pm):
             if count:
                 scoped = bool(FEATURE_SCOPE.search(rel))
                 folders.append({"path": rel, "component_files": count, "feature_scoped": scoped})
+        if rel and name in TOKEN_DIR_NAMES and any(f.endswith(SOURCE_EXTS + (".css", ".scss", ".json")) for _, _, fs in walk(os.path.join(root, rel), 2) for f in fs):
+            tokens.append(rel)
         if os.path.basename(rel) == ".storybook":
             storybook_dirs.append(rel)
         for f in files:
@@ -233,7 +235,7 @@ def ui_facts(root, pkg, pm):
                 break
     return {
         "component_folders": sorted(folders, key=lambda f: (f["feature_scoped"], -f["component_files"])),
-        "token_files": sorted(tokens),
+        "token_files": sorted(t for t in tokens if not any(t.startswith(other + "/") for other in tokens)),
         "icon_packages": [{"package": p, "declared_in": declared[p], "imports": imports[p]} for p in sorted(declared, key=lambda p: -imports[p])],
         "storybook_config": storybook_dirs,
         "preview_scripts": preview,

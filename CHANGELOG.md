@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `shared/ui_check.py` checks the lines a branch adds against the contract's `ui`: raw colors and new fonts outside `ui.tokens`, and icon packages other than `ui.icons` (same npm scope counts as the same set). It works on any stack, skips tests, docs and comments, honours `ui-ok: <why>`, and the session context asks for it before `verify` on UI changes. It advises; it is not a merge gate. Each `run.apps` entry can carry its own `ui` in a monorepo.
 - Contract `ui` section: shared component folders, token files, icon package and component preview. `plant` detects the candidates and asks only when they leave a choice, `contract.py validate --strict` checks the paths, and the session context hands the set fields to UI work.
 - `onboard` is now `plant` (`/pothos:plant`); asking to onboard a repository still starts it.
 - Renamed from devflow to Pothos: commands are `/pothos:<skill>`, the home folder is `~/.config/pothos` (`POTHOS_HOME`), the contract's default workflow value is `pothos`, and the unattended runner is `pothos-run.py`.

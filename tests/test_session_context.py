@@ -200,10 +200,18 @@ class SessionContextTest(unittest.TestCase):
         self.assertIn("Design tokens and theme: `src/styles/tokens.css`", text)
         self.assertIn("Icons come from `lucide-react`", text)
         self.assertIn("Component preview: `pnpm run storybook`, answering at http://localhost:6006.", text)
+        self.assertIn("ui_check.py", text)
 
     def test_ui_building_blocks_apply_in_repo_workflow_too(self):
         self.write({"version": 1, "workflow": "repo", "ui": {"components": ["src/ui"]}})
         self.assertIn("Shared components: `src/ui`", self.ctx())
+
+    def test_each_app_gets_its_own_ui(self):
+        self.write({"version": 1, "verify": {"full": "npm test"}, "run": {"apps": [
+            {"name": "mobile", "path": "apps/mobile", "ui": {"icons": "lucide-react-native"}}]}})
+        text = self.ctx()
+        self.assertIn("In `apps/mobile` (`mobile`), instead of the above:", text)
+        self.assertIn("  - Icons come from `lucide-react-native`", text)
 
     def test_without_ui_nothing_is_claimed(self):
         self.write({"version": 1, "verify": {"full": "npm test"}, "ui": {"preview": {"url": "http://localhost:6006"}}})

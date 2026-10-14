@@ -128,12 +128,13 @@ class DetectTest(unittest.TestCase):
         self.write("src/styles/app.css", "@import 'tailwindcss';\n@theme { --color-brand: red; }")
         self.write("src/styles/reset.css", "body { margin: 0; }")
         self.write(".storybook/main.ts", "")
+        self.write("src/theme/colors.ts", "export const brand = '#123456'\n")
         ui = detect(self.repo)["ui"]
         folders = [(f["path"], f["feature_scoped"]) for f in ui["component_folders"]]
         self.assertEqual(folders[:2], [("src/components", False), ("src/components/ui", False)])
         self.assertIn(("src/features/cart/components", True), folders)
         self.assertNotIn("src/__tests__/components", [f for f, _ in folders])
-        self.assertEqual(ui["token_files"], ["src/styles/app.css", "src/styles/tokens.css"])
+        self.assertEqual(ui["token_files"], ["src/styles/app.css", "src/styles/tokens.css", "src/theme"])
         self.assertEqual([(i["package"], i["imports"]) for i in ui["icon_packages"]], [("lucide-react", 2), ("react-icons", 1)])
         self.assertEqual(ui["storybook_config"], [".storybook"])
         self.assertEqual(ui["preview_scripts"][0]["command"], "pnpm run storybook")

@@ -10,7 +10,7 @@ Status of each phase.
 | 3 | Pilot on a side project | running on Lifetails, see below |
 | 4 | Work repositories, once the pilot holds | later |
 | 5 | Remaining repositories and more autonomy | later |
-| 6 | Frontend: page design and review of the running app | contract `ui` done; the rest below |
+| 6 | Frontend: page design and review of the running app | contract `ui` and `ui_check` done; the rest below |
 
 ## Phase 6: frontend
 
@@ -26,7 +26,9 @@ An eight-skill frontend catalogue (frontend-design, component-design, interactio
 
 ### 1. Contract `ui` (done)
 
-`ui.components`, `ui.tokens`, `ui.icons` and `ui.preview` tell every session where the shared components, the theme and the icon set live. `plant` detects candidates (`detect.py` reports component folders, flagging feature-scoped ones, theme stylesheets and token files, icon packages ranked by real imports, and Storybook scripts) and asks only when the candidates leave a choice. The session context lists only the fields the contract sets, and says anything else is unconfirmed.
+`ui.components`, `ui.tokens`, `ui.icons` and `ui.preview` tell every session where the shared components, the theme and the icon set live. `plant` detects candidates (`detect.py` reports component folders, flagging feature-scoped ones, theme stylesheets and token files, icon packages ranked by real imports, and Storybook scripts) and asks only when the candidates leave a choice. The session context lists only the fields the contract sets, and says anything else is unconfirmed. In a monorepo each `run.apps` entry carries its own `ui`.
+
+`shared/ui_check.py` turns the section into a check on the lines a branch adds: raw colors, new fonts, other icon sets. Benchmarked on the last 60 UI commits of four repositories: 48 of 59 finding groups were real, 11 were values a person would keep (domain data, flags, platform config, the font setup file), no noise once docs and comments are skipped, about 0.1 seconds per commit. At that precision it advises (yellow in review, `ui-ok: <why>` to keep a value) and stays out of the `verify` gate.
 
 ### 2. `frontend-design`: vendor and measure
 
