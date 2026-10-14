@@ -134,6 +134,17 @@ class ContractTest(unittest.TestCase):
         strict = run(["validate", "--strict"], self.repo)
         self.assertIn("run.apps[0].path: path 'apps/web' does not exist", strict.stdout)
 
+    def test_ui_section_is_validated(self):
+        self.write({"version": 1, "verify": {"full": "x"}, "ui": {"components": ["src/ui"], "tokens": ["../theme.css"],
+                                                                  "icons": "", "preview": {"url": "http://localhost:6006"}}})
+        result = run(["validate"], self.repo)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("ui.icons: must not be empty", result.stdout)
+        self.assertIn("ui.preview: missing required field 'command'", result.stdout)
+        strict = run(["validate", "--strict"], self.repo)
+        self.assertIn("ui.components[0]: path 'src/ui' does not exist", strict.stdout)
+        self.assertIn("ui.tokens[0]: '../theme.css' must be a path inside the repository", strict.stdout)
+
     def test_remote_key_edge_cases(self):
         sys.path.insert(0, os.path.dirname(SCRIPT))
         import contract

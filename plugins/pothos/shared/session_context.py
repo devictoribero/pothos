@@ -151,6 +151,27 @@ def run_section(data):
     return "### Running the app\n\n" + "\n".join(lines) if lines else None
 
 
+def ui_lines(data):
+    """The repository's UI building blocks, from the contract's ui section. Unset fields stay unsaid."""
+    ui = data.get("ui") or {}
+    quote = lambda items: ", ".join(f"`{item}`" for item in items)
+    facts = []
+    if ui.get("components"):
+        facts.append(f"- Shared components: {quote(ui['components'])}. Search them before creating a component, and reuse or extend what fits.")
+    if ui.get("tokens"):
+        facts.append(f"- Design tokens and theme: {quote(ui['tokens'])}. Use these values instead of raw colors, sizes or breakpoints.")
+    if ui.get("icons"):
+        facts.append(f"- Icons come from `{ui['icons']}`; do not add another icon set.")
+    preview = ui.get("preview") or {}
+    if preview.get("command"):
+        served = f", answering at {preview['url']}" if preview.get("url") else ""
+        facts.append(f"- Component preview: `{preview['command']}`{served}.")
+    if not facts:
+        return []
+    return ["", "This repository's UI building blocks (from the contract; anything not listed is unconfirmed, so find it in the code "
+            "and never assume a library or path):"] + facts
+
+
 def standards_section(data, repo_workflow=False):
     repo_files = [] if repo_workflow else list(((data.get("review") or {}).get("standards")) or [])
     personal = sorted(glob.glob(os.path.join(PLUGIN, "standards", "*.md")))
@@ -172,6 +193,7 @@ def standards_section(data, repo_workflow=False):
               + (" and follow it unless the repository's own component skills say otherwise." if repo_workflow else ".")]
     lines += ["When reviewing a diff that creates or changes UI components, also run `component-design`'s audit on those "
               "components and report its findings next to " + ("the repository's own review." if repo_workflow else "`code-review`'s.")]
+    lines += ui_lines(data)
     if build_skills:
         lines += ["Also load these repository skills before writing code: " + ", ".join(f"`{s}`" for s in build_skills) + "."]
     return "\n".join(lines)

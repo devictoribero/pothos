@@ -116,6 +116,33 @@ class DetectTest(unittest.TestCase):
         self.assertEqual(ci["setup_steps"], ["pnpm install --frozen-lockfile", "pnpm --filter api db:generate"])
         self.assertEqual(detect(self.repo)["candidates"]["setup"][0]["script"], "db:generate")
 
+    def test_ui_facts_list_candidates_without_choosing(self):
+        self.write("pnpm-lock.yaml", "")
+        self.write("package.json", json.dumps({"scripts": {"storybook": "storybook dev -p 6006"},
+                                               "dependencies": {"lucide-react": "1", "react-icons": "1"}}))
+        self.write("src/components/ui/Button.tsx", "import { Plus } from 'lucide-react'\n")
+        self.write("src/components/ui/Dialog.tsx", "import { X } from 'lucide-react'\nimport { FaX } from 'react-icons/fa'\n")
+        self.write("src/features/cart/components/CartLine.tsx", "")
+        self.write("src/__tests__/components/Fake.tsx", "")
+        self.write("src/styles/tokens.css", ":root { --a: 1; }")
+        self.write("src/styles/app.css", "@import 'tailwindcss';\n@theme { --color-brand: red; }")
+        self.write("src/styles/reset.css", "body { margin: 0; }")
+        self.write(".storybook/main.ts", "")
+        ui = detect(self.repo)["ui"]
+        folders = [(f["path"], f["feature_scoped"]) for f in ui["component_folders"]]
+        self.assertEqual(folders[:2], [("src/components", False), ("src/components/ui", False)])
+        self.assertIn(("src/features/cart/components", True), folders)
+        self.assertNotIn("src/__tests__/components", [f for f, _ in folders])
+        self.assertEqual(ui["token_files"], ["src/styles/app.css", "src/styles/tokens.css"])
+        self.assertEqual([(i["package"], i["imports"]) for i in ui["icon_packages"]], [("lucide-react", 2), ("react-icons", 1)])
+        self.assertEqual(ui["storybook_config"], [".storybook"])
+        self.assertEqual(ui["preview_scripts"][0]["command"], "pnpm run storybook")
+        self.assertEqual(ui["preview_scripts"][0]["url"], "http://localhost:6006")
+
+    def test_ui_facts_are_empty_without_ui(self):
+        self.assertEqual(detect(self.repo)["ui"], {"component_folders": [], "token_files": [], "icon_packages": [],
+                                                   "storybook_config": [], "preview_scripts": []})
+
     def test_docs_agent_files_and_existing_contract(self):
         self.write("CONTEXT.md", "# Terms")
         self.write("docs/decisions/0001.md", "x")

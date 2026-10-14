@@ -61,6 +61,15 @@ If the repository already has Matt Pocock's setup output (`docs/agents/issue-tra
 
 - `skills`: repository skills that guide how code is written rather than checked afterwards, such as design-system or component rules whose description says to use them when creating or editing files. A skill can be in both `build.skills` and `review.skills`.
 
+## ui
+
+Read `ui` in the report. Every value is a candidate found on disk; nothing in it is chosen yet. Skip the whole section for a repository with no UI.
+
+- `components`: the folders whose components every feature may use, such as design-system primitives and common UI. Never take a `feature_scoped` folder: it belongs to one feature. When a parent and its child are both listed (`src/components` and `src/components/primitives`), keep the folders a reader would search first, usually the children that hold primitives and common pieces, and ask when it is not clear.
+- `tokens`: the files that define the theme or the tokens new code must use. Open each candidate: a file that only consumes values, or a single component's local tokens, does not count. Leave the field out when no file defines a shared scale.
+- `icons`: the package in `icon_packages` with clearly the most imports. When two packages are both in real use, ask which one new code takes; without a user, leave it out and list it as an assumption.
+- `preview`: a `preview_scripts` entry, with `command` as given and `url` only when it carries a port. `storybook_config` without a script means the preview cannot be started; leave it out and report the gap.
+
 ## pr
 
 - `base`: `default_branch`. When it is null, ask; without a user, use `main` only if that branch exists and list it as an assumption.

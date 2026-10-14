@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Contract `ui` section: shared component folders, token files, icon package and component preview. `plant` detects the candidates and asks only when they leave a choice, `contract.py validate --strict` checks the paths, and the session context hands the set fields to UI work.
 - `onboard` is now `plant` (`/pothos:plant`); asking to onboard a repository still starts it.
 - Renamed from devflow to Pothos: commands are `/pothos:<skill>`, the home folder is `~/.config/pothos` (`POTHOS_HOME`), the contract's default workflow value is `pothos`, and the unattended runner is `pothos-run.py`.
 - Every step of the cycle starts from plain language: `vendor.json` can mark a vendored skill `model_invocable` and append `triggers` to its description, re-applied on every update.

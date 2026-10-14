@@ -29,7 +29,7 @@ If the user says the repository follows its own workflow, skip the steps: save `
    If `existing_contract` is set, or the argument is `audit`, follow **Audit mode** instead.
 2. **Read context.** Skim AGENTS.md or CLAUDE.md, any `docs/agents/*.md` files, and the CI files the report lists. They settle what the word hits in `tracker_hints` cannot, such as "we do not use Jira".
 3. **Draft.** Map the report to contract fields with `references/mapping.md`. Start from `${CLAUDE_PLUGIN_ROOT}/templates/contract.json` and drop every field you cannot fill.
-4. **Confirm.** Show the draft and its assumptions in one message, and ask about the open choices only. Always ask which screenshots each app supports (`run.screenshots`, and per app in a monorepo): evidence relies on it to avoid trying what cannot work. Skip this step when the user asked for no questions or nobody is available.
+4. **Confirm.** Show the draft and its assumptions in one message, and ask about the open choices only. Always ask which screenshots each app supports (`run.screenshots`, and per app in a monorepo): evidence relies on it to avoid trying what cannot work. In a repository with UI, show the `ui` section and ask about any folder or icon set the mapping left open. Skip this step when the user asked for no questions or nobody is available.
 5. **Save.** Pipe the draft to the contract script, which validates it strictly and saves it only if it is valid:
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/shared/contract.py" write <<'JSON'
@@ -43,7 +43,7 @@ If the user says the repository follows its own workflow, skip the steps: save `
 ## Audit mode
 
 1. Run `python3 "${CLAUDE_PLUGIN_ROOT}/shared/contract.py" validate --strict` and the detection script.
-2. Compare them. Drift means a command that names a script that no longer exists, a path that no longer exists, CI that now runs scripts `verify.full` does not, or a new e2e tool or docs folder the contract ignores.
+2. Compare them. Drift means a command that names a script that no longer exists, a path that no longer exists (including `ui` folders and token files), a UI the contract has no `ui` section for, CI that now runs scripts `verify.full` does not, or a new e2e tool or docs folder the contract ignores.
 3. Report each drift with a proposed fix. Apply the fixes with `contract.py write` only after the user confirms. Without a user, change nothing and report.
 4. End with the readiness report.
 

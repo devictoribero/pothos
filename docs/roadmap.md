@@ -10,6 +10,42 @@ Status of each phase.
 | 3 | Pilot on a side project | running on Lifetails, see below |
 | 4 | Work repositories, once the pilot holds | later |
 | 5 | Remaining repositories and more autonomy | later |
+| 6 | Frontend: page design and review of the running app | contract `ui` done; the rest below |
+
+## Phase 6: frontend
+
+An eight-skill frontend catalogue (frontend-design, component-design, interaction-patterns, design-system, accessibility, ui-review, testing, frontend-refactoring) was weighed against what Pothos already has. Two real gaps remain: designing whole pages, and reviewing the running app rather than the diff. Everything else already has an owner:
+
+| Proposed skill | Owner today |
+|---|---|
+| design-system | The contract's `ui` section, plus `component-design` step 2 and review rules 1 and 2 |
+| interaction-patterns | `component-design` `references/accessibility.md`; a pattern's edge cases join it only when an eval shows agents miss them |
+| accessibility | `component-design` and review rule 24 |
+| testing | `standards/testing.md` and `tdd` |
+| frontend-refactoring | `improve-codebase-architecture`, `codebase-design`, `component-design`'s no-shims rule and `verify` |
+
+### 1. Contract `ui` (done)
+
+`ui.components`, `ui.tokens`, `ui.icons` and `ui.preview` tell every session where the shared components, the theme and the icon set live. `plant` detects candidates (`detect.py` reports component folders, flagging feature-scoped ones, theme stylesheets and token files, icon packages ranked by real imports, and Storybook scripts) and asks only when the candidates leave a choice. The session context lists only the fields the contract sets, and says anything else is unconfirmed.
+
+### 2. `frontend-design`: vendor and measure
+
+Candidate: Anthropic's `frontend-design` (anthropics/skills, Apache-2.0, `skills/frontend-design` at 41bbe19). It is written for distinctive visual identity: it picks typefaces, a palette and a hero. That helps a landing page and fights a repository with a design system. The eval has to show both sides:
+
+- Three cases: a marketing page with no design system, a dashboard and a dense operational table inside a seeded app that has tokens, primitives and an icon set.
+- Deterministic graders (`regex` on files): no new font family or raw hex color outside the token files in the design-system cases, the seeded primitives imported instead of re-created, no new icon package, the build passes.
+- Visual quality is judged outside `claude plugin eval`, which cannot see a page: screenshots at 1280 and 390 pixels, scored blind by a reviewer subagent with one five-point rubric (hierarchy, composition, density, coherence with the existing system, responsive behavior), three runs per arm, as the `component-design` comparisons did.
+- Arms: no skill, the vendored skill, and the vendored skill with a hook line that limits it to layout and composition when `ui.tokens` is set. The skill text is never edited.
+- The seed works offline: a pinned toolchain with `node_modules` linked per package, never an install during the run.
+- It ships only if it wins on the visual score without losing a deterministic grader. The threshold is written down before the runs.
+
+### 3. `ui-review`: the running app
+
+A skill that starts the app through `evidence.py serve`, walks the named flow at desktop and mobile widths with `evidence.py shot`, opens every screenshot, and writes one report outside the repository. Findings use the red and yellow of `standards/review.md` and carry an evidence label: reproduced (seen in a screenshot or an interaction) or inferred (from the code). A check that needs something the contract lacks, such as `run.url`, a login or `run.screenshots: web`, is reported as skipped, never passed. It reads no diff (that is `code-review` and the `component-design` audit) and fixes nothing. It ships with evals seeded with known UI bugs: horizontal overflow at 390 pixels, an unreachable empty state, a dialog that loses focus.
+
+### 4. Later, only on evidence
+
+Interaction edge cases in `component-design` when a `ui-review` or an eval keeps finding the same miss. A separate accessibility skill only if its rules outgrow `component-design`.
 
 ## Phase 3: pilot on Lifetails
 

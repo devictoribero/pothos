@@ -191,6 +191,25 @@ class SessionContextTest(unittest.TestCase):
         self.write({"version": 1, "verify": {"full": "npm test"}, "build": {"skills": ["ui-primitives"]}})
         self.assertIn("Also load these repository skills before writing code: `ui-primitives`", self.ctx())
 
+    def test_ui_building_blocks_reach_ui_work(self):
+        self.write({"version": 1, "verify": {"full": "npm test"}, "ui": {
+            "components": ["src/components/ui"], "tokens": ["src/styles/tokens.css"], "icons": "lucide-react",
+            "preview": {"command": "pnpm run storybook", "url": "http://localhost:6006"}}})
+        text = self.ctx()
+        self.assertIn("Shared components: `src/components/ui`. Search them before creating a component", text)
+        self.assertIn("Design tokens and theme: `src/styles/tokens.css`", text)
+        self.assertIn("Icons come from `lucide-react`", text)
+        self.assertIn("Component preview: `pnpm run storybook`, answering at http://localhost:6006.", text)
+
+    def test_ui_building_blocks_apply_in_repo_workflow_too(self):
+        self.write({"version": 1, "workflow": "repo", "ui": {"components": ["src/ui"]}})
+        self.assertIn("Shared components: `src/ui`", self.ctx())
+
+    def test_without_ui_nothing_is_claimed(self):
+        self.write({"version": 1, "verify": {"full": "npm test"}, "ui": {"preview": {"url": "http://localhost:6006"}}})
+        text = self.ctx()
+        self.assertNotIn("UI building blocks", text)
+
     def test_repo_workflow_keeps_personal_standards_below_the_repository(self):
         os.makedirs(os.path.join(self.home, "standards"))
         open(os.path.join(self.home, "standards", "mine.md"), "w").close()
