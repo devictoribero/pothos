@@ -204,13 +204,17 @@ class SessionContextTest(unittest.TestCase):
 
     def test_ui_building_blocks_apply_in_repo_workflow_too(self):
         self.write({"version": 1, "workflow": "repo", "ui": {"components": ["src/ui"]}})
-        self.assertIn("Shared components: `src/ui`", self.ctx())
+        text = self.ctx()
+        self.assertIn("Shared components: `src/ui`", text)
+        self.assertIn("Before you call a UI change done, run", text)
+        self.assertNotIn("`verify` runs the UI check", text)
 
     def test_each_app_gets_its_own_ui(self):
         self.write({"version": 1, "verify": {"full": "npm test"}, "run": {"apps": [
             {"name": "mobile", "path": "apps/mobile", "ui": {"icons": "lucide-react-native"}}]}})
         text = self.ctx()
-        self.assertIn("In `apps/mobile` (`mobile`), instead of the above:", text)
+        self.assertIn("In `apps/mobile` (`mobile`):", text)
+        self.assertNotIn("instead of the above", text)
         self.assertIn("  - Icons come from `lucide-react-native`", text)
 
     def test_without_ui_nothing_is_claimed(self):

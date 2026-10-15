@@ -167,22 +167,26 @@ def ui_facts(ui):
     return facts
 
 
-def ui_lines(data):
+def ui_lines(data, repo_workflow=False):
     """The repository's UI building blocks, from the contract's ui sections. Unset fields stay unsaid."""
     lines = [f"- {fact}" for fact in ui_facts(data.get("ui") or {})]
+    has_top = bool(lines)
     for app in ((data.get("run") or {}).get("apps") or []):
         facts = ui_facts((app.get("ui") or {}) if isinstance(app, dict) else {})
         if facts:
-            lines.append(f"- In `{app.get('path')}` (`{app.get('name')}`), instead of the above:")
+            lines.append(f"- In `{app.get('path')}` (`{app.get('name')}`)" + (", instead of the above:" if has_top else ":"))
             lines += [f"  - {fact}" for fact in facts]
     if not lines:
         return []
     checker = os.path.join(PLUGIN, "shared", "ui_check.py")
     return ["", "This repository's UI building blocks (from the contract; anything not listed is unconfirmed, so find it in the code "
             "and never assume a library or path):"] + lines + [
-            f"- `verify` runs the UI check after `full` and records it as advisory: raw colors, new fonts and other icon sets "
-            f"on the lines the branch adds. Run it while you work with `python3 \"{checker}\"`. Fix each finding, or keep the "
-            "value with a `ui-ok: <why>` comment on that line. `code-review` reports what remains as yellow findings."]
+            (f"- Before you call a UI change done, run `python3 \"{checker}\"`: it flags raw colors, new fonts and other icon sets "
+             "on the lines the branch adds. Fix each finding, or keep the value with a `ui-ok: <why>` comment on that line, and "
+             "mention what remains in your review." if repo_workflow else
+             f"- `verify` runs the UI check after `full` and records it as advisory: raw colors, new fonts and other icon sets "
+             f"on the lines the branch adds. Run it while you work with `python3 \"{checker}\"`. Fix each finding, or keep the "
+             "value with a `ui-ok: <why>` comment on that line. `code-review` reports what remains as yellow findings.")]
 
 
 def standards_section(data, repo_workflow=False):
@@ -206,7 +210,7 @@ def standards_section(data, repo_workflow=False):
               + (" and follow it unless the repository's own component skills say otherwise." if repo_workflow else ".")]
     lines += ["When reviewing a diff that creates or changes UI components, also run `component-design`'s audit on those "
               "components and report its findings next to " + ("the repository's own review." if repo_workflow else "`code-review`'s.")]
-    lines += ui_lines(data)
+    lines += ui_lines(data, repo_workflow)
     if build_skills:
         lines += ["Also load these repository skills before writing code: " + ", ".join(f"`{s}`" for s in build_skills) + "."]
     return "\n".join(lines)

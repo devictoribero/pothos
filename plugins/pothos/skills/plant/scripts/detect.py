@@ -161,7 +161,7 @@ def workspace_apps(root, pkg, pm):
 
 SKIP_DIRS = {"__tests__", "__mocks__", "test-utils", "node_modules", ".git", "dist", "build", ".next", ".expo", "coverage", "storybook-static", "ios", "android", "vendor"}
 COMPONENT_DIR_NAMES = {"components", "ui", "primitives", "design-system", "designsystem", "common"}
-COMPONENT_EXTS = (".tsx", ".jsx", ".vue", ".svelte")
+COMPONENT_EXTS = (".tsx", ".jsx", ".vue", ".svelte", ".astro")
 TOKEN_FILE = re.compile(r"^(tokens?|design-tokens|theme|themes|variables|colors|palette)(\.[\w-]+)*\.(css|scss|ts|tsx|js|mjs|json)$|"
                         r"^tailwind\.config\.(js|cjs|mjs|ts)$|\.tokens\.json$", re.I)
 ICON_PACKAGES = ui_check.ICON_PACKAGES
