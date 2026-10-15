@@ -59,6 +59,36 @@ class VerifyTest(unittest.TestCase):
         with open(shown["receipts"]["full"]["log"]) as fh:
             self.assertIn("all good", fh.read())
 
+    def test_ui_findings_are_recorded_but_never_block(self):
+        self.contract({"verify": {"full": "echo ok"}, "ui": {"tokens": ["theme"]}})
+        self.git("checkout", "-q", "-b", "feature")
+        os.makedirs(os.path.join(self.repo, "src"))
+        with open(os.path.join(self.repo, "src", "a.css"), "w") as fh:
+            fh.write(".a { color: #123456; }\n")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "raw color")
+        run = self.run_script("run", "full")
+        self.assertEqual(run.returncode, 0, run.stdout)
+        self.assertIn("src/a.css:1 raw-color: #123456", run.stdout)
+        self.assertIn("advisory, does not block", run.stdout)
+        check = self.run_script("check")
+        self.assertEqual(check.returncode, 0)
+        self.assertIn("ui: 1 advisory finding(s)", check.stdout)
+        shown = json.loads(self.run_script("show").stdout)
+        self.assertEqual(shown["receipts"]["ui"]["status"], "findings")
+
+    def test_ui_check_still_runs_and_records_when_full_fails(self):
+        self.contract({"verify": {"full": "exit 1"}, "ui": {"icons": "lucide-react"}})
+        run = self.run_script("run", "full")
+        self.assertEqual(run.returncode, 1)
+        self.assertIn("ui: clean", run.stdout)
+
+    def test_without_ui_the_check_is_skipped(self):
+        self.contract({"verify": {"full": "echo ok"}})
+        run = self.run_script("run", "all")
+        self.assertEqual(run.returncode, 0)
+        self.assertIn("ui: skipped", run.stdout)
+
     def test_failing_run_exits_1_and_prints_the_tail(self):
         self.contract({"verify": {"full": "echo boom-line; exit 3"}})
         result = self.run_script("run", "full")

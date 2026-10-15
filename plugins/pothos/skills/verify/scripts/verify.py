@@ -10,6 +10,8 @@ Usage:
 
 Receipts live in $POTHOS_HOME/receipts/<host>/<owner>/<repo>/<commit>/<level>.json with the full log next
 to them. A run on a dirty working tree is recorded but never counts as a pass: commit first.
+After full, the contract's ui check runs on the branch's added lines and writes ui.json. It is advisory:
+it never changes an exit code, and check only mentions it.
 
 The checks run in a detached process, so a slow suite outlives the caller. `run` waits up to --wait
 seconds (default 540, under an agent's ten-minute command limit) and exits 4 when the run is still
@@ -29,6 +31,7 @@ import time
 SHARED = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "shared")
 sys.path.insert(0, os.path.realpath(SHARED))
 import contract  # noqa: E402
+import ui_check  # noqa: E402
 
 LEVELS = ("fast", "full", "e2e")
 TAIL = 60
@@ -130,7 +133,7 @@ def receipts(root):
         return None, {}
     folder = receipt_dir(root, commit)
     found = {}
-    for level in LEVELS:
+    for level in LEVELS + ("ui",):
         path = os.path.join(folder, f"{level}.json")
         if os.path.isfile(path):
             with open(path, encoding="utf-8") as fh:
@@ -158,7 +161,9 @@ def check(root, data, need_e2e):
     if problems:
         print("not verified: " + "; ".join(problems))
         return 1
-    print(f"verified: {', '.join(wanted)} passed on {commit[:12]}")
+    ui = found.get("ui") or {}
+    note = f"; ui: {len(ui['findings'])} advisory finding(s), see `verify.py show`" if ui.get("status") == "findings" else ""
+    print(f"verified: {', '.join(wanted)} passed on {commit[:12]}{note}")
     return 0
 
 
@@ -177,11 +182,41 @@ def budget(argv):
     return float(value) if value else WAIT
 
 
+def ui_level(root, data):
+    """Advisory: the UI check on the branch's added lines. Recorded in the receipt, never changes the exit code."""
+    commit = head(root)
+    receipt = {"commit": commit, "level": "ui", "at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")}
+    try:
+        base = ui_check.base_ref(root, data, None)
+        result = ui_check.findings(root, data, base)
+    except Exception as exc:  # an advisory check must never break verification
+        write_receipt(receipt_dir(root, commit), "ui", {**receipt, "status": "error", "error": str(exc)})
+        print(f"ui: could not run ({exc}); advisory only")
+        return
+    if result is None:
+        write_receipt(receipt_dir(root, commit), "ui", {**receipt, "status": "skipped"})
+        print("ui: skipped (the contract's ui sets neither tokens nor icons)")
+        return
+    active, found = result
+    write_receipt(receipt_dir(root, commit), "ui", {**receipt, "status": "findings" if found else "clean",
+                                                    "rules": active, "findings": found})
+    if found:
+        print("\n".join(found[:TAIL]))
+        print(f"ui: {len(found)} finding(s), advisory, does not block. {ui_check.HINT}")
+    else:
+        print("ui: clean")
+
+
 def execute(root, data, level, env):
     """The checks themselves, run inside the detached process."""
+    if level == "full":
+        status = run_level(root, data, "full", env)
+        ui_level(root, data)
+        return status
     if level != "all":
         return run_level(root, data, level, env)
     status = run_level(root, data, "full", env)
+    ui_level(root, data)
     if status:
         return status
     if command_for_any_e2e(data):

@@ -180,9 +180,9 @@ def ui_lines(data):
     checker = os.path.join(PLUGIN, "shared", "ui_check.py")
     return ["", "This repository's UI building blocks (from the contract; anything not listed is unconfirmed, so find it in the code "
             "and never assume a library or path):"] + lines + [
-            f"- Before `verify` on a change that touches UI, run `python3 \"{checker}\"`. It flags raw colors, new fonts and "
-            "other icon sets on the lines the branch adds. Fix each finding, or keep the value with a `ui-ok: <why>` comment on "
-            "that line. `code-review` reports what remains as yellow findings."]
+            f"- `verify` runs the UI check after `full` and records it as advisory: raw colors, new fonts and other icon sets "
+            f"on the lines the branch adds. Run it while you work with `python3 \"{checker}\"`. Fix each finding, or keep the "
+            "value with a `ui-ok: <why>` comment on that line. `code-review` reports what remains as yellow findings."]
 
 
 def standards_section(data, repo_workflow=False):

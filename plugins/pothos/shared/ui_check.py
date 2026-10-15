@@ -166,12 +166,13 @@ def check_line(path, text, ui):
     return found
 
 
-def run(root, data, base):
+def findings(root, data, base):
+    """(active rules, findings) for the lines added since base; None when the contract gives nothing to check."""
     pairs = scopes(data)
-    if not pairs:
-        print("skipped: the contract has no ui section; run /pothos:plant audit to add one")
-        return 0
-    findings = []
+    active = sorted({rule for _, ui in pairs for rule, key in (("raw-color", "tokens"), ("font", "tokens"), ("icon-set", "icons")) if ui.get(key)})
+    if not active:
+        return None
+    found = []
     for path, lines in sorted(added_lines(root, base).items()):
         ui = ui_for(path, pairs)
         is_manifest = os.path.basename(path) == "package.json"
@@ -181,16 +182,23 @@ def run(root, data, base):
             continue
         for number, text in lines:
             for rule, snippet in check_line(path, text, ui):
-                findings.append(f"{path}:{number} {rule}: {snippet}")
-    active = sorted({rule for _, ui in pairs for rule, key in (("raw-color", "tokens"), ("font", "tokens"), ("icon-set", "icons")) if ui.get(key)})
-    if not active:
-        print("skipped: the ui section sets neither tokens nor icons, so there is nothing to check against")
+                found.append(f"{path}:{number} {rule}: {snippet}")
+    return active, found
+
+
+HINT = "Use the tokens or the configured icon set, or add 'ui-ok: <why>' to the line when the raw value is intended."
+
+
+def run(root, data, base):
+    result = findings(root, data, base)
+    if result is None:
+        print("skipped: the contract's ui sets neither tokens nor icons; run /pothos:plant audit to add them")
         return 0
-    for line in findings:
+    active, found = result
+    for line in found:
         print(line)
-    print(f"ui-check: {len(findings)} finding(s); rules: {', '.join(active)}. "
-          "Use the tokens or the configured icon set, or add 'ui-ok: <why>' to the line when the raw value is intended.")
-    return 1 if findings else 0
+    print(f"ui-check: {len(found)} finding(s); rules: {', '.join(active)}. {HINT}")
+    return 1 if found else 0
 
 
 def main(argv):

@@ -28,7 +28,7 @@ An eight-skill frontend catalogue (frontend-design, component-design, interactio
 
 `ui.components`, `ui.tokens`, `ui.icons` and `ui.preview` tell every session where the shared components, the theme and the icon set live. `plant` detects candidates (`detect.py` reports component folders, flagging feature-scoped ones, theme stylesheets and token files, icon packages ranked by real imports, and Storybook scripts) and asks only when the candidates leave a choice. The session context lists only the fields the contract sets, and says anything else is unconfirmed. In a monorepo each `run.apps` entry carries its own `ui`.
 
-`shared/ui_check.py` turns the section into a check on the lines a branch adds: raw colors, new fonts, other icon sets. Benchmarked on the last 60 UI commits of four repositories: 48 of 59 finding groups were real, 11 were values a person would keep (domain data, flags, platform config, the font setup file), no noise once docs and comments are skipped, about 0.1 seconds per commit. At that precision it advises (yellow in review, `ui-ok: <why>` to keep a value) and stays out of the `verify` gate.
+`shared/ui_check.py` turns the section into a check on the lines a branch adds: raw colors, new fonts, other icon sets. Benchmarked on the last 60 UI commits of four repositories: 48 of 59 finding groups were real, 11 were values a person would keep (domain data, flags, platform config, the font setup file), no noise once docs and comments are skipped, about 0.1 seconds per commit. At that precision it advises: `verify` runs it after `full` and records a `ui` receipt that never blocks, review reports what remains as yellow, and `ui-ok: <why>` keeps a value.
 
 ### 2. `frontend-design`: vendor and measure
 
