@@ -62,7 +62,7 @@ Only `version` and `verify.full` are required. The schema documents every field,
 | Prove | `evidence` | Pothos | Screenshots and before/after output for the pull request, stored outside the repo. |
 | Review | `code-review` | Pocock | Standards and spec review in parallel subagents. Reads Pothos's standards too. |
 | Ship | `pr` | Pocock | Pull request body with summary, evidence and merge danger. |
-| Tend | `tend` | Pothos | Babysits a ready pull request: answers review comments, fixes red checks and, when a person added the contract's auto-merge label, merges through a gate once everything is green. |
+| Tend | `tend` | Pothos | Babysits a ready pull request: answers review comments, fixes red checks and, when a person authorized it (the auto-merge label, "and merge it", or a `Merge: auto` ticket), merges through a gate once everything is green. |
 | Learn | `diagnosing-bugs`, `retro` | Pocock | Find the cause of a bug; look back at a session. |
 | Design | `component-design` | Pothos | UI component APIs: composition, naming, accessibility, tests. |
 | Design | `codebase-design`, `domain-modeling`, `improve-codebase-architecture` | Pocock | Deep modules, glossary and decision records, architecture improvements. |

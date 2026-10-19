@@ -2,13 +2,18 @@
 """Decide whether a pull request may merge itself, and merge it when it may.
 
 Usage:
-  merge_gate.py status [PR] [--repo DIR]   print the pull request's state and the verdict; changes nothing
-  merge_gate.py merge  [PR] [--repo DIR]   merge when the verdict is ready, then delete the remote branch
+  merge_gate.py status    [PR] [--repo DIR]   print the pull request's state and the verdict; changes nothing
+  merge_gate.py merge     [PR] [--repo DIR]   merge when the verdict is ready, then delete the remote branch
+  merge_gate.py authorize [PR] (--quote TEXT | --ticket FILE) [--repo DIR]
+                                              add the contract's label for a person who authorized this pull
+                                              request, and say who did in a comment on it
 
 PR is a number; without it, the pull request of the current branch. Run it from inside the repository.
 
 A pull request is a candidate only when the contract has `pr.auto_merge` and the pull request carries its
-label: the label is a person's decision about that pull request, and this script never adds it. A candidate
+label: the label is a person's decision about that pull request. `authorize` adds it on their behalf, with
+their own words (`--quote`, which the PreToolUse hook checks against what the person typed in the session)
+or a ticket that carries a `Merge: auto` line above its first section (`--ticket`). A candidate
 is ready when, on its head commit, every check finished green (or, in a repository whose workflows never
 run on pull requests, a passing verify receipt exists), no person's review asks for changes, no review thread
 is open and GitHub can merge it. A commit that reports no checks while a workflow in `.github/workflows` of
@@ -16,8 +21,8 @@ this checkout runs on pushes or pull requests is treated as checks not reported 
 without checks. `merge` then runs `gh pr merge --<method> --match-head-commit <sha>`, so a push between the
 check and the merge makes GitHub refuse it, and deletes the head branch on the remote when GitHub did not.
 
-Exit codes: 0 ready (status) or merged (merge), 1 waiting (checks running, review pending, branch behind),
-2 no contract, 3 not a candidate, 4 needs a person (changes requested, conflicts with the base),
+Exit codes: 0 ready (status), merged (merge) or labelled (authorize), 1 waiting (checks running, review pending, branch behind),
+2 no contract, 3 not a candidate (or nothing to authorize with), 4 needs a person (changes requested, conflicts with the base),
 5 gh is missing or failed, 64 usage. Standard library only.
 """
 import json
@@ -42,6 +47,9 @@ WORKFLOWS = os.path.join(".github", "workflows")
 ON_BLOCK = re.compile(r'^"?on"?:[ \t]*([^\n]*)\n((?:[ \t]+[^\n]*\n|[ \t]*\n)*)', re.M)
 EVENTS = re.compile(r"\b(?:push|pull_request|pull_request_target)\b")
 NESTED_EVENT = re.compile(r"^[ \t]+(?:push|pull_request|pull_request_target)[ \t]*:", re.M)
+# A ticket authorizes its pull request with this line in its header, above the first `## ` section, so a
+# comment appended at the bottom cannot add it.
+TICKET_AUTO = re.compile(r"^merge:[ \t]*auto[ \t]*$", re.I)
 REVIEW_QUERY = """query($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) { pullRequest(number: $number) {
     reviewThreads(first: 100) { pageInfo { hasNextPage } nodes { isResolved } }
@@ -254,26 +262,83 @@ def delete_remote_branch(root, pr):
     return f"deleted {branch} on the remote"
 
 
+def ticket_authorizes(path):
+    """True when the ticket's header (the lines above its first `## ` section) has a `Merge: auto` line."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                if line.startswith("## "):
+                    return False
+                if TICKET_AUTO.match(line.strip()):
+                    return True
+    except OSError:
+        return False
+    return False
+
+
+def authorize(root, data, number, quote, ticket):
+    label = ((data.get("pr") or {}).get("auto_merge") or {}).get("label")
+    if not label:
+        print("cannot authorize: the contract has no pr.auto_merge", file=sys.stderr)
+        return NOT_CANDIDATE
+    if ticket and not ticket_authorizes(ticket):
+        print(f"cannot authorize: {ticket} has no `Merge: auto` line above its first section", file=sys.stderr)
+        return NOT_CANDIDATE
+    pr = json.loads(gh(["pr", "view", *([number] if number else []), "--json", "number,labels"], root))
+    if label.casefold() in {(l.get("name") or "").casefold() for l in pr.get("labels") or []}:
+        print(f"#{pr['number']} already carries {label!r}")
+        return READY
+    source = (f"the person, in their own words:\n\n> {quote}" if quote
+              else f"the ticket `{ticket}`, which carries `Merge: auto`.")
+    body = (f"Auto-merge authorized by {source}\n\n`tend` merges this pull request through its merge gate once every "
+            f"check is green, no review asks for changes and no thread is open. Remove the label `{label}` to stop it.")
+    gh(["pr", "edit", str(pr["number"]), "--add-label", label], root)
+    gh(["pr", "comment", str(pr["number"]), "--body", body], root)
+    print(f"authorized: #{pr['number']} carries {label!r}")
+    return READY
+
+
+def take(args, flag):
+    """Remove `flag VALUE` from args and return VALUE; None when absent, False when the value is missing."""
+    if flag not in args:
+        return None
+    i = args.index(flag)
+    if i + 1 >= len(args):
+        return False
+    value = args[i + 1]
+    del args[i:i + 2]
+    return value
+
+
+def usage_error(args, repo, quote, ticket):
+    if False in (repo, quote, ticket) or not args or args[0] not in ("status", "merge", "authorize"):
+        return True
+    if len(args) > 2 or (len(args) == 2 and not args[1].isdigit()):
+        return True
+    if args[0] != "authorize":
+        return quote is not None or ticket is not None
+    return (quote is None) == (ticket is None) or (quote is not None and not quote.strip())
+
+
 def main(argv):
     args = list(argv)
-    repo = os.getcwd()
-    if "--repo" in args:
-        i = args.index("--repo")
-        if i + 1 >= len(args):
-            print(__doc__, file=sys.stderr)
-            return USAGE
-        repo = args[i + 1]
-        del args[i:i + 2]
-    if not args or args[0] not in ("status", "merge") or len(args) > 2 or (len(args) == 2 and not args[1].isdigit()):
+    repo, quote, ticket = take(args, "--repo"), take(args, "--quote"), take(args, "--ticket")
+    if usage_error(args, repo, quote, ticket):
         print(__doc__, file=sys.stderr)
         return USAGE
     command, number = args[0], (args[1] if len(args) == 2 else None)
-    root = contract.repo_root(repo)
+    root = contract.repo_root(repo or os.getcwd())
     path = contract.locate(root)
     if not path:
         print("no pothos contract for this repository; run /pothos:plant", file=sys.stderr)
         return NO_CONTRACT
     data = contract.load(path)
+    if command == "authorize":
+        try:
+            return authorize(root, data, number, quote and quote.strip(), ticket)
+        except GhError as exc:
+            print(f"gh failed: {exc}", file=sys.stderr)
+            return GH_FAILED
     method = ((data.get("pr") or {}).get("auto_merge") or {}).get("method") or "squash"
     if method not in METHODS:
         print(f"pr.auto_merge.method {method!r} is not one of {', '.join(METHODS)}", file=sys.stderr)

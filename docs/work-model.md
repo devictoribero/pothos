@@ -43,7 +43,7 @@ AFTER THE PULL REQUEST: tend, one pass at a time from /loop
   answer review comments / fix a red check / update the branch ─▶ merge gate
        ▲                                                              │ something missing
        └──────────────────────────────────────────────────────────────┘
-                                              │ all green and a person added the auto-merge label
+                                              │ all green and a person authorized the auto-merge label
                          merge into the base branch, delete the remote branch, close the ticket
                          (without the label, a person reviews and merges)
 ```
@@ -84,7 +84,7 @@ main ─────────────────────────
 - **Before the first ticket,** `implement-spec` creates the integration branch `feature/<slug>` from the base branch. When the contract lists several backends under `run.environments`, the agent asks which one this feature runs against and records the answer on the spec, so every ticket, evidence run and end-to-end run uses the same backend.
 - **Tickets merge without pull requests.** A merger subagent merges each finished ticket into the integration branch and runs `verify`; a red result goes back to an implementer, never into the branch. The receipt is checked locally, so this works whether or not the repository's CI runs on feature branches.
 - **One pull request, opened as a draft** after the first merge and marked ready only when every ticket is merged, `code-review` findings are fixed, `verify check` passes and evidence is attached.
-- **Merging into the base branch is always a person's decision.** A person merges, or gives the pull request the contract's auto-merge label so `tend`'s merge gate merges it once everything is green. No agent adds that label.
+- **Merging into the base branch is always a person's decision.** A person merges, or authorizes the pull request so `tend`'s merge gate merges it once everything is green. They authorize it by adding the contract's auto-merge label, by asking for the merge in their own message ("do X and merge it", `/pothos:tend <n> merge`), or by approving a local ticket that carries `Merge: auto`, which `to-tickets` proposes for copy and documentation changes. An agent adds the label only through `merge_gate.py authorize`, which leaves a comment naming who authorized it.
 
 Why not one pull request per ticket: it adds a review surface nobody reads, it would need a fork of `implement-spec`, and the receipt already gives each merge the guarantee a ticket pull request's CI would.
 

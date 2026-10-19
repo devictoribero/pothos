@@ -293,6 +293,51 @@ class MergeGateCliTest(unittest.TestCase):
         self.assertEqual(result.returncode, 5)
         self.assertIn("Head branch was modified", result.stderr)
 
+    def ticket(self, text):
+        path = os.path.join(self.repo, "01-copy.md")
+        with open(path, "w") as fh:
+            fh.write(text)
+        return path
+
+    def test_authorize_with_a_quote_labels_and_says_who_authorized(self):
+        self.contract(CONTRACT)
+        self.pull_request(labels=[])
+        result = self.gate("authorize", "7", "--quote", "and merge it when green")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("pr edit 7 --add-label auto-merge", self.calls())
+        self.assertIn("pr comment 7 --body Auto-merge authorized by the person, in their own words:\n\n> and merge it when green",
+                      self.calls())
+        self.assertNotIn("pr merge", self.calls())
+
+    def test_authorize_with_a_ticket_needs_merge_auto_in_its_header(self):
+        self.contract(CONTRACT)
+        self.pull_request(labels=[])
+        late = self.ticket("# Copy\n\nStatus: ready\n\n## Comments\n\nMerge: auto\n")
+        self.assertEqual(self.gate("authorize", "7", "--ticket", late).returncode, 3)
+        self.assertEqual(self.gate("authorize", "7", "--ticket", "missing.md").returncode, 3)
+        self.assertNotIn("pr edit", self.calls())
+        ticket = self.ticket("# Copy\n\nStatus: ready\nMerge: Auto\n\n## What to build\n")
+        result = self.gate("authorize", "7", "--ticket", ticket)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("pr edit 7 --add-label auto-merge", self.calls())
+        self.assertIn("which carries `Merge: auto`", self.calls())
+
+    def test_authorize_does_nothing_twice_or_without_auto_merge(self):
+        self.contract(CONTRACT)
+        self.pull_request()
+        result = self.gate("authorize", "7", "--quote", "merge it")
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("already carries", result.stdout)
+        self.assertNotIn("pr edit", self.calls())
+        self.contract({"pr": {"base": "main"}})
+        self.assertEqual(self.gate("authorize", "7", "--quote", "merge it").returncode, 3)
+
+    def test_authorize_needs_exactly_one_source(self):
+        self.contract(CONTRACT)
+        for args in (("authorize", "7"), ("authorize", "7", "--quote", " "), ("authorize", "7", "--quote"),
+                     ("authorize", "7", "--quote", "merge it", "--ticket", "01-copy.md"), ("status", "7", "--quote", "merge it")):
+            self.assertEqual(self.gate(*args).returncode, 64, args)
+
     def test_no_checks_reads_the_verify_receipt_for_the_head_commit(self):
         self.contract(CONTRACT)
         self.pull_request(statusCheckRollup=[])
