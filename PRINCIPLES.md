@@ -1,8 +1,8 @@
 # Principles
 
-How this plugin is built. Every skill and script, and every hook once there are any, follows these rules, and the checks in `scripts/` enforce the ones a script can check.
+How this plugin is built. Every skill, script and hook follows these rules, and the checks in `scripts/` enforce the ones a script can check.
 
-The rules for the code agents produce will live in the plugin itself, in `plugins/pothos/shared/engineering.md`, because agents load that file while they work. This file is for people and agents changing the plugin.
+The rules for the code agents produce live in `plugins/pothos/standards/`, because agents load those files while they work. This file is for people and agents changing the plugin.
 
 ## The plugin knows how you work. The repository knows the project.
 
@@ -43,7 +43,7 @@ A standard is a rule that applies to every change: do this, avoid that, and why.
 Each skill ships cases under `evals/` with deterministic graders where possible and an LLM grader only for judgement. Check what the agent did, not what it says it did: a grader that reads `package.json` to confirm it is unchanged beats a judge asked whether the report claims changes. LLM judges also miss content at the end of long messages, so anything a regex can find goes to a regex. Run the evals before each release:
 
 ```bash
-claude plugin eval plugins/pothos --scaffold
+claude plugin eval plugins/pothos --scaffold --allow-tools Bash Write Edit
 ```
 
 ## Easy to change

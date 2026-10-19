@@ -26,10 +26,13 @@ class MergeGuardTest(unittest.TestCase):
                               env={**os.environ, "POTHOS_HOME": self.home})
 
     def test_merging_is_blocked_even_inside_a_compound_command(self):
-        for command in ("gh pr merge 7 --squash", "git push && gh  pr merge 7"):
+        for command in ("gh pr merge 7 --squash", "git push && gh  pr merge 7",
+                        "gh api -X PUT repos/acme/shop/pulls/7/merge -f merge_method=squash",
+                        "gh api graphql -f query='mutation { mergePullRequest(input: {pullRequestId: \"x\"}) { clientMutationId } }'",
+                        "gh api graphql -f query='mutation { enablePullRequestAutoMerge(input: {pullRequestId: \"x\"}) { clientMutationId } }'"):
             result = self.guard(command)
             self.assertEqual(result.returncode, 2, command)
-            self.assertIn("agents never run `gh pr merge`", result.stderr)
+            self.assertIn("agents never merge a pull request", result.stderr)
 
     def test_adding_the_default_label_is_blocked(self):
         for command in ("gh pr edit 7 --add-label auto-merge", "gh pr create --label auto-merge --fill",
@@ -45,7 +48,8 @@ class MergeGuardTest(unittest.TestCase):
 
     def test_everything_else_passes(self):
         for command in ("ls", "gh pr view 7", "gh pr edit 7 --add-label bug", "gh pr edit 7 --add-label auto-merge-later",
-                        "git merge main", "python3 merge_gate.py merge 7", "gh label create auto-merge"):
+                        "git merge main", "python3 merge_gate.py merge 7", "gh label create auto-merge",
+                        "gh api repos/acme/shop/pulls/7/merges", "gh pr view 7 --json mergedAt"):
             self.assertEqual(self.guard(command).returncode, 0, command)
 
     def test_bad_input_never_blocks(self):

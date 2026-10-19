@@ -7,14 +7,16 @@ tell who added the label: this hook blocks the Bash commands that would let an a
 
 It reads the hook input on stdin and exits 2, with the reason on stderr, to block the command; it exits 0
 for everything else, including any error of its own, so a bug here never stops other work.
-It covers the usual commands, not an agent determined to get around it.
+It covers the usual commands (`gh pr merge`, the REST and GraphQL merge calls through `gh api`, and the
+label flags and endpoints), not an agent determined to get around it.
 """
 import json
 import os
 import re
 import sys
 
-MERGE = re.compile(r"\bgh\s+pr\s+merge\b")
+MERGE = re.compile(r"\bgh\s+pr\s+merge\b"
+                   r"|\bgh\s+api\b.*(?:/pulls/\d+/merge\b|mergePullRequest|enablePullRequestAutoMerge)", re.S)
 LABELLING = re.compile(r"\bgh\b.*(--add-label|--label\b|/labels\b)", re.S)
 DEFAULT_LABEL = "auto-merge"
 
@@ -29,7 +31,7 @@ def contract_label(cwd):
 
 def reason(command, cwd):
     if MERGE.search(command):
-        return ("Blocked by pothos: agents never run `gh pr merge`. A person merges, or /pothos:tend's merge gate merges "
+        return ("Blocked by pothos: agents never merge a pull request. A person merges, or /pothos:tend's merge gate merges "
                 "a pull request a person gave the auto-merge label. The user can run it with `! gh pr merge <n>`.")
     if LABELLING.search(command):
         labels = {DEFAULT_LABEL, contract_label(cwd)} - {None}

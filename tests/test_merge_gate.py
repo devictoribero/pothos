@@ -97,6 +97,14 @@ class EvaluateTest(unittest.TestCase):
         self.assertEqual(self.verdict(pr(statusCheckRollup=[]))[0], merge_gate.WAITING)
         self.assertEqual(self.verdict(pr(statusCheckRollup=[]), receipt_ok=True)[0], merge_gate.READY)
 
+    def test_no_checks_waits_when_the_repository_has_workflows(self):
+        verdict, facts, reasons = self.verdict(pr(statusCheckRollup=[]), receipt_ok=True)
+        self.assertEqual(verdict, merge_gate.READY)
+        verdict, facts, reasons = merge_gate.evaluate(pr(statusCheckRollup=[]), CONTRACT, True, checks_expected=True)
+        self.assertEqual(verdict, merge_gate.WAITING)
+        self.assertIn("the workflows have not reported on this commit yet", reasons)
+        self.assertIn("checks: none reported yet on this commit (the repository has workflows that run on it)", facts)
+
     def test_changes_requested_needs_a_person(self):
         reviews = [{"author": {"login": "ana"}, "state": "CHANGES_REQUESTED"}, {"author": {"login": "bo"}, "state": "APPROVED"}]
         verdict, _, reasons = self.verdict(pr(latestReviews=reviews))
@@ -241,6 +249,42 @@ class MergeGateCliTest(unittest.TestCase):
         result = self.gate("status", "7")
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("verify receipt passed", result.stdout)
+
+    def test_a_receipt_does_not_replace_checks_the_workflows_will_report(self):
+        self.contract(CONTRACT)
+        self.pull_request(statusCheckRollup=[])
+        folder = os.path.join(self.home, "receipts", "github.com", "acme", "shop", SHA)
+        os.makedirs(folder)
+        with open(os.path.join(folder, "full.json"), "w") as fh:
+            json.dump({"status": "passed", "dirty": False}, fh)
+        workflows = os.path.join(self.repo, ".github", "workflows")
+        os.makedirs(workflows)
+        with open(os.path.join(workflows, "cron.yml"), "w") as fh:
+            fh.write("on:\n  schedule:\n    - cron: '0 7 * * 1'\n")
+        self.assertEqual(self.gate("status", "7").returncode, 0)  # no workflow runs on this commit
+        with open(os.path.join(workflows, "check.yml"), "w") as fh:
+            fh.write("on:\n  pull_request:\n  push:\n    branches: [main]\n")
+        result = self.gate("merge", "7")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("not reported on this commit yet", result.stdout)
+        self.assertNotIn("pr merge", self.calls())
+
+
+class ExpectsChecksTest(unittest.TestCase):
+    def test_reads_the_trigger_shapes_github_accepts(self):
+        yes = ("on:\n  push:\n    branches: [main]\n  pull_request:\n", "on: [push, pull_request]\n",
+               "on: pull_request\n", "on:\n  pull_request_target:\n    types: [opened]\n")
+        no = ("on:\n  schedule:\n    - cron: '0 7 * * 1'\n  workflow_dispatch:\n",
+              "on:\n  workflow_dispatch:\njobs:\n  b:\n    steps:\n      - uses: docker/build-push-action@v5\n"
+              "        with:\n          push: true\n")
+        for text in yes:
+            self.assertTrue(merge_gate.TRIGGERS.search(text), text)
+        for text in no:
+            self.assertFalse(merge_gate.TRIGGERS.search(text), text)
+
+    def test_without_a_workflows_folder_nothing_is_expected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertFalse(merge_gate.expects_checks(tmp))
 
 
 if __name__ == "__main__":

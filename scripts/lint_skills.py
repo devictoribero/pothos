@@ -5,6 +5,7 @@ Checks:
 - SKILL.md has frontmatter with a name that matches its directory and a description.
 - The description fits in 1024 characters and SKILL.md stays under 300 lines.
 - Files referenced as references/... or scripts/... from SKILL.md exist.
+- hooks/hooks.json parses, and every script a hook command names under ${CLAUDE_PLUGIN_ROOT} exists.
 - No file under the plugin matches scripts/forbidden-terms.txt.
 
 Exit 0 when clean, 1 when any check fails. Standard library only.
@@ -76,6 +77,28 @@ def check_skills():
     return errors
 
 
+def check_hooks():
+    errors = []
+    path = os.path.join(PLUGIN, "hooks", "hooks.json")
+    if not os.path.isfile(path):
+        return errors
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except ValueError as exc:
+        return [f"hooks/hooks.json: not valid JSON ({exc})"]
+    for event, groups in (data.get("hooks") or {}).items():
+        for group in groups:
+            for hook in group.get("hooks") or []:
+                command = hook.get("command") or ""
+                for match in re.finditer(r"\$\{CLAUDE_PLUGIN_ROOT\}/([^\s\"']+)", command):
+                    if not os.path.isfile(os.path.join(PLUGIN, match.group(1))):
+                        errors.append(f"hooks/hooks.json: {event} names a missing script {match.group(1)}")
+                if hook.get("type") == "command" and not hook.get("timeout"):
+                    errors.append(f"hooks/hooks.json: {event} command has no timeout")
+    return errors
+
+
 def vendored_paths():
     with open(os.path.join(PLUGIN, "vendor.json"), encoding="utf-8") as fh:
         data = json.load(fh)
@@ -102,7 +125,7 @@ def check_forbidden():
 
 
 def main():
-    errors = check_skills() + check_forbidden()
+    errors = check_skills() + check_hooks() + check_forbidden()
     for error in errors:
         print(error)
     print("ok" if not errors else f"{len(errors)} problem(s)")

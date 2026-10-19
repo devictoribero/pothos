@@ -31,6 +31,7 @@ Every merge decision goes through `"${CLAUDE_SKILL_DIR}/scripts/merge_gate.py"`.
 3. **Pick the one action**, in this order:
    - **Ready and a candidate:** go to step 5.
    - **Draft, closed, or changes requested:** nothing to do yourself; report what is needed and who must act.
+   - **Green but not a candidate** (no `pr.auto_merge` in the contract, or no label): report that the pull request is ready for a person to merge, or to label when they want the gate to merge it.
    - **Unanswered review comments:** follow `references/review-comments.md`.
    - **A failed check:** read its log (`gh run view <run-id> --log-failed`, the run id is in `gh pr checks <n>`), fix the cause, run `verify` (`/pothos:verify`), commit and push. Never weaken, skip or delete a check.
    - **Branch behind the base:** merge the base into the branch, run `verify`, push.

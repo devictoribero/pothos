@@ -11,7 +11,8 @@ A pull request is a candidate only when the contract has `pr.auto_merge` and the
 label: the label is a person's decision about that pull request, and this script never adds it. A candidate
 is ready when, on its head commit, every check finished green (or, in a repository with no checks at all,
 a passing verify receipt exists), no review asks for changes, no review thread is open and GitHub can
-merge it. `merge` then runs `gh pr merge --<method> --match-head-commit <sha>`, so a push between the
+merge it. A commit that reports no checks while `.github/workflows` runs on pushes or pull requests is
+treated as checks not reported yet, never as a repository without checks. `merge` then runs `gh pr merge --<method> --match-head-commit <sha>`, so a push between the
 check and the merge makes GitHub refuse it, and deletes the head branch on the remote when GitHub did not.
 
 Exit codes: 0 ready (status) or merged (merge), 1 waiting (checks running, review pending, branch behind),
@@ -34,6 +35,11 @@ METHODS = ("squash", "rebase", "merge")
 PR_FIELDS = ("number,url,state,isDraft,baseRefName,headRefName,headRefOid,isCrossRepository,labels,"
              "mergeable,mergeStateStatus,latestReviews,statusCheckRollup")
 GREEN = {"SUCCESS", "NEUTRAL", "SKIPPED"}
+WORKFLOWS = os.path.join(".github", "workflows")
+# A workflow that runs on pushes or pull requests: `on: push`, `on: [push, pull_request]`, or a `push:` /
+# `pull_request:` key right under `on:` (one level of indentation; a step's `push: true` sits deeper).
+TRIGGERS = re.compile(r"^on:\s*(?:\[[^\]]*\b(?:push|pull_request)\b|(?:push|pull_request)\b)"
+                      r"|^ {1,4}(?:push|pull_request|pull_request_target)\s*:", re.M)
 THREADS_QUERY = """query($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) { pullRequest(number: $number) {
     reviewThreads(first: 100) { nodes { isResolved } } } } }"""
@@ -103,8 +109,26 @@ def receipt_passed(root, data, commit):
     return True
 
 
-def evaluate(pr, data, receipt_ok):
-    """The verdict and the facts behind it. Pure: everything it needs comes in as arguments."""
+def expects_checks(root):
+    """True when the checkout has a workflow that runs on pushes or pull requests, so a commit without checks
+    is one whose checks have not been reported yet."""
+    folder = os.path.join(root, WORKFLOWS)
+    if not os.path.isdir(folder):
+        return False
+    for name in sorted(os.listdir(folder)):
+        if name.endswith((".yml", ".yaml")):
+            try:
+                with open(os.path.join(folder, name), encoding="utf-8", errors="replace") as fh:
+                    if TRIGGERS.search(fh.read()):
+                        return True
+            except OSError:
+                continue
+    return False
+
+
+def evaluate(pr, data, receipt_ok, checks_expected=False):
+    """The verdict and the facts behind it. Pure: everything it needs comes in as arguments.
+    checks_expected: the repository has workflows that run on this pull request, so no checks means not yet."""
     auto = ((data.get("pr") or {}).get("auto_merge")) or {}
     label = auto.get("label")
     base = (data.get("pr") or {}).get("base") or "main"
@@ -120,7 +144,9 @@ def evaluate(pr, data, receipt_ok):
     merge_state = (pr.get("mergeStateStatus") or "UNKNOWN").upper()
 
     facts = [f"pr #{pr.get('number')} ({pr.get('headRefName')} -> {pr.get('baseRefName')}) at {(pr.get('headRefOid') or '')[:12]}"]
-    if not checks:
+    if not checks and checks_expected:
+        facts.append("checks: none reported yet on this commit (the repository has workflows that run on it)")
+    elif not checks:
         facts.append("checks: none on this commit; verify receipt " + ("passed" if receipt_ok else "missing or not passing"))
     else:
         passed = len(states) - len(failed) - len(pending)
@@ -152,7 +178,9 @@ def evaluate(pr, data, receipt_ok):
         waiting.append(f"failed checks: {', '.join(failed)}")
     if pending:
         waiting.append(f"checks still running: {', '.join(pending)}")
-    if not checks and not receipt_ok:
+    if not checks and checks_expected:
+        waiting.append("the workflows have not reported on this commit yet")
+    elif not checks and not receipt_ok:
         waiting.append("no checks on this commit and no passing verify receipt")
     if threads:
         waiting.append(f"{threads} unresolved review thread(s)")
@@ -220,8 +248,9 @@ def main(argv):
     try:
         pr = fetch(root, number)
         checks = pr.get("statusCheckRollup") or []
-        receipt_ok = not checks and receipt_passed(root, data, pr.get("headRefOid") or "")
-        verdict, facts, reasons = evaluate(pr, data, receipt_ok)
+        expected = not checks and expects_checks(root)
+        receipt_ok = not checks and not expected and receipt_passed(root, data, pr.get("headRefOid") or "")
+        verdict, facts, reasons = evaluate(pr, data, receipt_ok, expected)
         report(verdict, facts, reasons)
         if command == "status" or verdict != READY:
             return verdict

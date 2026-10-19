@@ -2,7 +2,7 @@
 
 How Pothos turns an idea into merged code: the artifacts, the two loops, and who runs each step. Skills follow this document; when a skill and this document disagree, fix one of them.
 
-Most steps run Matt Pocock's skills, vendored unchanged. The vocabulary is his: spec, ticket, blocked by, frontier, tracer bullet, integration branch, glossary. Pothos adds the private contract, `verify`, `evidence`, `explain` and the standards.
+Most steps run Matt Pocock's skills, vendored unchanged. The vocabulary is his: spec, ticket, blocked by, frontier, tracer bullet, integration branch, glossary. Pothos adds the private contract, `verify`, `evidence`, `tend`, `explain` and the standards.
 
 ## Artifacts
 
@@ -55,7 +55,7 @@ Small work enters at the same point: `implement` builds one ticket on its own br
 - **Input:** one pull request that is ready for review. Drafts belong to `implement-spec`.
 - **Who:** `tend`, one pass per run. Each pass does at most one thing: answer review comments, fix a failing check, or update a branch that fell behind. Waiting between passes belongs to `/loop /pothos:tend <n>` or `pothos-run.py`.
 - **Never reviews again.** Code review, verify and evidence happen before the pull request is ready; `tend` reacts only to review comments, checks and the label.
-- **Merges only through the gate.** `merge_gate.py` merges when the contract has `pr.auto_merge`, the pull request carries its label, every check on the head commit is green (or, with no checks at all, a passing verify receipt exists), no review asks for changes and no thread is open. It pins the merge to the head commit and deletes the remote branch.
+- **Merges only through the gate.** `merge_gate.py` merges when the contract has `pr.auto_merge`, the pull request carries its label, every check on the head commit is green (or, in a repository whose workflows never run on pull requests, a passing verify receipt exists), no review asks for changes and no thread is open. A commit whose checks have not been reported yet waits. It pins the merge to the head commit and deletes the remote branch.
 - **A person's thread is theirs to resolve.** `tend` fixes and replies; a bot's thread it may resolve after the fix.
 
 ### Outer loop
@@ -75,7 +75,7 @@ Small work enters at the same point: `implement` builds one ticket on its own br
 ## Branches and merges
 
 ```
-main ─────────────────────────────────────────────▶ feature pull request (a person reviews and merges)
+main ─────────────────────────────────────────────▶ feature pull request (a person merges, or labels it for `tend`)
   └─ feature/<slug> ──●──────●──────●──●──────●──●──▶
                        ▲ 01   ▲ 02   ▲ 03 ▲ 04  ▲ 05 ▲ 06
       each ticket merges straight in once `verify check` passes on the merged commit
