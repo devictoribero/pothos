@@ -10,10 +10,14 @@ Usage:
   evidence.py shot URL NAME [--width W] [--height H] [--wait MS]
                                                    headless browser screenshot into the evidence folder
   evidence.py sim NAME                             screenshot of the booted iOS simulator
+  evidence.py emu NAME                             screenshot of the running Android emulator (ANDROID_SERIAL picks one)
+  evidence.py upload FILE [FILE ...]               upload to this month's pr-evidence release, print markdown
 
 Evidence lives in $POTHOS_HOME/evidence/<host>/<owner>/<repo>/<branch>/, never in the repository.
-Exit codes: 0 ok, 1 failed (server never answered, no browser, no simulator), 2 no contract,
-3 nothing to run (no dev command or URL), 64 usage.
+upload needs pr.evidence set to github-release in the contract: it publishes the files as assets of a
+prerelease named pr-evidence-YYYY-MM, one per month so no release reaches GitHub's 1000-asset limit.
+Exit codes: 0 ok, 1 failed (server never answered, no browser, no simulator, upload failed), 2 no contract,
+3 nothing to run (no dev command or URL, upload not enabled), 64 usage.
 """
 import json
 import os
@@ -22,6 +26,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -211,6 +216,102 @@ def sim(root, name):
     return 0
 
 
+def adb():
+    found = shutil.which("adb")
+    if found:
+        return found
+    for sdk in (os.environ.get("ANDROID_HOME"), os.environ.get("ANDROID_SDK_ROOT"),
+                os.path.expanduser("~/Library/Android/sdk"), os.path.expanduser("~/Android/Sdk")):
+        path = os.path.join(sdk, "platform-tools", "adb") if sdk else ""
+        if path and os.path.isfile(path):
+            return path
+    return None
+
+
+def emu(root, name):
+    exe = adb()
+    if not exe:
+        print("adb not found; emulator screenshots need the Android SDK platform-tools", file=sys.stderr)
+        return 1
+    result = subprocess.run([exe, "exec-out", "screencap", "-p"], capture_output=True, timeout=60)
+    if result.returncode or not result.stdout.startswith(b"\x89PNG"):
+        reason = result.stderr.decode(errors="replace").strip() or "no PNG came back"
+        print(f"no Android emulator answered (set ANDROID_SERIAL when several run): {reason}", file=sys.stderr)
+        return 1
+    out = os.path.join(folder(root), safe_name(name) + ".png")
+    with open(out, "wb") as fh:
+        fh.write(result.stdout)
+    print(out)
+    return 0
+
+
+RELEASE_STORE = "github-release"
+VIDEO = (".mp4", ".mov", ".webm")
+
+
+def gh(args):
+    return subprocess.run(["gh", *args], capture_output=True, text=True)
+
+
+def github_repo(root):
+    """github.com/owner/repo for gh's -R, which also overrides a GH_HOST set to an ssh alias."""
+    remote = contract.git(["remote", "get-url", "origin"], root)
+    key = contract.remote_key(remote) if remote else None
+    return key if key and key.startswith("github.com/") and key.count("/") == 2 else None
+
+
+def asset_prefix(root, repo):
+    """The pull request number once one exists, the branch before: the month's release is shared repo-wide."""
+    branch = contract.git(["symbolic-ref", "--short", "-q", "HEAD"], root)
+    if branch:
+        number = gh(["pr", "view", branch, "-R", repo, "--json", "number", "--jq", ".number"]).stdout.strip()
+        if number.isdigit():
+            return "pr" + number
+    return safe_name(branch or "detached")
+
+
+def ensure_release(repo, tag, month):
+    if gh(["release", "view", tag, "-R", repo]).returncode == 0:
+        return True
+    created = gh(["release", "create", tag, "-R", repo, "--prerelease", "--title", f"PR evidence {month}",
+                  "--notes", "Screenshots embedded in this month's pull requests. Kept as their history; do not delete."])
+    # Another upload may have created it between the view and the create.
+    return created.returncode == 0 or gh(["release", "view", tag, "-R", repo]).returncode == 0
+
+
+def upload(root, files):
+    if ((load(root).get("pr") or {}).get("evidence")) != RELEASE_STORE:
+        print(f"upload publishes files to GitHub; enable it with pr.evidence set to {RELEASE_STORE} in the contract",
+              file=sys.stderr)
+        return 3
+    missing = [f for f in files if not os.path.isfile(f)]
+    if missing:
+        print("no such file: " + ", ".join(missing), file=sys.stderr)
+        return 1
+    repo = github_repo(root)
+    if not repo:
+        print("upload needs an origin remote on github.com", file=sys.stderr)
+        return 1
+    month = time.strftime("%Y-%m")
+    tag = f"pr-evidence-{month}"
+    if not ensure_release(repo, tag, month):
+        print(f"could not create the {tag} release on {repo}", file=sys.stderr)
+        return 1
+    prefix = asset_prefix(root, repo)
+    with tempfile.TemporaryDirectory() as staging:
+        for path in files:
+            name = f"{prefix}-{safe_name(os.path.basename(path))}"
+            staged = os.path.join(staging, name)
+            shutil.copyfile(path, staged)
+            result = gh(["release", "upload", tag, staged, "-R", repo, "--clobber"])
+            if result.returncode:
+                print(f"upload of {path} failed: {result.stderr.strip()}", file=sys.stderr)
+                return 1
+            url = f"https://{repo}/releases/download/{tag}/{name}"
+            print(f"[{name}]({url})" if name.lower().endswith(VIDEO) else f"![{name}]({url})")
+    return 0
+
+
 def main(argv):
     if not argv or argv[0] in ("-h", "--help"):
         print(__doc__.strip())
@@ -230,6 +331,10 @@ def main(argv):
         return shot(root, rest)
     if cmd == "sim" and len(rest) == 1:
         return sim(root, rest[0])
+    if cmd == "emu" and len(rest) == 1:
+        return emu(root, rest[0])
+    if cmd == "upload" and rest:
+        return upload(root, rest)
     print(f"usage error; run {os.path.basename(__file__)} --help", file=sys.stderr)
     return 64
 
