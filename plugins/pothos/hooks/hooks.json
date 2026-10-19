@@ -1,5 +1,5 @@
 {
-  "description": "Hands the repository's private pothos contract to every skill at session start, so third-party skills get their configuration without files in the repository, and assigns every pull request a session opens to the person who opened it.",
+  "description": "Hands the repository's private pothos contract to every skill at session start, so third-party skills get their configuration without files in the repository, keeps agents from merging pull requests or adding the auto-merge label, and assigns every pull request a session opens to the person who opened it.",
   "hooks": {
     "SessionStart": [
       {
@@ -8,6 +8,18 @@
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/shared/session_context.py\"",
             "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/shared/merge_guard.py\"",
+            "timeout": 5
           }
         ]
       }

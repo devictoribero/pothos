@@ -1,0 +1,13 @@
+schema_version: "1.1"
+name: tend-no-ci
+description: >
+  A labelled pull request in a repository with no CI checks and no verify receipt. The pass must run verify on the head commit and only then merge.
+tags: [tend]
+runs: 2
+expected_outcome: A passing full receipt, then the merge.
+execution:
+  max_turns: 40
+  timeout_seconds: 600
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit]
+context:
+  scaffold_script: seed.sh

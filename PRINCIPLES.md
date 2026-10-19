@@ -1,8 +1,8 @@
 # Principles
 
-How this plugin is built. Every skill and script, and every hook once there are any, follows these rules, and the checks in `scripts/` enforce the ones a script can check.
+How this plugin is built. Every skill, script and hook follows these rules, and the checks in `scripts/` enforce the ones a script can check.
 
-The rules for the code agents produce will live in the plugin itself, in `plugins/pothos/shared/engineering.md`, because agents load that file while they work. This file is for people and agents changing the plugin.
+The rules for the code agents produce live in `plugins/pothos/standards/`, because agents load those files while they work. This file is for people and agents changing the plugin.
 
 ## The plugin knows how you work. The repository knows the project.
 
@@ -24,7 +24,7 @@ Skills never call the next skill. Each one ends by naming the next step. Chainin
 
 ## Side effects need a person, at the moment they happen
 
-A skill may start on its own from its description; what needs a person is the side effect, not the skill. Skills that only write outside the repository (a private contract, a receipt, an explanation page) run without asking. Skills that publish (create tickets on a shared tracker, push, open or update a pull request, reply to a review) confirm right before publishing when a person is available, and stop with a report when nobody is. Merging into the base branch is never done by an agent. Every step of the cycle can start from plain language: where a third-party skill sets `disable-model-invocation`, `vendor.json` removes it and adds a trigger sentence to the description, and the skill body stays as upstream wrote it.
+A skill may start on its own from its description; what needs a person is the side effect, not the skill. Skills that only write outside the repository (a private contract, a receipt, an explanation page) run without asking. Skills that publish (create tickets on a shared tracker, push, open or update a pull request, reply to a review) confirm right before publishing when a person is available, and stop with a report when nobody is. Merging into the base branch is a person's decision. An agent carries it out only when a person has made that decision for one pull request with the auto-merge label the contract names, and a script confirms at that moment that every check is green, no review asks for changes and no thread is open. An agent never adds that label; a hook blocks the direct commands that would add it, merge a pull request or push to the base branch, and only that script merges. The label also confirms publishing on that pull request: pushing fixes and replying to its threads. Every step of the cycle can start from plain language: where a third-party skill sets `disable-model-invocation`, `vendor.json` removes it and adds a trigger sentence to the description, and the skill body stays as upstream wrote it.
 
 ## Small context
 
@@ -43,7 +43,7 @@ A standard is a rule that applies to every change: do this, avoid that, and why.
 Each skill ships cases under `evals/` with deterministic graders where possible and an LLM grader only for judgement. Check what the agent did, not what it says it did: a grader that reads `package.json` to confirm it is unchanged beats a judge asked whether the report claims changes. LLM judges also miss content at the end of long messages, so anything a regex can find goes to a regex. Run the evals before each release:
 
 ```bash
-claude plugin eval plugins/pothos --scaffold
+claude plugin eval plugins/pothos --scaffold --allow-tools Bash Write Edit
 ```
 
 ## Easy to change

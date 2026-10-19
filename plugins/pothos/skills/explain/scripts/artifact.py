@@ -3,8 +3,8 @@
 
 Artifacts are private and persistent, like contracts: they live under
 $POTHOS_HOME/artifacts/<host>/<owner>/<repo>/<YYYY-MM-DD>-<slug>/ (or artifacts/general/ outside a
-git repository), never inside the repository. Each folder holds index.html, a diagrams/ folder
-and summary.md. The repository folder keeps INDEX.md, one line per artifact, so any agent can find
+git repository), never inside the repository. Each folder holds index.html, meta.json, a diagrams/
+folder and summary.md. The repository folder keeps INDEX.md, one line per artifact, so any agent can find
 earlier explanations by reading a few lines instead of the HTML.
 
 Usage:
@@ -14,9 +14,10 @@ Usage:
   artifact.py parent FOLDER PARENT|none                     change where a page sits in the sidebar
   artifact.py put FOLDER RELPATH                            write stdin to FOLDER/RELPATH (the only way skills write pages)
   artifact.py light FILE...                                 make archify diagrams open in the light theme by default
-  artifact.py register DIR                                  add or refresh DIR's line in INDEX.md (needs summary.md)
-                                                            rebuild the sidebar for every page of the repository, and
-                                                            point <repo folder>/latest at this page
+  artifact.py register DIR                                  add or refresh DIR's line in INDEX.md (needs summary.md),
+                                                            drop archify's receipt files from DIR/diagrams, rebuild the
+                                                            sidebar for every page of the repository, and point
+                                                            <repo folder>/latest at this page
   artifact.py nav [--repo DIR]                              rebuild the sidebar (nav.js) for this repository
   artifact.py list [--repo DIR]                             print INDEX.md for this repository
   artifact.py open PATH                                     open in Brave, falling back to the default browser
@@ -51,6 +52,21 @@ def repo_folder(start):
     return os.path.join(contract.pothos_home(), "artifacts", key[: -len(".json")])
 
 
+def artifacts_root():
+    return os.path.realpath(os.path.join(contract.pothos_home(), "artifacts"))
+
+
+def inside_artifacts(path):
+    """Every command that writes must stay under $POTHOS_HOME/artifacts: a page folder given as a path inside
+    the repository would otherwise get an INDEX.md, a nav.js and a symlink written next to the project's files."""
+    return os.path.realpath(path).startswith(artifacts_root() + os.sep)
+
+
+def refuse(what):
+    print(f"refused: {what} only works inside {artifacts_root()}", file=sys.stderr)
+    return 1
+
+
 def flag(args, name, default=None):
     if name in args:
         i = args.index(name)
@@ -68,6 +84,7 @@ def cmd_new(args):
     title = flag(args, "--title")
     lang = flag(args, "--lang", "en")
     parent = flag(args, "--parent")
+    parent = os.path.basename(os.path.abspath(parent)) if parent else None  # a path or a folder name
     repo = os.path.abspath(flag(args, "--repo", os.getcwd()))
     if not slug or not title or not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", slug):
         print("usage: artifact.py new --slug kebab-case-slug --title 'Title'", file=sys.stderr)
@@ -101,9 +118,8 @@ def cmd_put(args):
         print("usage: artifact.py put FOLDER RELPATH < content", file=sys.stderr)
         return 64
     folder = os.path.realpath(args[0])
-    artifacts = os.path.realpath(os.path.join(contract.pothos_home(), "artifacts"))
     target = os.path.realpath(os.path.join(folder, args[1]))
-    is_artifact = folder.startswith(artifacts + os.sep) and os.path.isfile(os.path.join(folder, "meta.json"))
+    is_artifact = inside_artifacts(folder) and os.path.isfile(os.path.join(folder, "meta.json"))
     if not is_artifact or not target.startswith(folder + os.sep):
         print("refused: put only writes inside a folder created by `artifact.py new`", file=sys.stderr)
         return 1
@@ -122,8 +138,10 @@ def cmd_light(files):
     for path in files:
         with open(path, encoding="utf-8") as fh:
             text = fh.read()
-        patched = text.replace('data-theme="dark"', 'data-theme="light"', 1).replace(ARCHIFY_FALLBACK, "'light'").replace(ARCHIFY_LIVE_OS, "return;")
-        if ARCHIFY_FALLBACK in text or 'data-theme="dark"' in text:
+        # Only the <html> tag's attribute: a CSS selector such as [data-theme="dark"] must stay as it is.
+        patched, on_html = re.subn(r'(<html\b[^>]*?)data-theme="dark"', r'\1data-theme="light"', text, count=1)
+        patched = patched.replace(ARCHIFY_FALLBACK, "'light'").replace(ARCHIFY_LIVE_OS, "return;")
+        if ARCHIFY_FALLBACK in text or on_html:
             with open(path, "w", encoding="utf-8") as fh:
                 fh.write(patched)
             print(f"light by default: {path}")
@@ -144,11 +162,35 @@ def first_line(path):
     return ""
 
 
+RECEIPT_SUFFIXES = (".finalize.json", ".finalize-summary.json", ".browser-check.json", ".delivery.json")
+RECEIPT_FOLDERS = (".old-receipts",)
+
+
+def clean_receipts(folder):
+    """Remove archify's gate receipts under folder/diagrams. They are evidence for the run that produced a
+    diagram, not part of the page, and they weigh more than the candidate JSON. Diagram HTML and candidates stay."""
+    removed = 0
+    diagrams = os.path.join(folder, "diagrams")
+    for root, dirs, files in os.walk(diagrams):
+        for name in list(dirs):
+            if name in RECEIPT_FOLDERS:
+                shutil.rmtree(os.path.join(root, name))
+                dirs.remove(name)
+                removed += 1
+        for name in files:
+            if name.endswith(RECEIPT_SUFFIXES):
+                os.remove(os.path.join(root, name))
+                removed += 1
+    return removed
+
+
 def cmd_register(args):
     if len(args) != 1:
         print("usage: artifact.py register DIR", file=sys.stderr)
         return 64
-    folder = os.path.abspath(args[0])
+    folder = os.path.realpath(args[0])  # realpath: registering through the `latest` link must name the real folder
+    if not inside_artifacts(folder):
+        return refuse("register")
     summary = os.path.join(folder, "summary.md")
     meta_path = os.path.join(folder, "meta.json")
     if not all(os.path.isfile(os.path.join(folder, f)) for f in ("summary.md", "meta.json", "index.html")):
@@ -172,6 +214,7 @@ def cmd_register(args):
     lines = sorted([line] + lines, key=date_of, reverse=True)
     with open(index, "w", encoding="utf-8") as fh:
         fh.write("# Explanations\n\nNewest first. Read summary.md before opening the HTML.\n\n" + "\n".join(l for l in lines if l.startswith("- ")) + "\n")
+    receipts = clean_receipts(folder)
     build_nav(os.path.dirname(folder))
     latest = os.path.join(os.path.dirname(folder), "latest")
     if os.path.islink(latest) or not os.path.exists(latest):
@@ -180,7 +223,7 @@ def cmd_register(args):
             os.remove(tmp)
         os.symlink(name, tmp)
         os.replace(tmp, latest)
-    print(f"registered in {index}")
+    print(f"registered in {index}" + (f"; removed {receipts} archify receipt file(s)" if receipts else ""))
     return 0
 
 
@@ -200,6 +243,7 @@ def build_nav(base):
     pages = pages_in(base)
     with open(NAV_RUNTIME, encoding="utf-8") as fh:
         runtime = fh.read()
+    os.makedirs(base, exist_ok=True)
     with open(os.path.join(base, "nav.js"), "w", encoding="utf-8") as fh:
         fh.write("window.POTHOS_NAV = " + json.dumps(pages, ensure_ascii=False, indent=1) + ";\n" + runtime)
     for page in pages:
@@ -225,7 +269,9 @@ def cmd_parent(args):
     if len(args) != 2:
         print("usage: artifact.py parent FOLDER PARENT|none", file=sys.stderr)
         return 64
-    folder = os.path.abspath(args[0])
+    folder = os.path.realpath(args[0])
+    if not inside_artifacts(folder):
+        return refuse("parent")
     base, name = os.path.dirname(folder), os.path.basename(folder)
     parent = None if args[1] == "none" else os.path.basename(os.path.abspath(args[1]))
     meta_path = os.path.join(folder, "meta.json")

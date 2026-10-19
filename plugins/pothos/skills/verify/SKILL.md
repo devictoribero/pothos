@@ -19,6 +19,8 @@ Every command goes through `"${CLAUDE_SKILL_DIR}/scripts/verify.py"`. Run it fro
 
 A level the contract does not configure is recorded as skipped and does not block. Say so in the pull request.
 
+After `full`, the UI check runs on the lines the branch adds, when the contract's `ui` sets tokens or icons, and writes a `ui` receipt. It is advisory: it never changes an exit code. Fix its findings or mark an intended value with `ui-ok: <why>`, and list what remains in the pull request.
+
 ## Steps
 
 1. **Commit first.** A run on uncommitted changes is recorded, but it never counts as a pass. The local tracker folder (`.scratch/` by default) is ignored, because tickets change while code is verified.

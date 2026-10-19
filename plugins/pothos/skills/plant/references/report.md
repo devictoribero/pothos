@@ -34,5 +34,6 @@ Check these gaps, in this order, and list every one that applies:
 5. No `verify.e2e`.
 6. No `docs.glossary`, so agents have no shared domain language. A `GLOSSARY.md` at the root closes it; the planned domain-model skill will maintain it.
 7. No `docs.decisions`.
-8. No PR template.
-9. CI does not block merge on `verify.full`. Only report this when the CI files make it visible.
+8. A repository with UI but no `ui.components` or `ui.tokens`: agents may build a second button or use raw colors.
+9. No PR template.
+10. CI does not block merge on `verify.full`. Only report this when the CI files make it visible.

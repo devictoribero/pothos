@@ -11,6 +11,6 @@ expected_outcome: Parallel explorers, then a page that follows the real flow end
 execution:
   max_turns: 60
   timeout_seconds: 1200
-  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit, Task]
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit, Agent]
 context:
   scaffold_script: seed.sh

@@ -1,0 +1,13 @@
+schema_version: "1.1"
+name: tend-red-check
+description: >
+  A labelled pull request whose test check fails. One pass must read the failing log, fix the code, verify and push, and not merge: the new checks have not run yet.
+tags: [tend]
+runs: 2
+expected_outcome: The code is fixed and pushed; no merge.
+execution:
+  max_turns: 40
+  timeout_seconds: 600
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit]
+context:
+  scaffold_script: seed.sh
