@@ -43,6 +43,33 @@ class UiCheckTest(unittest.TestCase):
         env = {**os.environ, "POTHOS_HOME": self.home}
         return subprocess.run([sys.executable, SCRIPT], cwd=self.repo, capture_output=True, text=True, env=env)
 
+    def test_an_unreadable_contract_exits_2(self):
+        path = os.path.join(self.home, "contracts", "github.com", "acme", "shop.json")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as fh:
+            fh.write("{not json")
+        result = self.check()
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("not valid JSON", result.stderr)
+
+    def test_paths_survive_diff_noprefix(self):
+        self.contract({"ui": {"tokens": ["src/tokens.css"]}})
+        self.git("config", "diff.noprefix", "true")
+        self.write("src/tokens.css", ":root { --ink: #111111; }\n")
+        self.write("src/a.css", ".b { color: #123456; }\n")
+        result = self.check()
+        self.assertIn("src/a.css:1", result.stdout)
+        self.assertNotIn("tokens.css", result.stdout)
+
+    def test_universal_css_selectors_are_not_comments(self):
+        self.contract({"ui": {"tokens": ["src/tokens.css"]}})
+        self.write("src/tokens.css", ":root { --ink: #111111; }\n")
+        self.write("src/reset.css", "* { color: #123456; }\n*, *::before { background: rgb(1, 2, 3); }\n * ok\n")
+        result = self.check()
+        self.assertIn("src/reset.css:1", result.stdout)
+        self.assertIn("src/reset.css:2", result.stdout)
+        self.assertNotIn("src/reset.css:3", result.stdout)
+
     def test_no_contract_exits_2(self):
         self.assertEqual(self.check().returncode, 2)
 

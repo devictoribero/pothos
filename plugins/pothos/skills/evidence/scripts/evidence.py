@@ -15,6 +15,7 @@ Evidence lives in $POTHOS_HOME/evidence/<host>/<owner>/<repo>/<branch>/, never i
 Exit codes: 0 ok, 1 failed (server never answered, no browser, no simulator), 2 no contract,
 3 nothing to run (no dev command or URL), 64 usage.
 """
+import json
 import os
 import re
 import shutil
@@ -56,7 +57,11 @@ def load(root):
     if not path:
         print("no pothos contract for this repository; run /pothos:plant", file=sys.stderr)
         sys.exit(2)
-    return contract.load(path)
+    try:
+        return contract.load(path)
+    except json.JSONDecodeError as exc:
+        print(f"the contract at {path} is not valid JSON ({exc}); run /pothos:plant", file=sys.stderr)
+        sys.exit(2)
 
 
 def answers(url):
@@ -125,19 +130,21 @@ def serve(root, args):
     if answers(url):
         print(f"already-running url={url}")
         return 0
-    log_path = os.path.join(folder(root), "server.log")
+    log_path = os.path.join(folder(root), f"server-{safe_name(app_name or 'app')}.log")
     log = open(log_path, "w", encoding="utf-8")
     proc = subprocess.Popen(command, shell=True, cwd=root, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
     deadline = time.monotonic() + float(flag(args, "--timeout", "180"))
     while time.monotonic() < deadline:
-        if proc.poll() is not None:
+        # A command that exits 0 may have started the server in the background (a daemon, a container):
+        # keep waiting for the URL. A non-zero exit means it failed.
+        if proc.poll() is not None and proc.returncode != 0:
             print(f"the dev command exited with {proc.returncode} before {url} answered; log {log_path}", file=sys.stderr)
             return 1
         if answers(url):
             print(f"pid={proc.pid} url={url} log={log_path}")
             return 0
         time.sleep(1)
-    os.killpg(proc.pid, signal.SIGTERM)
+    stop(proc.pid)
     print(f"{url} did not answer in time; stopped the server; log {log_path}", file=sys.stderr)
     return 1
 
@@ -174,7 +181,11 @@ def shot(root, args):
     width, height = flag(args, "--width", "1280"), flag(args, "--height", "800")
     cmd = [exe, "--headless=new", "--disable-gpu", "--hide-scrollbars", f"--window-size={width},{height}",
            f"--virtual-time-budget={flag(args, '--wait', '4000')}", f"--screenshot={out}", url]
-    subprocess.run(cmd, capture_output=True, timeout=120)
+    try:
+        subprocess.run(cmd, capture_output=True, timeout=120)
+    except subprocess.TimeoutExpired:
+        print(f"the browser did not finish {url} in 120 seconds", file=sys.stderr)
+        return 1
     if not os.path.isfile(out):
         print(f"the browser produced no screenshot for {url}", file=sys.stderr)
         return 1
@@ -208,7 +219,7 @@ def main(argv):
         return plan(root, rest)
     if cmd == "serve":
         return serve(root, rest)
-    if cmd == "stop" and len(rest) == 1 and rest[0].isdigit():
+    if cmd == "stop" and len(rest) == 1 and rest[0].isdigit() and int(rest[0]) > 1:  # 0 and 1 would signal this shell
         return stop(rest[0])
     if cmd == "shot" and len(rest) >= 2:
         return shot(root, rest)

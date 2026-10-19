@@ -3,7 +3,8 @@
 
 Usage: detect.py [REPO_DIR]
 
-Only reports facts found on disk. It never guesses a command that is not declared
+Only reports facts found on disk, plus one bounded call to the origin remote for its default
+branch when the clone does not know it. It never guesses a command that is not declared
 somewhere, so the model drafting the contract cannot invent one either.
 Standard library only.
 """
@@ -71,6 +72,15 @@ def run(cmd, cwd):
     try:
         return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=True).stdout.strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
+def run_remote(cmd, cwd):
+    """The one command that leaves the disk: bounded, and never waiting for credentials at a terminal."""
+    try:
+        return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=True, timeout=5,
+                              env={**os.environ, "GIT_TERMINAL_PROMPT": "0"}).stdout.strip()
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
         return None
 
 
@@ -246,7 +256,7 @@ def default_branch(root):
     head = run(["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"], root)
     if head and "/" in head:
         return head.split("/", 1)[1]
-    symref = run(["git", "ls-remote", "--symref", "origin", "HEAD"], root)
+    symref = run_remote(["git", "ls-remote", "--symref", "origin", "HEAD"], root)
     match = re.search(r"ref: refs/heads/(\S+)\s+HEAD", symref or "")
     if match:
         return match.group(1)

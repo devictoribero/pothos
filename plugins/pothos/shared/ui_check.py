@@ -16,6 +16,7 @@ A line containing "ui-ok" is skipped: write why next to it.
 Exit codes: 0 clean or nothing to check, 1 findings, 2 no contract, 64 usage.
 Standard library only.
 """
+import json
 import os
 import re
 import subprocess
@@ -35,7 +36,7 @@ ICON_PACKAGES = [
 CHECKED_EXTS = (".css", ".scss", ".sass", ".less", ".styl", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs",
                 ".vue", ".svelte", ".astro", ".html")
 SKIPPED_PATH = re.compile(r"(^|/)(__tests__|__mocks__|__snapshots__|test|tests|e2e|cypress|docs?)/|\.(test|spec|stories|story|snap)\.", re.I)
-COMMENT_LINE = re.compile(r"^\s*(//|/\*|\*|<!--|\{/\*)")
+COMMENT_LINE = re.compile(r"^\s*(//|/\*|\*(?!\s*[{,])|<!--|\{/\*)")  # `* {` and `*, *::before` are CSS selectors
 
 HEX = re.compile(r"(?<![\w.&#/-])#([0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![\w-])")
 FUNC_COLOR = re.compile(r"\b(rgba?|hsla?|oklch|oklab|lab|lch|hwb)\(\s*[\d.]")
@@ -71,8 +72,9 @@ def base_ref(root, data, explicit):
 def added_lines(root, base):
     """{path: [(line number, text)]} for every line added since base, including uncommitted and untracked files."""
     added = {}
-    diff = git(["diff", "--unified=0", "--no-color", "--no-ext-diff", base] if base else
-               ["diff", "--unified=0", "--no-color", "--no-ext-diff", "HEAD"], root) or ""
+    # Explicit prefixes: a user's diff.noprefix=true would otherwise shift every path by two characters.
+    options = ["diff", "--unified=0", "--no-color", "--no-ext-diff", "--src-prefix=a/", "--dst-prefix=b/"]
+    diff = git(options + [base if base else "HEAD"], root) or ""
     path, number = None, 0
     for line in diff.splitlines():
         if line.startswith("+++ "):
@@ -217,11 +219,16 @@ def main(argv):
         return 2
     root = contract.repo_root(repo)
     try:
-        base = base_ref(root, contract.load(path), explicit)
+        data = contract.load(path)
+    except json.JSONDecodeError as exc:
+        print(f"the contract at {path} is not valid JSON ({exc}); run /pothos:plant", file=sys.stderr)
+        return 2
+    try:
+        base = base_ref(root, data, explicit)
     except ValueError as exc:
         print(exc, file=sys.stderr)
         return 64
-    return run(root, contract.load(path), base)
+    return run(root, data, base)
 
 
 if __name__ == "__main__":
