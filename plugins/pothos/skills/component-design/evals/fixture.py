@@ -8,7 +8,7 @@ node_modules into it package by package (scripts/toolchain.sh installs the toolc
 COMPONENT_DESIGN_TOOLCHAIN overrides where it lives) and prints the eval's prompt with {project}
 replaced by the copy's absolute path. Give that prompt to a fresh agent. Afterwards, score criterion 12
 with reuse_check.py and the eval's `reuse` entry; the exact command is printed on stderr.
-Exit 2 on a usage error, 1 when the toolchain cannot be installed.
+Exit 2 on a usage error (also -h), 1 when the toolchain cannot be installed.
 """
 import argparse, json, os, shutil, subprocess, sys
 
@@ -39,8 +39,14 @@ def main(argv):
     ap.add_argument("eval_id", nargs="?")
     ap.add_argument("dest", nargs="?")
     ap.add_argument("--evals", default=os.path.join(HERE, "evals.json"))
-    a = ap.parse_args(argv)
-    if not a.eval_id or not a.dest or a.eval_id in ("-h", "--help"):
+    if "-h" in argv or "--help" in argv:
+        print(__doc__)
+        return 2
+    try:
+        a = ap.parse_args(argv)
+    except SystemExit:
+        a = None
+    if a is None or not a.eval_id or not a.dest:
         print(__doc__)
         return 2
     with open(a.evals, encoding="utf-8") as fh:
@@ -68,12 +74,14 @@ def main(argv):
     if missing:
         print(f"fixture.py: the toolchain lacks {', '.join(missing)}; add them to scripts/toolchain.sh", file=sys.stderr)
     reuse = ev.get("reuse") or {}
-    score = f"{os.path.join(HERE, 'reuse_check.py')} {fixture} {dest}"
     if reuse.get("components"):
-        score += " --components " + ",".join(reuse["components"])
-    if reuse.get("hooks"):
-        score += " --hooks " + ",".join(reuse["hooks"])
-    print(f"Project ready at {dest}. Score criterion 12 afterwards with:\n  {score}", file=sys.stderr)
+        score = f"{os.path.join(HERE, 'reuse_check.py')} {fixture} {dest} --components " + ",".join(reuse["components"])
+        if reuse.get("hooks"):
+            score += " --hooks " + ",".join(reuse["hooks"])
+        print(f"Project ready at {dest}. Score criterion 12 afterwards with:\n  {score}", file=sys.stderr)
+    else:
+        print(f"Project ready at {dest}. Eval {a.eval_id!r} names no `reuse.components`, so criterion 12 has "
+              "nothing to score; add them to evals.json.", file=sys.stderr)
     print(ev["prompt"].replace("{project}", dest))
     return 0
 

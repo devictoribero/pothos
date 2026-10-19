@@ -28,7 +28,7 @@ JSON
   echo "import '@testing-library/jest-dom/vitest';" > setup.ts
   cp -R "$SRC/src" src
   mkdir node_modules
-  for p in "$TC"/node_modules/* "$TC"/node_modules/.bin "$TC"/node_modules/@*; do [[ -e "$p" ]] && ln -sf "$p" node_modules/; done
+  for p in "$TC"/node_modules/* "$TC"/node_modules/.bin; do [[ -e "$p" ]] && ln -sf "$p" node_modules/; done
   echo "== type-check"; ./node_modules/.bin/tsc --noEmit -p .
   echo "== tests"; ./node_modules/.bin/vitest run
   exit 0
@@ -37,8 +37,9 @@ fi
 PROJECT="$(cd "${1:?usage: verify.sh <project-dir> [overlay-dir]}" && pwd)"
 OVERLAY="${2:-}"
 rsync -a --exclude node_modules --exclude .git --exclude build --exclude dist --exclude .next "$PROJECT"/ "$SCRATCH"/
+[[ -d "$PROJECT/node_modules" ]] || { echo "No node_modules in $PROJECT: install the project's dependencies first."; exit 1; }
 mkdir -p "$SCRATCH/node_modules"
-for p in "$PROJECT"/node_modules/* "$PROJECT"/node_modules/.bin; do ln -s "$p" "$SCRATCH/node_modules/"; done
+for p in "$PROJECT"/node_modules/* "$PROJECT"/node_modules/.bin; do [[ -e "$p" ]] && ln -s "$p" "$SCRATCH/node_modules/"; done
 TESTS=()
 if [[ -n "$OVERLAY" ]]; then
   OVERLAY="$(cd "$OVERLAY" && pwd)"

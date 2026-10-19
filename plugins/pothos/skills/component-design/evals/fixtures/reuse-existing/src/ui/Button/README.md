@@ -23,7 +23,7 @@
 **Accessibility**
 - The element is a native button with the visible text as its name.
 - A pending button is `aria-busy` and `aria-disabled`, and stays in the tab order.
-- Pending and variant are never shown by color alone: pending shows a spinner next to the text.
 
 **Decisions**
 - `isPending` instead of `disabled` while saving, so focus never drops when a save starts.
+- Pending shows a spinner next to the text (CSS on `aria-busy`), so the state is never color alone.

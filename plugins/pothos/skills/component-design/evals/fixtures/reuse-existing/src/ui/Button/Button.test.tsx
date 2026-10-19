@@ -17,6 +17,24 @@ describe('given a button with a click handler', () => {
 
     expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('type', 'button');
   });
+
+  it('is a native button with the visible text as its name', () => {
+    render(<Button onClick={vi.fn()}>Save</Button>);
+
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInstanceOf(HTMLButtonElement);
+  });
+});
+
+describe('given a button with native attributes and events', () => {
+  it('passes every native attribute and event through to the element', async () => {
+    const onFocus = vi.fn();
+    render(<Button aria-describedby="hint" onFocus={onFocus}>Save</Button>);
+
+    await userEvent.tab();
+
+    expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('aria-describedby', 'hint');
+    expect(onFocus).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('given a pending button', () => {

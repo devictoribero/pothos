@@ -13,7 +13,8 @@
 ```
 
 **State**
-- `value` is controlled by the consumer, as on a native input; uncontrolled with `defaultValue` also works.
+- `value` is controlled by the consumer, as on a native input.
+- Uncontrolled with `defaultValue` also works.
 
 **Behavior and invariants**
 - Every native input attribute and event passes through to the input.

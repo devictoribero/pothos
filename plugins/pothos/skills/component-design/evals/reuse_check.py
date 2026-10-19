@@ -6,8 +6,9 @@ Usage: reuse_check.py <fixture-dir> <project-dir> --components Button,TextField 
 
 Compares the agent's copy of the project with the fixture it started from and reports:
   - the files the run added, and the fixture files it changed or removed;
-  - which named components the new code imports from the shared UI folder (tests, previews and
-    example consumers are left out) and which named hooks it imports from the hooks folder;
+  - which named components the new code imports by name (`import { Button } from '…/ui'`) from the
+    shared UI folder, and which named hooks from the hooks folder; tests, previews and example
+    consumers are left out, and a default or namespace import does not count;
   - raw controls (`<button`, `<input`, `<select`, `<textarea`) in that code that stand in for a
     named component;
   - second copies: a new file under the shared UI or hooks folder named like a named component or
@@ -16,7 +17,7 @@ Compares the agent's copy of the project with the fixture it started from and re
 Score: 2 when every named component is imported, no raw control stands in for one and there is no
 second copy; 1 when some components are reused and the rest rebuilt; 0 when none are reused. Hooks
 are reported for the reviewer, since a run needs them only where its state calls for them, but a
-second copy of one counts against the score. Exit 0 after scoring, 2 on a usage error.
+second copy of one counts against the score. Exit 0 after scoring, 2 on a usage error (also -h).
 """
 import argparse, json, os, re, sys
 
@@ -74,12 +75,18 @@ def main(argv):
     ap.add_argument("--ui", default="ui")
     ap.add_argument("--hooks-dir", default="hooks")
     ap.add_argument("--json", action="store_true")
-    a = ap.parse_args(argv)
-    components = [c for c in a.components.split(",") if c]
-    hooks = [h for h in a.hooks.split(",") if h]
-    if not a.fixture or not a.project or a.fixture in ("-h", "--help"):
+    if "-h" in argv or "--help" in argv:
         print(__doc__)
         return 2
+    try:
+        a = ap.parse_args(argv)
+    except SystemExit:
+        a = None
+    if a is None or not a.fixture or not a.project:
+        print(__doc__)
+        return 2
+    components = [c for c in a.components.split(",") if c]
+    hooks = [h for h in a.hooks.split(",") if h]
     if not components:
         print("reuse_check.py: --components names at least one component", file=sys.stderr)
         return 2

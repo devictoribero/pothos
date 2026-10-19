@@ -41,7 +41,7 @@ function useControllableState<T>(controlled: T | undefined, defaultValue: T, onC
 
 The handler fires in both modes. Transient UI controlled by presence takes `open` only when it needs an exit animation or a portal. A timer that ends in an event is internal, configured by a prop named after the outcome and its unit (`autoDismissAfter`), restarted only when that prop changes.
 
-Derive, don't duplicate: a value that follows from props or other state (the visible pane from the selection, `isEmpty` from the items, a count) is computed at render, never stored where it can disagree. When controlled state names an item (`value`, `selectedIds`) and that item leaves the data, the component renders as nothing selected and the contract says so; it never shows a ghost item nor silently selects a neighbour. Logic a second component needs becomes a hook in the shared hooks folder only when it has no UI of its own; until then it stays local to the component.
+Derive, don't duplicate: a value that follows from props or other state (the visible pane from the selection, `isEmpty` from the items, a count) is computed at render, never stored where it can disagree. When controlled state names an item (`value`, `selectedIds`) and that item leaves the data, the component renders as nothing selected and the contract says so; it never shows a ghost item nor silently selects a neighbour. Whether logic becomes a hook is the row "Extracting a piece" in SKILL.md; a hook has no UI of its own, and lives in the shared hooks folder once a second component uses it.
 
 ## Default parts
 

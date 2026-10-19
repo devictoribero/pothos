@@ -1,6 +1,6 @@
 # Rubric
 
-Score each output 0, 1 or 2 per criterion (0 = missing or wrong, 1 = partly, 2 = done well). The total is out of 24; evals without a fixture skip criterion 12 and score out of 22. Criteria 1 to 3 are measured by scripts; the rest by a reviewer reading the code with the evidence written next to each score.
+Score each output 0, 1 or 2 per criterion (0 = missing or wrong, 1 = partly, 2 = done well). The total is out of 24; evals without a fixture skip criterion 12 and score out of 22. Criteria 1 to 3, and 12 where it applies, are measured by scripts; the rest by a reviewer reading the code with the evidence written next to each score.
 
 | # | Criterion | 2 means | How it is measured |
 |---|---|---|---|

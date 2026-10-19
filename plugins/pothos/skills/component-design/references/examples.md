@@ -180,24 +180,23 @@ export function CartLine({ line, onQuantityChange, onRemove }: CartLineProps) {
 ## Extracting a piece: a second consumer, not shorter JSX
 
 ```tsx
-// features/projects/ProjectNameEditor: one consumer, one job. The field, Save and Cancel stay inline.
-// Editing is controlled by default (`isEditing` + `onEditingChange`) because the "Each state" row says so,
-// not because anyone asked for it.
-export function ProjectNameEditor({ name, isEditing, onEditingChange, onRename }: ProjectNameEditorProps) { … }
+// features/listings/PhotoUploader: one consumer, one job. Picking, progress, failure and retry stay inline,
+// tangled with photo order and captions. `files` is controlled by default (`files` + `onFilesChange`) because
+// the "Each state" row says so, not because anyone asked for it.
+export function PhotoUploader({ files, onFilesChange, onUpload }: PhotoUploaderProps) { … }
 
-// Later, features/boards/BoardTitleEditor needs the same rest → edit → pending → failed cycle. Now the piece
-// has one coherent job and a name a consumer would look for: ui/InlineEditable, extracted with both consumers
-// moved onto it in the same change.
-<InlineEditable.Root isEditing={isEditing} onEditingChange={setEditing} onSubmit={rename}>
-  <InlineEditable.Display>{name}</InlineEditable.Display>
-  <InlineEditable.Field label="Project name" />
-</InlineEditable.Root>
+// Later, features/profile/AvatarUploader needs the same pick → upload → failed → retry cycle. Now the piece has
+// one coherent job and names a consumer would look for: `useUpload` in the shared hooks folder (no UI of its
+// own) and ui/DropZone, extracted with both consumers moved onto them in the same change.
+<DropZone.Root files={files} onFilesChange={setFiles} status={upload.status} onRetry={upload.retry}>
+  <DropZone.Prompt>Drop photos or browse</DropZone.Prompt>
+</DropZone.Root>
 ```
 
-- The first consumer paid for no abstraction it did not use; the second one bought it, and the primitive speaks UI words (`Display`, `Field`), not `projectName`.
-- Extracting changes nothing about who owns the state: controlled in the feature, controlled in the primitive.
+- The first consumer paid for no abstraction it did not use; the second one bought it, and the primitive speaks UI words (`Prompt`, `status`), not `photo` or `avatar`.
+- Extracting changes nothing about who owns the state: `files` controlled in the feature, controlled in the primitive; the hook owns only the transfer.
 
-❌ `<NameRow>`, `<EditControls>` and `useEditMode` extracted on day one to shorten the JSX, or because the design file has layers with those names: three names to search for and nothing reused.
+❌ `<UploadRow>`, `<RetryControls>` and `useUploadMode` extracted on day one to shorten the JSX, or because the design file has layers with those names: three names to search for and nothing reused.
 
 ## Workbench: regions, capabilities by handler presence
 

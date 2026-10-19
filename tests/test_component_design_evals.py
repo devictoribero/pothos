@@ -94,9 +94,22 @@ class ReuseCheckTest(unittest.TestCase):
         self.assertEqual(result["changed_fixture_files"], ["src/ui/index.ts"])
         self.assertEqual(result["removed_fixture_files"], ["src/ui/TextField/TextField.tsx"])
 
-    def test_usage_error_without_components(self):
+    def test_counts_named_imports_spread_over_lines_with_type_and_alias_forms(self):
+        p = self.project("f")
+        write(p, "src/features/projects/NameEditor.tsx",
+              "import {\n  type ButtonProps,\n  Button as PrimaryButton,\n  TextField,\n} from '@/ui';\n"
+              "import { useControllableState as useControllable } from '@/hooks/useControllableState';\n")
+        result = self.check(p)
+        self.assertEqual(result["score"], 2)
+        self.assertEqual(result["components"], {"Button": True, "TextField": True})
+        self.assertEqual(result["hooks"], {"useControllableState": True})
+
+    def test_usage_error_without_components_and_help_print_the_usage(self):
         out = subprocess.run([sys.executable, REUSE, self.fixture, self.fixture], capture_output=True, text=True)
         self.assertEqual(out.returncode, 2)
+        out = subprocess.run([sys.executable, REUSE, "-h"], capture_output=True, text=True)
+        self.assertEqual(out.returncode, 2)
+        self.assertIn("Usage: reuse_check.py", out.stdout)
 
 
 class FixtureTest(unittest.TestCase):
@@ -109,6 +122,7 @@ class FixtureTest(unittest.TestCase):
         write(self.evals_dir, "evals.json", json.dumps({"evals": [
             {"id": "demo", "fixture": "fixtures/demo", "prompt": "Work in {project} now.",
              "reuse": {"components": ["Button"], "hooks": ["useThing"]}},
+            {"id": "unscored", "fixture": "fixtures/demo", "prompt": "Work in {project} now."},
             {"id": "plain", "prompt": "No fixture."}]}))
         self.toolchain = os.path.join(self.tmp.name, "toolchain")
         write(self.toolchain, "node_modules/react/package.json", "{}")
@@ -133,6 +147,18 @@ class FixtureTest(unittest.TestCase):
         self.assertTrue(os.path.islink(os.path.join(dest, "node_modules", ".bin")))
         self.assertIn("lacks typescript", out.stderr)
         self.assertIn("--components Button --hooks useThing", out.stderr)
+
+    def test_says_when_the_eval_names_nothing_to_score_instead_of_printing_a_broken_command(self):
+        dest = os.path.join(self.tmp.name, "run5")
+        out = self.prepare("unscored", dest)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertNotIn("reuse_check.py", out.stderr)
+        self.assertIn("names no `reuse.components`", out.stderr)
+
+    def test_help_prints_the_usage(self):
+        out = self.prepare("--help")
+        self.assertEqual(out.returncode, 2)
+        self.assertIn("Usage: fixture.py", out.stdout)
 
     def test_refuses_an_existing_destination_and_evals_without_a_fixture(self):
         dest = os.path.join(self.tmp.name, "run2")
