@@ -37,9 +37,19 @@
   "build": {
     "skills": []
   },
+  "ui": {
+    "components": [],
+    "tokens": [],
+    "icons": "",
+    "preview": {
+      "command": "",
+      "url": ""
+    }
+  },
   "pr": {
     "base": "main",
     "template": "",
-    "evidence": ""
+    "evidence": "",
+    "auto_merge": {"label": ""}
   }
 }

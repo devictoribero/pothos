@@ -51,6 +51,32 @@ class SessionContextTest(unittest.TestCase):
         self.assertIn("/pothos:plant", text)
         self.assertIn("Never run `/setup-matt-pocock-skills`", text)
 
+    def artifacts_index(self, lines):
+        folder = os.path.join(self.home, "artifacts", "github.com", "acme", "shop")
+        os.makedirs(folder, exist_ok=True)
+        with open(os.path.join(folder, "INDEX.md"), "w") as fh:
+            fh.write("# Explanations\n\n" + "".join(f"- [{title}]({title}/index.html) · summary: {title}/summary.md\n" for title in lines))
+        return os.path.join(folder, "INDEX.md")
+
+    def test_points_at_earlier_explanations_with_or_without_a_contract(self):
+        self.assertNotIn("Earlier explanations", self.ctx())
+        index = self.artifacts_index(["checkout", "refunds"])
+        text = self.ctx()
+        self.assertIn("### Earlier explanations", text)
+        self.assertIn("2 explanation pages", text)
+        self.assertIn(f"read `{index}`", text)
+        self.assertIn("/pothos:plant", text)  # still no contract
+        self.write({"version": 1, "verify": {"full": "npm test"}})
+        text = self.ctx()
+        self.assertIn("`full`: `npm test`", text)
+        self.assertIn("2 explanation pages", text)
+        self.write({"version": 1, "workflow": "repo"})
+        self.assertIn("Earlier explanations", self.ctx())
+
+    def test_an_empty_artifacts_index_is_ignored(self):
+        self.artifacts_index([])
+        self.assertNotIn("Earlier explanations", self.ctx())
+
     def test_reads_the_session_directory_from_the_hook_event(self):
         self.write({"version": 1, "verify": {"full": "npm test"}})
         elsewhere = os.path.join(self.tmp.name, "elsewhere")
@@ -77,6 +103,19 @@ class SessionContextTest(unittest.TestCase):
         text = self.ctx()
         self.assertIn(".scratch/<feature-slug>/", text)
         self.assertIn("names no tracker", text)
+
+    def test_auto_merge_label_is_named_and_forbidden_to_the_agent(self):
+        self.write({"version": 1, "verify": {"full": "npm test"}, "pr": {"auto_merge": {"label": "ship-it"}}})
+        text = self.ctx()
+        self.assertIn("the label `ship-it`", text)
+        self.assertIn("Never add that label yourself", text)
+        self.assertIn("only tend's merge gate does, for a labelled pull request", text)
+
+    def test_without_auto_merge_only_the_merge_rule_remains(self):
+        self.write({"version": 1, "verify": {"full": "npm test"}})
+        text = self.ctx()
+        self.assertIn("Never merge into the base branch yourself.", text)
+        self.assertNotIn("Never add that label", text)
 
     def test_github_tracker_uses_the_gh_template(self):
         self.write({"version": 1, "verify": {"full": "npm test"}, "tracker": {"kind": "github"}})
@@ -164,6 +203,37 @@ class SessionContextTest(unittest.TestCase):
     def test_build_skills_load_before_writing_code(self):
         self.write({"version": 1, "verify": {"full": "npm test"}, "build": {"skills": ["ui-primitives"]}})
         self.assertIn("Also load these repository skills before writing code: `ui-primitives`", self.ctx())
+
+    def test_ui_building_blocks_reach_ui_work(self):
+        self.write({"version": 1, "verify": {"full": "npm test"}, "ui": {
+            "components": ["src/components/ui"], "tokens": ["src/styles/tokens.css"], "icons": "lucide-react",
+            "preview": {"command": "pnpm run storybook", "url": "http://localhost:6006"}}})
+        text = self.ctx()
+        self.assertIn("Shared components: `src/components/ui`. Search them before creating a component", text)
+        self.assertIn("Design tokens and theme: `src/styles/tokens.css`", text)
+        self.assertIn("Icons come from `lucide-react`", text)
+        self.assertIn("Component preview: `pnpm run storybook`, answering at http://localhost:6006.", text)
+        self.assertIn("ui_check.py", text)
+
+    def test_ui_building_blocks_apply_in_repo_workflow_too(self):
+        self.write({"version": 1, "workflow": "repo", "ui": {"components": ["src/ui"]}})
+        text = self.ctx()
+        self.assertIn("Shared components: `src/ui`", text)
+        self.assertIn("Before you call a UI change done, run", text)
+        self.assertNotIn("`verify` runs the UI check", text)
+
+    def test_each_app_gets_its_own_ui(self):
+        self.write({"version": 1, "verify": {"full": "npm test"}, "run": {"apps": [
+            {"name": "mobile", "path": "apps/mobile", "ui": {"icons": "lucide-react-native"}}]}})
+        text = self.ctx()
+        self.assertIn("In `apps/mobile` (`mobile`):", text)
+        self.assertNotIn("instead of the above", text)
+        self.assertIn("  - Icons come from `lucide-react-native`", text)
+
+    def test_without_ui_nothing_is_claimed(self):
+        self.write({"version": 1, "verify": {"full": "npm test"}, "ui": {"preview": {"url": "http://localhost:6006"}}})
+        text = self.ctx()
+        self.assertNotIn("UI building blocks", text)
 
     def test_repo_workflow_keeps_personal_standards_below_the_repository(self):
         os.makedirs(os.path.join(self.home, "standards"))

@@ -22,9 +22,9 @@ TEMPLATES = os.path.join(HERE, "vendor", "pocock-setup")
 PLUGIN = os.path.dirname(HERE)
 ROLES = ["needs-triage", "needs-info", "ready-for-agent", "ready-for-human", "wontfix"]
 COMPETING_SKILLS = ("grill-with-docs, to-spec, to-tickets, wayfinder, triage, implement, implement-spec, code-review, pr, "
-                    "verify, evidence")
+                    "verify, evidence, tend")
 CYCLE_SKILLS = ("grilling, grill-with-docs, to-spec, to-tickets, wayfinder, triage, implement, implement-spec, "
-                "tdd, code-review, pr, prototype, diagnosing-bugs, retro, verify, evidence")
+                "tdd, code-review, pr, prototype, diagnosing-bugs, retro, verify, evidence, tend")
 
 
 def template(name):
@@ -151,6 +151,44 @@ def run_section(data):
     return "### Running the app\n\n" + "\n".join(lines) if lines else None
 
 
+def ui_facts(ui):
+    quote = lambda items: ", ".join(f"`{item}`" for item in items)
+    facts = []
+    if ui.get("components"):
+        facts.append(f"Shared components: {quote(ui['components'])}. Search them before creating a component, and reuse or extend what fits.")
+    if ui.get("tokens"):
+        facts.append(f"Design tokens and theme: {quote(ui['tokens'])}. Use these values instead of raw colors, sizes or breakpoints.")
+    if ui.get("icons"):
+        facts.append(f"Icons come from `{ui['icons']}`; do not add another icon set.")
+    preview = ui.get("preview") or {}
+    if preview.get("command"):
+        served = f", answering at {preview['url']}" if preview.get("url") else ""
+        facts.append(f"Component preview: `{preview['command']}`{served}.")
+    return facts
+
+
+def ui_lines(data, repo_workflow=False):
+    """The repository's UI building blocks, from the contract's ui sections. Unset fields stay unsaid."""
+    lines = [f"- {fact}" for fact in ui_facts(data.get("ui") or {})]
+    has_top = bool(lines)
+    for app in ((data.get("run") or {}).get("apps") or []):
+        facts = ui_facts((app.get("ui") or {}) if isinstance(app, dict) else {})
+        if facts:
+            lines.append(f"- In `{app.get('path')}` (`{app.get('name')}`)" + (", instead of the above:" if has_top else ":"))
+            lines += [f"  - {fact}" for fact in facts]
+    if not lines:
+        return []
+    checker = os.path.join(PLUGIN, "shared", "ui_check.py")
+    return ["", "This repository's UI building blocks (from the contract; anything not listed is unconfirmed, so find it in the code "
+            "and never assume a library or path):"] + lines + [
+            (f"- Before you call a UI change done, run `python3 \"{checker}\"`: it flags raw colors, new fonts and other icon sets "
+             "on the lines the branch adds. Fix each finding, or keep the value with a `ui-ok: <why>` comment on that line, and "
+             "mention what remains in your review." if repo_workflow else
+             f"- `verify` runs the UI check after `full` and records it as advisory: raw colors, new fonts and other icon sets "
+             f"on the lines the branch adds. Run it while you work with `python3 \"{checker}\"`. Fix each finding, or keep the "
+             "value with a `ui-ok: <why>` comment on that line. `code-review` reports what remains as yellow findings.")]
+
+
 def standards_section(data, repo_workflow=False):
     repo_files = [] if repo_workflow else list(((data.get("review") or {}).get("standards")) or [])
     personal = sorted(glob.glob(os.path.join(PLUGIN, "standards", "*.md")))
@@ -172,6 +210,7 @@ def standards_section(data, repo_workflow=False):
               + (" and follow it unless the repository's own component skills say otherwise." if repo_workflow else ".")]
     lines += ["When reviewing a diff that creates or changes UI components, also run `component-design`'s audit on those "
               "components and report its findings next to " + ("the repository's own review." if repo_workflow else "`code-review`'s.")]
+    lines += ui_lines(data, repo_workflow)
     if build_skills:
         lines += ["Also load these repository skills before writing code: " + ", ".join(f"`{s}`" for s in build_skills) + "."]
     return "\n".join(lines)
@@ -194,13 +233,44 @@ def pr_section(data):
                      "from `/pothos:evidence` in it.")
     if pr.get("evidence"):
         lines.append(f"- Upload screenshots with `{pr['evidence']}`; it prints markdown to embed.")
-    lines.append("- Never merge into the base branch yourself.")
+    label = (pr.get("auto_merge") or {}).get("label")
+    if label:
+        lines.append(f"- A person may give a ready pull request the label `{label}`; `/pothos:tend` then merges it through its merge "
+                     "gate once everything is green. Never add that label yourself.")
+    lines.append("- Never merge into the base branch yourself" + (": only tend's merge gate does, for a labelled pull request." if label else "."))
     return "\n".join(lines)
+
+
+def artifacts_section(start):
+    """Point the session at this repository's explanation pages, so earlier work is reused instead of redone.
+    The rule lives here rather than in a user's CLAUDE.md because the pages are only useful if every session knows
+    they exist."""
+    try:
+        folder = os.path.join(contract.pothos_home(), "artifacts", contract.key_for(start, "artifacts"))
+    except ValueError:
+        return None
+    index = os.path.join(folder, "INDEX.md")
+    if not os.path.isfile(index):
+        return None
+    with open(index, encoding="utf-8") as fh:
+        count = sum(1 for line in fh if line.startswith("- "))
+    if not count:
+        return None
+    pages = "1 explanation page" if count == 1 else f"{count} explanation pages"
+    return (f"### Earlier explanations\n\nThis repository has {pages} written by `/pothos:explain` under `{folder}`. "
+            f"Before explaining, mapping or investigating an area of this code, read `{index}` and the `summary.md` of any "
+            "page that covers it: it holds the answer, the key facts and the sources in a few lines. When the user asks for "
+            "an explanation or a visual of something a page already covers, update that page instead of writing a new one.")
 
 
 def build(start):
     if not contract.git(["rev-parse", "--git-dir"], start):
         return None
+    text = contract_section(start)
+    return "\n\n".join(part for part in (text, artifacts_section(start)) if part)
+
+
+def contract_section(start):
     try:
         path = contract.locate(start)
     except ValueError as exc:

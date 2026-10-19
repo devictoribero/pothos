@@ -3,7 +3,8 @@
 
 Usage: detect.py [REPO_DIR]
 
-Only reports facts found on disk. It never guesses a command that is not declared
+Only reports facts found on disk, plus one bounded call to the origin remote for its default
+branch when the clone does not know it. It never guesses a command that is not declared
 somewhere, so the model drafting the contract cannot invent one either.
 Standard library only.
 """
@@ -12,6 +13,9 @@ import os
 import re
 import subprocess
 import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "shared"))
+import ui_check  # noqa: E402
 
 LOCKFILES = [
     ("pnpm-lock.yaml", "pnpm"),
@@ -71,6 +75,15 @@ def run(cmd, cwd):
         return None
 
 
+def run_remote(cmd, cwd):
+    """The one command that leaves the disk: bounded, and never waiting for credentials at a terminal."""
+    try:
+        return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=True, timeout=5,
+                              env={**os.environ, "GIT_TERMINAL_PROMPT": "0"}).stdout.strip()
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        return None
+
+
 def read(path):
     try:
         with open(path, encoding="utf-8-sig", errors="replace") as fh:
@@ -125,9 +138,9 @@ def workspace_command(pm, name, rel, script):
             "bun": f"bun run --filter {name} {script}"}.get(pm, f"npm run {script} --workspace {rel}")
 
 
-def workspace_apps(root, pkg, pm):
-    """Every workspace package with a package.json: its folder, name, start scripts and kind."""
-    apps = []
+def workspace_manifests(root, pkg):
+    """(folder, package.json) of every workspace package."""
+    found = []
     for pattern in workspace_globs(root, pkg):
         base = pattern.rstrip("/").removesuffix("/*").removesuffix("/**")
         folders = [base] if base == pattern.rstrip("/") else [
@@ -139,21 +152,111 @@ def workspace_apps(root, pkg, pm):
                 manifest = json.loads(text) if text else None
             except ValueError:
                 manifest = None
-            if not isinstance(manifest, dict):
-                continue
-            name = manifest.get("name") or os.path.basename(rel)
-            scripts = manifest.get("scripts") or {}
-            dev = [n for n in ROLES["dev_mocked"] + ROLES["dev"] if n in scripts]
-            apps.append({"path": rel, "package": name, "kind": app_kind(manifest),
-                         "dev_scripts": [{"script": n, "command": workspace_command(pm, name, rel, n), "body": scripts[n]} for n in dev]})
+            if isinstance(manifest, dict):
+                found.append((rel, manifest))
+    return found
+
+
+def workspace_apps(root, pkg, pm):
+    """Every workspace package with a package.json: its folder, name, start scripts and kind."""
+    apps = []
+    for rel, manifest in workspace_manifests(root, pkg):
+        name = manifest.get("name") or os.path.basename(rel)
+        scripts = manifest.get("scripts") or {}
+        dev = [n for n in ROLES["dev_mocked"] + ROLES["dev"] if n in scripts]
+        apps.append({"path": rel, "package": name, "kind": app_kind(manifest),
+                     "dev_scripts": [{"script": n, "command": workspace_command(pm, name, rel, n), "body": scripts[n]} for n in dev]})
     return apps
+
+
+SKIP_DIRS = {"__tests__", "__mocks__", "test-utils", "node_modules", ".git", "dist", "build", ".next", ".expo", "coverage", "storybook-static", "ios", "android", "vendor"}
+COMPONENT_DIR_NAMES = {"components", "ui", "primitives", "design-system", "designsystem", "common"}
+COMPONENT_EXTS = (".tsx", ".jsx", ".vue", ".svelte", ".astro")
+TOKEN_FILE = re.compile(r"^(tokens?|design-tokens|theme|themes|variables|colors|palette)(\.[\w-]+)*\.(css|scss|ts|tsx|js|mjs|json)$|"
+                        r"^tailwind\.config\.(js|cjs|mjs|ts)$|\.tokens\.json$", re.I)
+ICON_PACKAGES = ui_check.ICON_PACKAGES
+TOKEN_DIR_NAMES = {"tokens", "design-tokens", "theme", "themes"}
+# A components folder below one of these belongs to one feature or route, not to the shared UI.
+FEATURE_SCOPE = re.compile(r"(^|/)(features?|modules|domains|pages|routes|screens|views)/[^/]+/", re.I)
+CUSTOM_PROPERTY = re.compile(r"^\s*--[\w-]+\s*:", re.M)
+
+
+def declares_tokens(path):
+    """A stylesheet that defines the theme: a Tailwind @theme block or at least ten custom properties."""
+    text = read(path) or ""
+    return "@theme" in text or len(CUSTOM_PROPERTY.findall(text)) >= 10
+
+
+STORYBOOK_SCRIPTS = ["storybook", "storybook:dev", "dev:storybook", "sb"]
+SOURCE_EXTS = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".vue", ".svelte")
+
+
+def walk(root, depth):
+    """(relative folder, dirs, files) up to `depth` folders deep, skipping dependencies and build output."""
+    for base, dirs, files in os.walk(root):
+        rel = os.path.relpath(base, root)
+        level = 0 if rel == "." else rel.count(os.sep) + 1
+        dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS and not d.startswith(".") or d == ".storybook")
+        if level >= depth:
+            dirs[:] = []
+        yield ("" if rel == "." else rel), dirs, files
+
+
+def ui_facts(root, pkg, pm):
+    """Facts plant needs for the contract's ui section. Candidates only: the model and the user choose."""
+    manifests = [("", pkg or {})] + (workspace_manifests(root, pkg) if pkg else [])
+    folders, tokens, storybook_dirs, sources = [], [], [], []
+    for rel, dirs, files in walk(root, 6):
+        name = os.path.basename(rel).lower()
+        if rel and name in COMPONENT_DIR_NAMES:
+            count = sum(1 for _, _, fs in walk(os.path.join(root, rel), 3) for f in fs if f.endswith(COMPONENT_EXTS))
+            if count:
+                scoped = bool(FEATURE_SCOPE.search(rel))
+                folders.append({"path": rel, "component_files": count, "feature_scoped": scoped})
+        if rel and name in TOKEN_DIR_NAMES and any(f.endswith(SOURCE_EXTS + (".css", ".scss", ".json")) for _, _, fs in walk(os.path.join(root, rel), 2) for f in fs):
+            tokens.append(rel)
+        if os.path.basename(rel) == ".storybook":
+            storybook_dirs.append(rel)
+        for f in files:
+            path = os.path.join(rel, f) if rel else f
+            if TOKEN_FILE.search(f) or (f.endswith((".css", ".scss")) and declares_tokens(os.path.join(root, path))):
+                tokens.append(path)
+            if f.endswith(SOURCE_EXTS) and len(sources) < 5000:
+                sources.append(path)
+    declared = {}
+    for rel, manifest in manifests:
+        deps = {**(manifest.get("dependencies") or {}), **(manifest.get("devDependencies") or {})}
+        for package in ICON_PACKAGES:
+            if package in deps:
+                declared.setdefault(package, []).append(rel or ".")
+    imports = {package: 0 for package in declared}
+    for path in sources:
+        text = read(os.path.join(root, path)) or ""
+        for package in declared:
+            imports[package] += len(re.findall(r"""from\s+['"]""" + re.escape(package) + r"""(?:/[^'"]*)?['"]|require\(['"]""" + re.escape(package), text))
+    preview = []
+    for rel, manifest in manifests:
+        scripts = manifest.get("scripts") or {}
+        for script in STORYBOOK_SCRIPTS:
+            if script in scripts:
+                command = f"{runner_prefix(pm)} {script}" if not rel else workspace_command(pm, manifest.get("name") or os.path.basename(rel), rel, script)
+                port = re.search(r"(?:-p|--port)[ =](\d+)", scripts[script])
+                preview.append({"command": command, "body": scripts[script], "url": f"http://localhost:{port.group(1)}" if port else None})
+                break
+    return {
+        "component_folders": sorted(folders, key=lambda f: (f["feature_scoped"], -f["component_files"])),
+        "token_files": sorted(t for t in tokens if not any(t.startswith(other + "/") for other in tokens)),
+        "icon_packages": [{"package": p, "declared_in": declared[p], "imports": imports[p]} for p in sorted(declared, key=lambda p: -imports[p])],
+        "storybook_config": storybook_dirs,
+        "preview_scripts": preview,
+    }
 
 
 def default_branch(root):
     head = run(["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"], root)
     if head and "/" in head:
         return head.split("/", 1)[1]
-    symref = run(["git", "ls-remote", "--symref", "origin", "HEAD"], root)
+    symref = run_remote(["git", "ls-remote", "--symref", "origin", "HEAD"], root)
     match = re.search(r"ref: refs/heads/(\S+)\s+HEAD", symref or "")
     if match:
         return match.group(1)
@@ -244,6 +347,7 @@ def detect(root):
         "git_remote": run(["git", "remote", "get-url", "origin"], root),
         "local_dir": next((d for d in [".scratch", "docs/plans"] if exists(d)), None),
     }
+    report["ui"] = ui_facts(root, pkg, pm)
     report["default_branch"] = default_branch(root)
 
     contract_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "shared", "contract.py")

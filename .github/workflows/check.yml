@@ -22,6 +22,7 @@ jobs:
           python3 -m json.tool .claude-plugin/marketplace.json > /dev/null
           python3 -m json.tool plugins/pothos/.claude-plugin/plugin.json > /dev/null
           python3 -m json.tool plugins/pothos/shared/contract.schema.json > /dev/null
+          python3 -m json.tool plugins/pothos/hooks/hooks.json > /dev/null
       - name: Manifest versions agree
         run: |
           python3 - <<'PY'

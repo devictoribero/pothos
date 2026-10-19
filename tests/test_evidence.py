@@ -100,6 +100,36 @@ class EvidenceTest(unittest.TestCase):
         self.contract({"run": {"apps": [{"name": "web", "path": "apps/web"}]}})
         self.assertEqual(self.run_script("serve", "--app", "admin").returncode, 3)
 
+    def test_a_dev_command_that_backgrounds_the_server_and_exits_0_is_waited_for(self):
+        port = free_port()
+        self.contract({"run": {"dev": f"(sleep 1; exec {sys.executable} -m http.server {port} --bind 127.0.0.1) & exit 0",
+                               "url": f"http://127.0.0.1:{port}/"}})
+        result = self.run_script("serve", "--timeout", "20")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        pid = result.stdout.split("pid=")[1].split()[0]
+        self.assertEqual(self.run_script("stop", pid).returncode, 0)
+
+    def test_stop_never_signals_the_callers_process_group(self):
+        for pid in ("0", "1"):
+            self.assertEqual(self.run_script("stop", pid).returncode, 64, pid)
+
+    def test_each_app_keeps_its_own_server_log(self):
+        self.contract({"run": {"apps": [{"name": "web", "path": "apps/web", "dev": "false", "url": "http://127.0.0.1:9/"},
+                                        {"name": "admin", "path": "apps/admin", "dev": "false", "url": "http://127.0.0.1:9/"}]}})
+        self.run_script("serve", "--app", "web", "--timeout", "3")
+        self.run_script("serve", "--app", "admin", "--timeout", "3")
+        folder = self.run_script("dir").stdout.strip()
+        self.assertEqual(sorted(f for f in os.listdir(folder) if f.startswith("server-")), ["server-admin.log", "server-web.log"])
+
+    def test_an_unreadable_contract_exits_2(self):
+        path = os.path.join(self.home, "contracts", "github.com", "acme", "shop.json")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as fh:
+            fh.write("{not json")
+        result = self.run_script("plan")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("not valid JSON", result.stderr)
+
     def test_usage_errors_exit_64(self):
         self.assertEqual(self.run_script().returncode, 64)
         self.assertEqual(self.run_script("shot", "http://x").returncode, 64)

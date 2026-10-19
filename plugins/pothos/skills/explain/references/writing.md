@@ -15,6 +15,9 @@ The reader knows the domain but did not watch you work. They will skim first and
 - `.table` wraps a table so it scrolls on narrow screens.
 - `.callout` highlights the one thing the reader must not miss; `.callout.warn` marks a risk. Use at most two per page.
 - `pre` for commands and snippets; `code` for names inside sentences.
+- `.cards` is a grid of `.card` articles for a set of parallel things (the pieces of a system, the options of a decision). A card is a `header` (name, then its badges), a paragraph, and optionally a `.pc` list. Give a card a group colour with `style="--accent: …"` only when the colour already means something elsewhere on the page, such as a phase in the diagrams.
+- Pros and cons go in `<dl class="pc"><div><dt>Pro</dt><dd>…</dd></div><div><dt>Con</dt><dd>…</dd></div></dl>`: two columns, the label above its reason, never label and reason on one line.
+- A badge is `<span class="b"><span class="k">key:</span>value</span>`, one neutral style for every badge. The key says what the badge classifies (`author:`, `launch:`, `status:`) and the value is a lowercase slug (`pocock`, `los-dos`, `otra-skill`). Meaning comes from the key, not from a colour per value: a page with five badge colours plus phase colours reads as noise.
 - A diagram is `<figure><div class="diagram"><iframe data-archify src="diagrams/NAME.html?theme=light" …></iframe></div><figcaption>…</figcaption></figure>`. The `data-archify` attribute lets the theme toggle switch the diagram too.
 
 ## Writing

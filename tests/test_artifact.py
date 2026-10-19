@@ -87,6 +87,25 @@ class ArtifactTest(unittest.TestCase):
         self.assertIn("Checkout charges the card after stock is reserved.", index)
         self.assertIn("Checkout flow", run(["list"], self.repo).stdout)
 
+    def test_register_removes_archify_receipts_but_keeps_diagrams(self):
+        folder = self.new()
+        self.finish(folder)
+        with open(os.path.join(folder, "summary.md"), "w") as fh:
+            fh.write("# Answer.\n")
+        diagrams = os.path.join(folder, "diagrams")
+        os.makedirs(os.path.join(diagrams, ".old-receipts"))
+        os.makedirs(os.path.join(diagrams, "review-2"))
+        for name in ("flow.json", "flow.html", "flow.finalize.json", "flow.finalize-summary.json", "flow.browser-check.json",
+                     "flow.delivery.json", "review-2/flow.html", "review-2/flow.finalize.json", ".old-receipts/old.json"):
+            with open(os.path.join(diagrams, name), "w") as fh:
+                fh.write("{}")
+        result = run(["register", folder], self.repo)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("removed 6 archify receipt file(s)", result.stdout)
+        left = sorted(os.path.relpath(os.path.join(r, f), diagrams) for r, _, fs in os.walk(diagrams) for f in fs)
+        self.assertEqual(left, ["flow.html", "flow.json", "review-2/flow.html"])
+        self.assertNotIn("removed", run(["register", folder], self.repo).stdout)
+
     def test_put_writes_inside_the_folder_only(self):
         folder = self.new()
         ok = subprocess.run([sys.executable, SCRIPT, "put", folder, "summary.md"], input="# Hi\n", capture_output=True, text=True)
@@ -181,6 +200,54 @@ class ArtifactTest(unittest.TestCase):
         self.assertEqual(run(["parent", a, b], self.repo).returncode, 1)
         self.assertEqual(run(["parent", b, "none"], self.repo).returncode, 0)
         self.assertEqual(run(["new", "--slug", "c", "--title", "C", "--parent", "missing"], self.repo).returncode, 64)
+
+    def test_writing_commands_refuse_folders_outside_the_artifacts_home(self):
+        page = os.path.join(self.repo, "docs", "page")
+        os.makedirs(page)
+        for name in ("index.html", "summary.md"):
+            with open(os.path.join(page, name), "w") as fh:
+                fh.write("x\n")
+        with open(os.path.join(page, "meta.json"), "w") as fh:
+            json.dump({"title": "One", "created": "2026-01-01"}, fh)
+        self.assertEqual(run(["register", page], self.repo).returncode, 1)
+        self.assertEqual(run(["parent", page, "none"], self.repo).returncode, 1)
+        self.assertEqual(sorted(os.listdir(os.path.join(self.repo, "docs"))), ["page"])
+        self.assertEqual(sorted(os.listdir(page)), ["index.html", "meta.json", "summary.md"])
+
+    def test_register_through_the_latest_link_names_the_real_folder(self):
+        folder = self.new()
+        self.finish(folder)
+        with open(os.path.join(folder, "summary.md"), "w") as fh:
+            fh.write("One\n")
+        self.assertEqual(run(["register", folder], self.repo).returncode, 0)
+        self.assertEqual(run(["register", os.path.join(self.base, "latest")], self.repo).returncode, 0)
+        self.assertEqual(os.readlink(os.path.join(self.base, "latest")), os.path.basename(folder))
+        with open(os.path.join(self.base, "INDEX.md")) as fh:
+            self.assertEqual(fh.read().count("- ["), 1)
+
+    def test_new_accepts_the_parent_as_a_path(self):
+        parent = self.new("parent", "Parent")
+        result = run(["new", "--slug", "child", "--title", "Child", "--parent", parent], self.repo)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with open(os.path.join(result.stdout.strip(), "meta.json")) as fh:
+            self.assertEqual(json.load(fh)["parent"], os.path.basename(parent))
+
+    def test_light_twice_leaves_the_dark_theme_css_alone(self):
+        path = os.path.join(self.tmp.name, "d.html")
+        with open(path, "w") as fh:
+            fh.write('<html data-theme="dark"><style>[data-theme="dark"] { color: white }</style>'
+                     "<script>" + "window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'" + "</script></html>")
+        self.assertEqual(run(["light", path], self.repo).returncode, 0)
+        self.assertEqual(run(["light", path], self.repo).returncode, 0)
+        with open(path) as fh:
+            text = fh.read()
+        self.assertIn('<html data-theme="light">', text)
+        self.assertIn('[data-theme="dark"] { color: white }', text)
+
+    def test_nav_on_a_repository_without_pages_creates_the_folder(self):
+        result = run(["nav"], self.repo)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(os.path.isfile(os.path.join(self.base, "nav.js")))
 
     def test_open_respects_no_open(self):
         folder = self.new()
