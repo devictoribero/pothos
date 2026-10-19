@@ -120,7 +120,7 @@ Additive first: optional part, optional prop with a behavior-preserving default,
 
 ## Project plumbing
 
-Project rules win on plumbing: primitives, tokens, lint, exports, test tooling. Consume shared behavior (focus trap, controllable state, roving focus, class-name helper); search before creating one; if missing, create it once in the shared place. An additive change the new component needs on a shared primitive (pass-through, a name) goes in the same change; plumbing that hurts accessibility is fixed at its source or recorded as a red finding, never wrapped locally. Without tokens, keep values where tokens can replace them: prefixed custom properties with fallbacks (`var(--card-radius, 8px)`). A third-party behavior library is consumed for behavior; override roles and `tabindex` that contradict the pattern.
+Project rules win on plumbing: primitives, tokens, lint, exports, test tooling. Shared behavior (focus trap, controllable state, roving focus, class-name helper) is consumed, never rewritten: step 2 of the skill looks for it first, and what is missing is created once in the shared place. An additive change the new component needs on a shared primitive (pass-through, a name) goes in the same change; plumbing that hurts accessibility is fixed at its source or recorded as a red finding, never wrapped locally. Without tokens, keep values where tokens can replace them: prefixed custom properties with fallbacks (`var(--card-radius, 8px)`). A third-party behavior library is consumed for behavior; override roles and `tabindex` that contradict the pattern.
 
 ## React Native
 

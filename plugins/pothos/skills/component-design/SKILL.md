@@ -10,7 +10,7 @@ Components are puzzle pieces: small, honest about what they need, and joined by 
 ## How to use this skill
 
 1. Decide the **kind**: a **primitive** knows no business and speaks product and UI words (`author`, `body`, `action`, `media`); a **feature component** renders one concept of one product (`JobCard`) by composing primitives. Asked for something reusable with no design system: build both, the primitive and a thin feature on top.
-2. Look for what already exists before writing anything: a component with the same role or name (button, field, dialog, menu, card) in the shared UI folder or the design system, the hooks and helpers the project shares, its tokens and icons. Reuse or extend what you find; a second button or dialog costs every future consumer a choice. Then read the plumbing you will consume: one component and one test next to where yours goes. If there is no project, write your assumptions at the top of each file.
+2. Look for what already exists before writing anything: a component with the same role or name (button, field, dialog, menu, card) in the shared UI folder or the design system, the hooks and helpers the project shares, its tokens and icons. When the session context names those folders, start there. Reuse or extend what you find; a second button or dialog costs every future consumer a choice. Then read the plumbing you will consume: one component and one test next to where yours goes. If there is no project, write your assumptions at the top of each file.
 3. Settle every row of the **decision guide** below, reading the example it points to. Write the contract (`references/contract.md`) before the code.
 4. Build. Then run `scripts/verify.sh`, `scripts/lint.py` and `scripts/check_contract.py`, and fix until they pass. Render the preview and look at it.
 5. Summarize what you assumed, what you decided that the request didn't, and anything you could not run, in the first lines.
@@ -42,7 +42,7 @@ Read `references/examples.md` first: most decisions below are shown there as a g
 | Optional capabilities | handler presence | A capability exists only when its handler is passed: no `onWidthChange`, no resize handle | Workbench |
 | Layout panes on narrow screens | derived · separate state | Derive the visible pane from the selection (nothing selected shows the list; Back clears it); never a second `pane` state that can contradict it. Escape is handled by the innermost layer and stopped | Workbench |
 | Where code lives | primitive · feature · screen | Primitives in the shared UI folder with no business imports; business rules, data and copy in the feature; routing and wiring in the screen. `scripts/lint.py` checks the direction | Card in two layers |
-| Extracting a piece | extract · keep inline | Extract when the piece has one coherent job and a name a consumer would look for, or when a second consumer appears. Never to shorten JSX, to mirror a design layer, or to add configuration nobody asked for: the simplest structure that meets the current need wins, and an abstraction has to buy reuse, consistency, testability or clarity | Card in two layers |
+| Extracting a piece | extract · keep inline | Extract a component or a hook when it has one coherent job and a name a consumer would look for, or when a second consumer appears; never to shorten JSX or to mirror a design layer. An abstraction has to buy reuse, consistency, testability or clarity. This row never decides who owns a state: a state is controlled by default (row "Each state") whether or not the request mentions it | Extracting a piece |
 | Outer layout | none | No outer margin, width or self-positioning; overlaid parts offer an `Anchor` and `placement` | Comment |
 | Copy | consumer's | A primitive holds no copy, numbers or units; accessible names content can't provide are required props | AvatarGroup |
 | Files and exports | namespace with `Root` · plain export | Parts make a namespace (`<Tabs.Root>`); no parts, a plain export. Project conventions win | Tabs |
@@ -61,7 +61,7 @@ Anything the input doesn't settle is written in the contract's Decisions with it
 - `scripts/verify.sh <project> [files…]` runs the project's type-check and tests in a scratch copy, so the project is never modified. Without a project, it builds a minimal one.
 - The preview shows **every state** the product needs side by side, rendered from the real components: loading, empty, failed, failed after retry, long and missing content, and each member of each closed set. A state that exists only in code is invisible to the reviewer.
 - When behavior lives in CSS (sticky, overflow, layering), also look at it in a real browser or a headless screenshot: jsdom doesn't lay out.
-- Look at layouts narrow as well as wide (a phone-width viewport or container): panes, toolbars and tables that only work wide are not done.
+- Look at layouts narrow as well as wide (a 390 px viewport or container): panes, toolbars and tables that only work wide are not done.
 
 Details and tooling: `references/testing.md`. How to write the tests themselves (test data, what to replace, timers, async): the testing standards listed under Coding standards in the session context (`standards/testing.md` in this plugin).
 

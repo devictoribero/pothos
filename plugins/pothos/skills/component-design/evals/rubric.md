@@ -15,7 +15,7 @@ Score each output 0, 1 or 2 per criterion (0 = missing or wrong, 1 = partly, 2 =
 | 9 | Honest verification | the summary states what ran, what didn't and every assumption | reviewer |
 | 10 | Product completeness | realistic states the product needs (empty, loading, failed, edge content) are handled and visible in the preview | reviewer looks at preview.html in a browser |
 | 11 | Dependencies and boundaries | imports point one way and primitives hold no business words | `scripts/lint.py <output>/src --business-words <the eval's domain words>` (Boundaries section) plus reviewer |
-| 12 | Reuse of what exists | the feature uses the project's primitives and shared hooks (the fixture's `Button`, `TextField`, `useControllableState`) and adds no second one; 1 if it reuses some and rebuilds the rest; 0 if it builds its own | `grep -rn "from '.*ui" src/features` plus reviewer; only evals with a fixture |
+| 12 | Reuse of what exists | the feature uses the project's primitives named in the eval's `reuse` entry, and its shared hooks where its state calls for them, and adds no second one; 1 if it reuses some and rebuilds the rest; 0 if it builds its own | `evals/reuse_check.py <fixture> <project> --components … --hooks …` plus reviewer; only evals with a fixture |
 
 ## Comparing two skill versions
 
