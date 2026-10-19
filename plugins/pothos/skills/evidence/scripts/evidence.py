@@ -133,13 +133,18 @@ def serve(root, args):
     log_path = os.path.join(folder(root), f"server-{safe_name(app_name or 'app')}.log")
     log = open(log_path, "w", encoding="utf-8")
     proc = subprocess.Popen(command, shell=True, cwd=root, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
-    deadline = time.monotonic() + float(flag(args, "--timeout", "180"))
+    timeout = float(flag(args, "--timeout", "180"))
+    deadline = time.monotonic() + timeout
+    exited_clean = False
     while time.monotonic() < deadline:
         # A command that exits 0 may have started the server in the background (a daemon, a container):
         # keep waiting for the URL. A non-zero exit means it failed.
         if proc.poll() is not None and proc.returncode != 0:
             print(f"the dev command exited with {proc.returncode} before {url} answered; log {log_path}", file=sys.stderr)
             return 1
+        if proc.poll() is not None and not exited_clean:
+            exited_clean = True
+            print(f"the dev command exited 0; waiting up to {timeout:.0f}s for {url} to answer", file=sys.stderr)
         if answers(url):
             print(f"pid={proc.pid} url={url} log={log_path}")
             return 0

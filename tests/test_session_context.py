@@ -104,6 +104,19 @@ class SessionContextTest(unittest.TestCase):
         self.assertIn(".scratch/<feature-slug>/", text)
         self.assertIn("names no tracker", text)
 
+    def test_auto_merge_label_is_named_and_forbidden_to_the_agent(self):
+        self.write({"version": 1, "verify": {"full": "npm test"}, "pr": {"auto_merge": {"label": "ship-it"}}})
+        text = self.ctx()
+        self.assertIn("the label `ship-it`", text)
+        self.assertIn("Never add that label yourself", text)
+        self.assertIn("only tend's merge gate does, for a labelled pull request", text)
+
+    def test_without_auto_merge_only_the_merge_rule_remains(self):
+        self.write({"version": 1, "verify": {"full": "npm test"}})
+        text = self.ctx()
+        self.assertIn("Never merge into the base branch yourself.", text)
+        self.assertNotIn("Never add that label", text)
+
     def test_github_tracker_uses_the_gh_template(self):
         self.write({"version": 1, "verify": {"full": "npm test"}, "tracker": {"kind": "github"}})
         self.assertIn("gh issue create", self.ctx())

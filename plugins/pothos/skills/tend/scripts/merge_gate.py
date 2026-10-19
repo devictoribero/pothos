@@ -9,10 +9,11 @@ PR is a number; without it, the pull request of the current branch. Run it from 
 
 A pull request is a candidate only when the contract has `pr.auto_merge` and the pull request carries its
 label: the label is a person's decision about that pull request, and this script never adds it. A candidate
-is ready when, on its head commit, every check finished green (or, in a repository with no checks at all,
-a passing verify receipt exists), no review asks for changes, no review thread is open and GitHub can
-merge it. A commit that reports no checks while `.github/workflows` runs on pushes or pull requests is
-treated as checks not reported yet, never as a repository without checks. `merge` then runs `gh pr merge --<method> --match-head-commit <sha>`, so a push between the
+is ready when, on its head commit, every check finished green (or, in a repository whose workflows never
+run on pull requests, a passing verify receipt exists), no person's review asks for changes, no review thread
+is open and GitHub can merge it. A commit that reports no checks while a workflow in `.github/workflows` of
+this checkout runs on pushes or pull requests is treated as checks not reported yet, never as a repository
+without checks. `merge` then runs `gh pr merge --<method> --match-head-commit <sha>`, so a push between the
 check and the merge makes GitHub refuse it, and deletes the head branch on the remote when GitHub did not.
 
 Exit codes: 0 ready (status) or merged (merge), 1 waiting (checks running, review pending, branch behind),
@@ -36,13 +37,15 @@ PR_FIELDS = ("number,url,state,isDraft,baseRefName,headRefName,headRefOid,isCros
              "mergeable,mergeStateStatus,latestReviews,statusCheckRollup")
 GREEN = {"SUCCESS", "NEUTRAL", "SKIPPED"}
 WORKFLOWS = os.path.join(".github", "workflows")
-# A workflow that runs on pushes or pull requests: `on: push`, `on: [push, pull_request]`, or a `push:` /
-# `pull_request:` key right under `on:` (one level of indentation; a step's `push: true` sits deeper).
-TRIGGERS = re.compile(r"^on:\s*(?:\[[^\]]*\b(?:push|pull_request)\b|(?:push|pull_request)\b)"
-                      r"|^ {1,4}(?:push|pull_request|pull_request_target)\s*:", re.M)
-THREADS_QUERY = """query($owner: String!, $name: String!, $number: Int!) {
+# The top-level `on:` key of a workflow (also written `"on":`): what follows on the same line, and the
+# indented block under it.
+ON_BLOCK = re.compile(r'^"?on"?:[ \t]*([^\n]*)\n((?:[ \t]+[^\n]*\n|[ \t]*\n)*)', re.M)
+EVENTS = re.compile(r"\b(?:push|pull_request|pull_request_target)\b")
+NESTED_EVENT = re.compile(r"^[ \t]+(?:push|pull_request|pull_request_target)[ \t]*:", re.M)
+REVIEW_QUERY = """query($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) { pullRequest(number: $number) {
-    reviewThreads(first: 100) { nodes { isResolved } } } } }"""
+    reviewThreads(first: 100) { pageInfo { hasNextPage } nodes { isResolved } }
+    latestOpinionatedReviews(first: 100) { nodes { state author { login __typename } } } } } }"""
 
 
 class GhError(Exception):
@@ -70,10 +73,15 @@ def owner_repo(url):
 def fetch(root, number):
     pr = json.loads(gh(["pr", "view", *([number] if number else []), "--json", PR_FIELDS], root))
     owner, name = owner_repo(pr.get("url"))
-    out = json.loads(gh(["api", "graphql", "-f", f"query={THREADS_QUERY}", "-F", f"owner={owner}",
+    out = json.loads(gh(["api", "graphql", "-f", f"query={REVIEW_QUERY}", "-F", f"owner={owner}",
                          "-F", f"name={name}", "-F", f"number={pr['number']}"], root))
-    nodes = (((out.get("data") or {}).get("repository") or {}).get("pullRequest") or {}).get("reviewThreads", {}).get("nodes", [])
-    pr["unresolvedThreads"] = sum(1 for n in nodes if not n.get("isResolved"))
+    node = (((out.get("data") or {}).get("repository") or {}).get("pullRequest") or {})
+    threads = node.get("reviewThreads") or {}
+    pr["unresolvedThreads"] = sum(1 for n in threads.get("nodes") or [] if not n.get("isResolved"))
+    pr["moreThreads"] = bool((threads.get("pageInfo") or {}).get("hasNextPage"))
+    reviews = (node.get("latestOpinionatedReviews") or {}).get("nodes") or []
+    pr["botReviewers"] = sorted({(r.get("author") or {}).get("login") for r in reviews
+                                 if (r.get("author") or {}).get("__typename") == "Bot"} - {None})
     pr["nameWithOwner"] = f"{owner}/{name}"
     return pr
 
@@ -109,9 +117,23 @@ def receipt_passed(root, data, commit):
     return True
 
 
+def runs_on_pushes(text):
+    """True when a workflow file triggers on push, pull_request or pull_request_target: `on: push`,
+    `on: [push, pull_request]`, `on: {push: {}, ...}`, or those keys indented under `on:`. A job or step
+    named `push` outside the `on:` block does not count."""
+    match = ON_BLOCK.search(text.replace("\r\n", "\n") + "\n")
+    if not match:
+        return False
+    inline = match.group(1).split("#", 1)[0]
+    if inline.strip():
+        return bool(EVENTS.search(inline))
+    return bool(NESTED_EVENT.search(match.group(2)))
+
+
 def expects_checks(root):
     """True when the checkout has a workflow that runs on pushes or pull requests, so a commit without checks
-    is one whose checks have not been reported yet."""
+    is one whose checks have not been reported yet. A workflow whose branch or path filters leave this pull
+    request out still counts: the gate then waits, and a person merges."""
     folder = os.path.join(root, WORKFLOWS)
     if not os.path.isdir(folder):
         return False
@@ -119,7 +141,7 @@ def expects_checks(root):
         if name.endswith((".yml", ".yaml")):
             try:
                 with open(os.path.join(folder, name), encoding="utf-8", errors="replace") as fh:
-                    if TRIGGERS.search(fh.read()):
+                    if runs_on_pushes(fh.read()):
                         return True
             except OSError:
                 continue
@@ -132,18 +154,22 @@ def evaluate(pr, data, receipt_ok, checks_expected=False):
     auto = ((data.get("pr") or {}).get("auto_merge")) or {}
     label = auto.get("label")
     base = (data.get("pr") or {}).get("base") or "main"
-    labels = {l.get("name") for l in pr.get("labels") or []}
+    labels = {(l.get("name") or "").casefold() for l in pr.get("labels") or []}  # GitHub matches labels regardless of case
     checks = pr.get("statusCheckRollup") or []
     states = [(check_name(c), check_state(c)) for c in checks]
     failed = [n for n, s in states if s == "failed"]
     pending = [n for n, s in states if s == "pending"]
+    bots = set(pr.get("botReviewers") or [])
     changes = sorted({(r.get("author") or {}).get("login", "?") for r in pr.get("latestReviews") or []
-                      if (r.get("state") or "").upper() == "CHANGES_REQUESTED"})
+                      if (r.get("state") or "").upper() == "CHANGES_REQUESTED"
+                      and (r.get("author") or {}).get("login") not in bots})
     threads = pr.get("unresolvedThreads", 0)
+    more_threads = pr.get("moreThreads", False)
     mergeable = (pr.get("mergeable") or "UNKNOWN").upper()
     merge_state = (pr.get("mergeStateStatus") or "UNKNOWN").upper()
 
-    facts = [f"pr #{pr.get('number')} ({pr.get('headRefName')} -> {pr.get('baseRefName')}) at {(pr.get('headRefOid') or '')[:12]}"]
+    facts = [f"pr #{pr.get('number')} ({pr.get('headRefName')} -> {pr.get('baseRefName')}) at {(pr.get('headRefOid') or '')[:12]}"
+             + (" from a fork" if pr.get("isCrossRepository") else "")]
     if not checks and checks_expected:
         facts.append("checks: none reported yet on this commit (the repository has workflows that run on it)")
     elif not checks:
@@ -153,13 +179,13 @@ def evaluate(pr, data, receipt_ok, checks_expected=False):
         facts.append(f"checks: {passed} passed, {len(pending)} running, {len(failed)} failed"
                      + (f" ({', '.join(failed)})" if failed else ""))
     facts.append("reviews: " + (f"changes requested by {', '.join(changes)}" if changes else "none asking for changes"))
-    facts.append(f"threads: {threads} unresolved")
+    facts.append(f"threads: {threads} unresolved" + (" of the first 100; there are more" if more_threads else ""))
     facts.append(f"mergeable: {mergeable.lower()}, merge state: {merge_state.lower()}")
 
     not_candidate = []
     if not label:
         not_candidate.append("the contract has no pr.auto_merge")
-    elif label not in labels:
+    elif label.casefold() not in labels:
         not_candidate.append(f"the pull request does not carry the label {label!r}")
     if (pr.get("state") or "").upper() != "OPEN":
         not_candidate.append(f"the pull request is {(pr.get('state') or 'unknown').lower()}")
@@ -184,6 +210,8 @@ def evaluate(pr, data, receipt_ok, checks_expected=False):
         waiting.append("no checks on this commit and no passing verify receipt")
     if threads:
         waiting.append(f"{threads} unresolved review thread(s)")
+    if more_threads:
+        waiting.append("more than 100 review threads: cannot tell they are all resolved")
     if merge_state == "BEHIND":
         waiting.append(f"the branch is behind {pr.get('baseRefName')}: update it")
     if mergeable == "UNKNOWN" or merge_state == "UNKNOWN":
@@ -192,7 +220,10 @@ def evaluate(pr, data, receipt_ok, checks_expected=False):
         waiting.append("GitHub's branch rules block the merge (a required review or check)")
 
     if not_candidate:
-        return NOT_CANDIDATE, facts, not_candidate
+        otherwise = person + waiting
+        return NOT_CANDIDATE, facts, not_candidate + [
+            ("otherwise needs a person: " if person else "otherwise waiting: ") + "; ".join(otherwise) if otherwise
+            else "otherwise ready"]
     if person:
         return NEEDS_PERSON, facts, person + waiting
     if waiting:
@@ -215,8 +246,10 @@ def delete_remote_branch(root, pr):
         return f"kept {branch}: open pull requests target it ({', '.join('#' + str(d['number']) for d in dependants)})"
     try:
         gh(["api", f"repos/{pr['nameWithOwner']}/git/ref/heads/{branch}"], root)
-    except GhError:
-        return f"{branch} already deleted on the remote"
+    except GhError as exc:
+        if "404" in str(exc) or "Not Found" in str(exc):
+            return f"{branch} already deleted on the remote"
+        return f"kept {branch}: could not read it on the remote ({exc})"
     gh(["api", "-X", "DELETE", f"repos/{pr['nameWithOwner']}/git/refs/heads/{branch}"], root)
     return f"deleted {branch} on the remote"
 

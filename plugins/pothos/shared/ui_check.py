@@ -36,7 +36,9 @@ ICON_PACKAGES = [
 CHECKED_EXTS = (".css", ".scss", ".sass", ".less", ".styl", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs",
                 ".vue", ".svelte", ".astro", ".html")
 SKIPPED_PATH = re.compile(r"(^|/)(__tests__|__mocks__|__snapshots__|test|tests|e2e|cypress|docs?)/|\.(test|spec|stories|story|snap)\.", re.I)
-COMMENT_LINE = re.compile(r"^\s*(//|/\*|\*(?!\s*[{,])|<!--|\{/\*)")  # `* {` and `*, *::before` are CSS selectors
+# A `*` line is a block comment only when text, `*/` or nothing follows: `* {`, `*, *::before`, `*::before`,
+# `* + *` and `*:not(.a)` are CSS selectors.
+COMMENT_LINE = re.compile(r"^\s*(//|/\*|\*(?:\s+[\w@`'\"(-]|\s*$|/)|<!--|\{/\*)")
 
 HEX = re.compile(r"(?<![\w.&#/-])#([0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![\w-])")
 FUNC_COLOR = re.compile(r"\b(rgba?|hsla?|oklch|oklab|lab|lch|hwb)\(\s*[\d.]")

@@ -30,5 +30,6 @@ Work through unresolved threads, review bodies that list findings, and issue com
   gh api graphql -f query='mutation($t:ID!){resolveReviewThread(input:{threadId:$t}){thread{isResolved}}}' -F t=<thread id>
   ```
 - A person's thread stays open for them to resolve. If a person asked for changes in a review, the gate keeps waiting until they approve or dismiss their review.
+- A bot's review that requests changes is handled like its threads: fix, reply, resolve the threads. The gate ignores a bot's review state, and the review itself is never dismissed by you.
 
 Report one line per comment: who, what they asked, and applied, declined (why) or out of scope.

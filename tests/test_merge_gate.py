@@ -31,7 +31,10 @@ elif args[:2] == ["api", "graphql"]:
 elif args[:2] == ["pr", "list"]:
     answer("dependants.json") if os.path.exists(os.path.join(d, "dependants.json")) else print("[]")
 elif args[:1] == ["api"] and "/git/ref/heads/" in args[-1]:
-    sys.exit(0 if os.path.exists(os.path.join(d, "branch-exists")) else 1)
+    if os.path.exists(os.path.join(d, "branch-exists")):
+        sys.exit(0)
+    print("gh: Not Found (HTTP 404)" if not os.path.exists(os.path.join(d, "api-down")) else "gh: connect: network is unreachable", file=sys.stderr)
+    sys.exit(1)
 elif args[:2] == ["pr", "merge"] and os.path.exists(os.path.join(d, "merge-fails")):
     print("Head branch was modified", file=sys.stderr); sys.exit(1)
 '''
@@ -75,6 +78,20 @@ class EvaluateTest(unittest.TestCase):
         for changes in ({"isDraft": True}, {"state": "MERGED"}, {"baseRefName": "feature/x"}, {"labels": []}):
             self.assertEqual(self.verdict(pr(**changes))[0], merge_gate.NOT_CANDIDATE, changes)
 
+    def test_a_non_candidate_verdict_still_says_what_else_is_missing(self):
+        _, _, reasons = self.verdict(pr(labels=[]))
+        self.assertEqual(reasons[-1], "otherwise ready")
+        _, _, reasons = self.verdict(pr(labels=[], statusCheckRollup=[run("lint", "COMPLETED", "FAILURE")]))
+        self.assertEqual(reasons[-1], "otherwise waiting: failed checks: lint")
+        _, _, reasons = self.verdict(pr(labels=[], mergeable="CONFLICTING"))
+        self.assertEqual(reasons[-1], "otherwise needs a person: the branch conflicts with the base")
+
+    def test_the_label_matches_regardless_of_case(self):
+        self.assertEqual(self.verdict(pr(labels=[{"name": "Auto-Merge"}]))[0], merge_gate.READY)
+
+    def test_a_fork_is_named_in_the_facts(self):
+        self.assertIn("from a fork", self.verdict(pr(isCrossRepository=True))[1][0])
+
     def test_a_failed_or_running_check_waits(self):
         failed = self.verdict(pr(statusCheckRollup=[run("lint", "COMPLETED", "FAILURE"), run("test", "COMPLETED", "SUCCESS")]))
         self.assertEqual(failed[0], merge_gate.WAITING)
@@ -90,6 +107,8 @@ class EvaluateTest(unittest.TestCase):
     def test_commit_statuses_are_read_too(self):
         pending = [{"__typename": "StatusContext", "context": "ci/build", "state": "PENDING"}]
         self.assertEqual(self.verdict(pr(statusCheckRollup=pending))[0], merge_gate.WAITING)
+        untyped = [{"context": "ci/build", "state": "SUCCESS"}]
+        self.assertEqual(self.verdict(pr(statusCheckRollup=untyped))[0], merge_gate.READY)
         failed = [{"__typename": "StatusContext", "context": "ci/build", "state": "ERROR"}]
         self.assertIn("failed checks: ci/build", self.verdict(pr(statusCheckRollup=failed))[2])
 
@@ -98,8 +117,6 @@ class EvaluateTest(unittest.TestCase):
         self.assertEqual(self.verdict(pr(statusCheckRollup=[]), receipt_ok=True)[0], merge_gate.READY)
 
     def test_no_checks_waits_when_the_repository_has_workflows(self):
-        verdict, facts, reasons = self.verdict(pr(statusCheckRollup=[]), receipt_ok=True)
-        self.assertEqual(verdict, merge_gate.READY)
         verdict, facts, reasons = merge_gate.evaluate(pr(statusCheckRollup=[]), CONTRACT, True, checks_expected=True)
         self.assertEqual(verdict, merge_gate.WAITING)
         self.assertIn("the workflows have not reported on this commit yet", reasons)
@@ -111,10 +128,21 @@ class EvaluateTest(unittest.TestCase):
         self.assertEqual(verdict, merge_gate.NEEDS_PERSON)
         self.assertIn("changes requested by ana", reasons)
 
+    def test_a_bot_requesting_changes_does_not_need_a_person(self):
+        reviews = [{"author": {"login": "coderabbitai"}, "state": "CHANGES_REQUESTED"}]
+        self.assertEqual(self.verdict(pr(latestReviews=reviews))[0], merge_gate.NEEDS_PERSON)
+        self.assertEqual(self.verdict(pr(latestReviews=reviews, botReviewers=["coderabbitai"]))[0], merge_gate.READY)
+
     def test_unresolved_threads_wait(self):
         verdict, _, reasons = self.verdict(pr(unresolvedThreads=2))
         self.assertEqual(verdict, merge_gate.WAITING)
         self.assertIn("2 unresolved review thread(s)", reasons)
+
+    def test_threads_beyond_the_first_page_wait(self):
+        verdict, facts, reasons = self.verdict(pr(moreThreads=True))
+        self.assertEqual(verdict, merge_gate.WAITING)
+        self.assertIn("more than 100 review threads: cannot tell they are all resolved", reasons)
+        self.assertIn("threads: 0 unresolved of the first 100; there are more", facts)
 
     def test_conflicts_need_a_person_and_behind_waits(self):
         self.assertEqual(self.verdict(pr(mergeable="CONFLICTING", mergeStateStatus="DIRTY"))[0], merge_gate.NEEDS_PERSON)
@@ -206,6 +234,33 @@ class MergeGateCliTest(unittest.TestCase):
         self.assertNotIn("DELETE", self.calls())
         self.assertIn("already deleted", result.stdout)
 
+    def test_a_branch_the_api_cannot_read_is_kept(self):
+        self.contract(CONTRACT)
+        self.pull_request()
+        open(os.path.join(self.fake, "api-down"), "w").close()
+        result = self.gate("merge", "7")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("kept fix-total: could not read it on the remote", result.stdout)
+        self.assertNotIn("DELETE", self.calls())
+
+    def test_repo_flag_names_the_checkout(self):
+        self.contract(CONTRACT)
+        self.pull_request()
+        result = subprocess.run([sys.executable, SCRIPT, "status", "7", "--repo", self.repo], cwd=self.tmp.name,
+                                env=self.env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("verdict: ready", result.stdout)
+
+    def test_bot_reviews_come_from_graphql(self):
+        self.contract(CONTRACT)
+        self.pull_request(latestReviews=[{"author": {"login": "coderabbitai"}, "state": "CHANGES_REQUESTED"}])
+        self.answer("threads.json", {"data": {"repository": {"pullRequest": {
+            "reviewThreads": {"pageInfo": {"hasNextPage": False}, "nodes": []},
+            "latestOpinionatedReviews": {"nodes": [{"state": "CHANGES_REQUESTED", "author": {"login": "coderabbitai", "__typename": "Bot"}}]}}}}})
+        result = self.gate("status", "7")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("reviews: none asking for changes", result.stdout)
+
     def test_branch_other_pull_requests_target_is_kept(self):
         self.contract(CONTRACT)
         self.pull_request()
@@ -273,14 +328,19 @@ class MergeGateCliTest(unittest.TestCase):
 class ExpectsChecksTest(unittest.TestCase):
     def test_reads_the_trigger_shapes_github_accepts(self):
         yes = ("on:\n  push:\n    branches: [main]\n  pull_request:\n", "on: [push, pull_request]\n",
-               "on: pull_request\n", "on:\n  pull_request_target:\n    types: [opened]\n")
+               "on: pull_request\n", "on:\n  pull_request_target:\n    types: [opened]\n",
+               "on: {push: {branches: [main]}, pull_request: {}}\n", "on: pull_request_target\n",
+               "on: [pull_request_target]\n", '"on":\n  push:\n', "name: ci\r\non:\r\n  pull_request:\r\n",
+               "on:\n\n  # runs on every push\n  push:\n", "on: push # every push\n")
         no = ("on:\n  schedule:\n    - cron: '0 7 * * 1'\n  workflow_dispatch:\n",
               "on:\n  workflow_dispatch:\njobs:\n  b:\n    steps:\n      - uses: docker/build-push-action@v5\n"
-              "        with:\n          push: true\n")
+              "        with:\n          push: true\n",
+              "on:\n  workflow_dispatch:\njobs:\n  push:\n    runs-on: ubuntu-latest\n",
+              "on: workflow_dispatch # not on push\n", "jobs:\n  a:\n    steps:\n      - run: echo on\n")
         for text in yes:
-            self.assertTrue(merge_gate.TRIGGERS.search(text), text)
+            self.assertTrue(merge_gate.runs_on_pushes(text), text)
         for text in no:
-            self.assertFalse(merge_gate.TRIGGERS.search(text), text)
+            self.assertFalse(merge_gate.runs_on_pushes(text), text)
 
     def test_without_a_workflows_folder_nothing_is_expected(self):
         with tempfile.TemporaryDirectory() as tmp:

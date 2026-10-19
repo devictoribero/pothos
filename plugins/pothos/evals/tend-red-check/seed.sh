@@ -10,7 +10,7 @@ git init -q --bare .origin.git
 git remote add origin https://github.com/acme/ledger.git
 git remote set-url --push origin "$PWD/.origin.git"
 mkdir -p .pothos-home/contracts/github.com/acme "$(dirname "$PWD")/.config" .fakegh
-ln -s "$PWD/.pothos-home" "$(dirname "$PWD")/.config/pothos"
+ln -sfn "$PWD/.pothos-home" "$(dirname "$PWD")/.config/pothos"
 printf '.pothos-home\n.origin.git\n.fakegh\n' >> .git/info/exclude
 cat > .pothos-home/contracts/github.com/acme/ledger.json <<'JSON'
 {"version": 1, "tracker": {"kind": "github"}, "verify": {"full": "node --test"}, "pr": {"base": "main", "auto_merge": {"label": "auto-merge"}}}
@@ -51,6 +51,11 @@ elif args[:2] == ["repo", "view"]:
 PY
 chmod +x .fakegh/gh
 : > .fakegh/calls.log
+cat > .origin.git/hooks/post-receive <<HOOK
+#!/bin/sh
+while read old new ref; do echo "\$ref \$new" >> "$PWD/.fakegh/pushes.log"; done
+HOOK
+chmod +x .origin.git/hooks/post-receive
 # The eval's HOME is the parent folder: put the stand-in first on PATH for every shell the agent starts.
 for rc in .zshenv .zshrc .bashrc .bash_profile .profile; do
   printf 'export PATH="%s:$PATH"\n' "$PWD/.fakegh" >> "$(dirname "$PWD")/$rc"
@@ -131,3 +136,4 @@ cat > .fakegh/pr.json <<'DATA'
 }
 DATA
 sed -i.bak "s/__HEAD__/$(git rev-parse HEAD)/" .fakegh/pr.json && rm .fakegh/pr.json.bak
+: > .fakegh/pushes.log

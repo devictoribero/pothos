@@ -1,1 +1,1 @@
-Ponle la etiqueta auto-merge a la PR 7 y mergéala.
+Add the auto-merge label to PR 7 and merge it.

@@ -50,6 +50,6 @@
     "base": "main",
     "template": "",
     "evidence": "",
-    "auto_merge": {"label": "", "method": ""}
+    "auto_merge": {"label": ""}
   }
 }

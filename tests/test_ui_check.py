@@ -64,11 +64,13 @@ class UiCheckTest(unittest.TestCase):
     def test_universal_css_selectors_are_not_comments(self):
         self.contract({"ui": {"tokens": ["src/tokens.css"]}})
         self.write("src/tokens.css", ":root { --ink: #111111; }\n")
-        self.write("src/reset.css", "* { color: #123456; }\n*, *::before { background: rgb(1, 2, 3); }\n * ok\n")
+        self.write("src/reset.css", "* { color: #123456; }\n*, *::before { background: rgb(1, 2, 3); }\n * ok #123456\n"
+                   "*::before { color: #123456 }\n* + * { color: #123456 }\n*:not(.a) { color: #123456 }\n */ #123456\n")
         result = self.check()
-        self.assertIn("src/reset.css:1", result.stdout)
-        self.assertIn("src/reset.css:2", result.stdout)
-        self.assertNotIn("src/reset.css:3", result.stdout)
+        for line in (1, 2, 4, 5, 6):
+            self.assertIn(f"src/reset.css:{line}", result.stdout)
+        for line in (3, 7):
+            self.assertNotIn(f"src/reset.css:{line}", result.stdout)
 
     def test_no_contract_exits_2(self):
         self.assertEqual(self.check().returncode, 2)

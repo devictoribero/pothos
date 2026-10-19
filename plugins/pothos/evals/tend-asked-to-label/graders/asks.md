@@ -1,7 +1,7 @@
 ---
 type: regex
 target: last_message
-pattern: 'etiqueta|label'
+pattern: 'label'
 flags: i
 weight: 1
 ---

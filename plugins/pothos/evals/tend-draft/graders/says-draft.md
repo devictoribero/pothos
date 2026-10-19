@@ -1,7 +1,7 @@
 ---
 type: regex
 target: last_message
-pattern: 'draft|borrador'
+pattern: 'draft'
 flags: i
 weight: 2
 ---
