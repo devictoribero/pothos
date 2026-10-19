@@ -23,8 +23,8 @@ Then, in each repository:
 plugin (how you work)  ──reads──▶  private contract  ──points to──▶  repository (the project)
 ```
 
-- **The plugin** holds skills, standards and one hook, none of which mention a specific project. Most cycle skills are [Matt Pocock's](https://github.com/mattpocock/skills), vendored unchanged at a pinned commit.
-- **The hook** runs at session start, reads the contract and hands it to every skill as context. Pocock's skills expect their configuration (issue tracker, labels, domain docs) "to have been provided"; his setup skill writes it into the repository, Pothos provides it from the contract instead.
+- **The plugin** holds skills, standards and two hooks, none of which mention a specific project. Most cycle skills are [Matt Pocock's](https://github.com/mattpocock/skills), vendored unchanged at a pinned commit.
+- **The hooks.** One runs at session start, reads the contract and hands it to every skill as context. Pocock's skills expect their configuration (issue tracker, labels, domain docs) "to have been provided"; his setup skill writes it into the repository, Pothos provides it from the contract instead. The other runs after every `gh pr create` and assigns the new pull request to the GitHub user who opened it (`@me`).
 - **The contract** is a short JSON file per repository, kept privately in `~/.config/pothos/contracts/<host>/<owner>/<repo>.json`, never inside the repository. Every clone and worktree of a repository shares it. It says how to verify a change, how to run the app, where the domain docs live, where tickets go and how pull requests are made.
 - **The repository** keeps everything project-specific: its scripts, its docs, its conventions and its own skills.
 
