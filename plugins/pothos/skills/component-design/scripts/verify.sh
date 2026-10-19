@@ -63,6 +63,7 @@ TC_SCRIPT="$(script type-check typecheck tsc check-types || true)"
 echo "== type-check"
 if [[ -n "$TC_SCRIPT" ]]; then npm run --silent "$TC_SCRIPT"; else ./node_modules/.bin/tsc --noEmit; fi
 echo "== tests"
-if [[ -x node_modules/.bin/vitest ]]; then ./node_modules/.bin/vitest run "${TESTS[@]}"
-elif [[ -x node_modules/.bin/jest ]]; then ./node_modules/.bin/jest "${TESTS[@]}"
+# ${TESTS[@]+"${TESTS[@]}"}: bash 3.2 (macOS) treats an empty array as unset under set -u.
+if [[ -x node_modules/.bin/vitest ]]; then ./node_modules/.bin/vitest run ${TESTS[@]+"${TESTS[@]}"}
+elif [[ -x node_modules/.bin/jest ]]; then ./node_modules/.bin/jest ${TESTS[@]+"${TESTS[@]}"}
 else echo "No vitest or jest found: run the project's tests by hand and say so."; exit 1; fi

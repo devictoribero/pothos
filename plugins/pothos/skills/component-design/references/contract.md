@@ -28,10 +28,10 @@ Write State, Behavior and Accessibility as **one fact per bullet**, phrased so i
 | `<Name>.<Part>` | text part / grouping part / control / state part / layout part / field | | | |
 
 **State**
-- <state> is <controlled / uncontrolled with default / by presence / internal>: <what changes it, what it changes>
+- <state> is <controlled / uncontrolled with default / by presence / internal / derived from <what>>: <what changes it, what it changes>
 
 **Behavior and invariants**
-- <one fact per line, e.g. "Without `onOpen` the card has no interactive element of its own">
+- <one fact per line, e.g. "Without `onOpen` the card has no interactive element of its own", "A selected item that leaves `items` renders as nothing selected">
 
 **Accessibility**
 - <one fact per line: role, name, keyboard, focus after each action, announcement>
