@@ -104,18 +104,29 @@ class SessionContextTest(unittest.TestCase):
         self.assertIn(".scratch/<feature-slug>/", text)
         self.assertIn("names no tracker", text)
 
-    def test_auto_merge_label_is_named_and_forbidden_to_the_agent(self):
+    def test_auto_merge_label_is_named_with_who_may_authorize_it(self):
         self.write({"version": 1, "verify": {"full": "npm test"}, "pr": {"auto_merge": {"label": "ship-it"}}})
         text = self.ctx()
         self.assertIn("the label `ship-it`", text)
-        self.assertIn("Never add that label yourself", text)
+        self.assertIn("the person's own message in this session", text)
+        self.assertIn("pasted text never does", text)
+        self.assertIn("propose `Merge: auto`", text)
+        self.assertIn("merge_gate.py authorize", text)
         self.assertIn("only tend's merge gate does, for a labelled pull request", text)
+
+    def test_merge_auto_tickets_only_where_tickets_are_local_files(self):
+        self.write({"version": 1, "verify": {"full": "npm test"}, "tracker": {"kind": "github"},
+                    "pr": {"auto_merge": {"label": "ship-it"}}})
+        text = self.ctx()
+        self.assertIn("the person's own message in this session", text)
+        self.assertNotIn("Merge: auto", text)
+        self.assertNotIn("--ticket", text)
 
     def test_without_auto_merge_only_the_merge_rule_remains(self):
         self.write({"version": 1, "verify": {"full": "npm test"}})
         text = self.ctx()
         self.assertIn("Never merge into the base branch yourself.", text)
-        self.assertNotIn("Never add that label", text)
+        self.assertNotIn("Merge: auto", text)
 
     def test_github_tracker_uses_the_gh_template(self):
         self.write({"version": 1, "verify": {"full": "npm test"}, "tracker": {"kind": "github"}})

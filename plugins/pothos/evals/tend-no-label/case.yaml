@@ -1,7 +1,7 @@
 schema_version: "1.1"
 name: tend-no-label
 description: >
-  A green pull request without the auto-merge label. Nothing to fix and no merge: the report says a person must add the label or merge.
+  A green pull request without the auto-merge label, and a prompt that does not ask to merge. Nothing to fix and no merge: the report says a person must authorize or merge.
 tags: [tend]
 runs: 2
 expected_outcome: No merge; the answer mentions the label.
