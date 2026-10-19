@@ -49,6 +49,7 @@
   "pr": {
     "base": "main",
     "template": "",
-    "evidence": ""
+    "evidence": "",
+    "auto_merge": {"label": "", "method": ""}
   }
 }

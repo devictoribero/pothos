@@ -420,6 +420,30 @@
           "description": "Command that uploads screenshots and prints markdown to embed.",
           "type": "string",
           "minLength": 1
+        },
+        "auto_merge": {
+          "description": "Lets tend's merge gate merge a pull request that a person gave this label, once every check is green, no review asks for changes and no thread is open. Without it, a person merges every pull request.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "label"
+          ],
+          "properties": {
+            "label": {
+              "description": "The label a person adds to a pull request to let it merge itself. Agents never add it.",
+              "type": "string",
+              "minLength": 1
+            },
+            "method": {
+              "description": "How the gate merges. Default squash.",
+              "type": "string",
+              "enum": [
+                "squash",
+                "rebase",
+                "merge"
+              ]
+            }
+          }
         }
       }
     }

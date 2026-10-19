@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `tend` skill: babysits a ready pull request one pass at a time (answers review comments, fixes a failing check, updates a branch that fell behind) and never reviews the code again. `scripts/merge_gate.py` merges a pull request only when the contract's new `pr.auto_merge` is set, a person gave it that label, every check on the head commit is green (or a passing verify receipt exists when the repository has no checks), no review asks for changes and no thread is open; it pins the merge to the head commit with the contract's method (squash by default) and deletes the remote branch. Eight evals run against a logging stand-in for `gh`.
+- PreToolUse hook (`shared/merge_guard.py`): blocks agents from running `gh pr merge` and from adding the auto-merge label. The principle on merging now reads: a person decides, and an agent carries it out only through the label and the gate.
 - `shared/ui_check.py` checks the lines a branch adds against the contract's `ui`: raw colors and new fonts outside `ui.tokens`, and icon packages other than `ui.icons` (same npm scope counts as the same set). It works on any stack, skips tests, docs and comments, honours `ui-ok: <why>`, and `verify` runs it after `full` and records an advisory `ui` receipt that never changes an exit code; `check` mentions open findings. Each `run.apps` entry can carry its own `ui` in a monorepo.
 - Contract `ui` section: shared component folders, token files, icon package and component preview. `plant` detects the candidates and asks only when they leave a choice, `contract.py validate --strict` checks the paths, and the session context hands the set fields to UI work.
 - `onboard` is now `plant` (`/pothos:plant`); asking to onboard a repository still starts it.

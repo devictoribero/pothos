@@ -77,3 +77,4 @@ In a monorepo, each app gets its own `ui` inside its `run.apps` entry, built fro
 - `base`: `default_branch`. When it is null, ask; without a user, use `main` only if that branch exists and list it as an assumption.
 - `template`: `pr_template`.
 - `evidence`: a script that uploads screenshots, when one exists under `scripts/`.
+- `auto_merge`: only when the user asks for it, since it lets labelled pull requests merge without a person at the end. Ask for the label (suggest `auto-merge`, or the one the team already uses) and leave `method` out unless the repository merges another way than squash.

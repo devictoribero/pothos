@@ -1,0 +1,13 @@
+schema_version: "1.1"
+name: tend-green-merges
+description: >
+  A labelled, green pull request with no threads. The pass must merge through the gate, pinned to the head commit.
+tags: [tend]
+runs: 2
+expected_outcome: merge_gate merges with --squash --match-head-commit.
+execution:
+  max_turns: 40
+  timeout_seconds: 600
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit]
+context:
+  scaffold_script: seed.sh

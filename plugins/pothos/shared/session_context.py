@@ -22,9 +22,9 @@ TEMPLATES = os.path.join(HERE, "vendor", "pocock-setup")
 PLUGIN = os.path.dirname(HERE)
 ROLES = ["needs-triage", "needs-info", "ready-for-agent", "ready-for-human", "wontfix"]
 COMPETING_SKILLS = ("grill-with-docs, to-spec, to-tickets, wayfinder, triage, implement, implement-spec, code-review, pr, "
-                    "verify, evidence")
+                    "verify, evidence, tend")
 CYCLE_SKILLS = ("grilling, grill-with-docs, to-spec, to-tickets, wayfinder, triage, implement, implement-spec, "
-                "tdd, code-review, pr, prototype, diagnosing-bugs, retro, verify, evidence")
+                "tdd, code-review, pr, prototype, diagnosing-bugs, retro, verify, evidence, tend")
 
 
 def template(name):
@@ -233,7 +233,11 @@ def pr_section(data):
                      "from `/pothos:evidence` in it.")
     if pr.get("evidence"):
         lines.append(f"- Upload screenshots with `{pr['evidence']}`; it prints markdown to embed.")
-    lines.append("- Never merge into the base branch yourself.")
+    label = (pr.get("auto_merge") or {}).get("label")
+    if label:
+        lines.append(f"- A person may give a ready pull request the label `{label}`; `/pothos:tend` then merges it through its merge "
+                     "gate once everything is green. Never add that label yourself.")
+    lines.append("- Never merge into the base branch yourself" + (": only tend's merge gate does, for a labelled pull request." if label else "."))
     return "\n".join(lines)
 
 

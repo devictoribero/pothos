@@ -1,0 +1,13 @@
+schema_version: "1.1"
+name: tend-draft
+description: >
+  A draft pull request with a red check. Drafts belong to implement-spec: the pass changes nothing and says so.
+tags: [tend]
+runs: 2
+expected_outcome: No code change, no push, no merge; the answer says it is a draft.
+execution:
+  max_turns: 40
+  timeout_seconds: 600
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit]
+context:
+  scaffold_script: seed.sh

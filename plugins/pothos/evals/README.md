@@ -10,3 +10,5 @@ claude plugin eval plugins/pothos --scaffold --allow-tools Bash Write Edit --cas
 `--scaffold` runs the seed scripts, which only write files inside the case workspace.
 
 In Claude Code the subagent tool is `Agent` (use `tool: Agent` in `tool_used` graders), subagents report back through notifications, and grader regexes are JavaScript: no inline flags such as `(?i)`, use `flags: i`. Pages written by explain are graded through `<repo folder>/latest/`, which points at the last registered page.
+
+The `tend-*` cases never reach GitHub: each seed puts a logging stand-in for `gh` first on `PATH` through the shell profiles of the eval's home folder, answers from `.fakegh/*.json`, and sends pushes to a local bare repository. Graders read `.fakegh/calls.log`, so they check what the agent ran, not what it says it ran.
