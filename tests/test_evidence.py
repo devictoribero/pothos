@@ -4,6 +4,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -130,10 +131,84 @@ class EvidenceTest(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("not valid JSON", result.stderr)
 
+    def fake_tool(self, name, body):
+        """A stand-in for gh or adb on PATH that logs its arguments to calls.log."""
+        bin_dir = os.path.join(self.tmp.name, "bin")
+        os.makedirs(bin_dir, exist_ok=True)
+        path = os.path.join(bin_dir, name)
+        with open(path, "w") as fh:
+            fh.write(f"#!/bin/sh\necho \"{name} $*\" >> {self.tmp.name}/calls.log\n{body}\n")
+        os.chmod(path, 0o755)
+        self.env["PATH"] = bin_dir + os.pathsep + os.environ["PATH"]
+
+    def calls(self):
+        with open(os.path.join(self.tmp.name, "calls.log")) as fh:
+            return fh.read().splitlines()
+
+    def screenshot(self, name="after home.png"):
+        path = os.path.join(self.tmp.name, name)
+        with open(path, "wb") as fh:
+            fh.write(b"\x89PNG fake")
+        return path
+
+    def test_upload_needs_the_contract_to_enable_it(self):
+        self.contract({})
+        self.fake_tool("gh", "exit 0")
+        result = self.run_script("upload", self.screenshot())
+        self.assertEqual(result.returncode, 3)
+        self.assertIn("github-release", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.tmp.name, "calls.log")))
+
+    def test_upload_creates_the_month_release_and_names_assets_after_the_branch(self):
+        self.contract({"pr": {"evidence": "github-release"}})
+        self.fake_tool("gh", 'case "$1 $2" in "release view") exit 1;; "pr view") exit 1;; esac; exit 0')
+        result = self.run_script("upload", self.screenshot())
+        self.assertEqual(result.returncode, 0, result.stderr)
+        tag = "pr-evidence-" + time.strftime("%Y-%m")
+        self.assertEqual(result.stdout.strip(),
+                         f"![feature-login-after-home.png](https://github.com/acme/shop/releases/download/{tag}/feature-login-after-home.png)")
+        calls = self.calls()
+        self.assertTrue(any(c.startswith(f"gh release create {tag} -R github.com/acme/shop --prerelease") for c in calls))
+        self.assertTrue(any(c.startswith(f"gh release upload {tag} ") and "feature-login-after-home.png -R github.com/acme/shop --clobber" in c
+                            for c in calls))
+        self.assertFalse(any(c.startswith(("gh release delete", "gh release delete-asset")) for c in calls))
+
+    def test_upload_names_assets_after_the_pull_request_and_links_videos(self):
+        self.contract({"pr": {"evidence": "github-release"}})
+        self.fake_tool("gh", 'case "$1 $2" in "pr view") echo 42;; esac; exit 0')
+        result = self.run_script("upload", self.screenshot("flow.mp4"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(result.stdout.startswith("[pr42-flow.mp4](https://github.com/acme/shop/releases/download/"))
+        self.assertFalse(any(c.startswith("gh release create") for c in self.calls()))
+
+    def test_upload_reports_a_missing_file_before_calling_github(self):
+        self.contract({"pr": {"evidence": "github-release"}})
+        self.fake_tool("gh", "exit 0")
+        result = self.run_script("upload", os.path.join(self.tmp.name, "nope.png"))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("no such file", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.tmp.name, "calls.log")))
+
+    def test_emu_saves_the_emulator_screenshot_in_the_branch_folder(self):
+        self.fake_tool("adb", "printf '\\211PNG fake'")
+        result = self.run_script("emu", "after home")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        out = result.stdout.strip()
+        self.assertTrue(out.endswith(os.path.join("feature-login", "after-home.png")))
+        with open(out, "rb") as fh:
+            self.assertTrue(fh.read().startswith(b"\x89PNG"))
+
+    def test_emu_without_a_device_fails(self):
+        self.fake_tool("adb", "echo 'error: no devices/emulators found' >&2; exit 1")
+        result = self.run_script("emu", "after")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("no devices", result.stderr)
+
     def test_usage_errors_exit_64(self):
         self.assertEqual(self.run_script().returncode, 64)
         self.assertEqual(self.run_script("shot", "http://x").returncode, 64)
         self.assertEqual(self.run_script("stop", "abc").returncode, 64)
+        self.assertEqual(self.run_script("upload").returncode, 64)
 
 
 if __name__ == "__main__":

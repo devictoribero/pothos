@@ -113,6 +113,7 @@ def verify_section(data):
 SCREENSHOTS = {
     "web": "headless browser",
     "ios-simulator": "booted iOS simulator",
+    "android-emulator": "running Android emulator",
     "none": "not supported; prove the change with test output and real calls, and do not try to capture any",
 }
 
@@ -231,7 +232,10 @@ def pr_section(data):
     if pr.get("template"):
         lines.append(f"- The repository's template `{pr['template']}` wins over the `pr` skill's template; put the evidence "
                      "from `/pothos:evidence` in it.")
-    if pr.get("evidence"):
+    if pr.get("evidence") == "github-release":
+        lines.append("- Upload screenshots with `/pothos:evidence` (`evidence.py upload`): they go to this month's "
+                     "`pr-evidence-YYYY-MM` prerelease and it prints markdown to embed.")
+    elif pr.get("evidence"):
         lines.append(f"- Upload screenshots with `{pr['evidence']}`; it prints markdown to embed.")
     label = (pr.get("auto_merge") or {}).get("label")
     if label:

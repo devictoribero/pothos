@@ -171,6 +171,10 @@ class SessionContextTest(unittest.TestCase):
         self.write({"version": 1, "verify": {"full": "npm test"}, "run": {"dev": "npm start", "screenshots": "none"}})
         self.assertIn("Screenshots for evidence: not supported", self.ctx())
 
+    def test_github_release_evidence_points_at_the_upload_command(self):
+        self.write({"version": 1, "verify": {"full": "npm test"}, "pr": {"evidence": "github-release"}})
+        self.assertIn("`evidence.py upload`): they go to this month's `pr-evidence-YYYY-MM` prerelease", self.ctx())
+
     def test_monorepo_apps_are_listed(self):
         os.makedirs(os.path.join(self.repo, "apps", "web"))
         self.write({"version": 1, "verify": {"full": "npm test"}, "run": {"apps": [

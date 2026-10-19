@@ -116,11 +116,12 @@
           }
         },
         "screenshots": {
-          "description": "Which screenshots evidence can take of the running app. web: a headless browser at run.url. ios-simulator: the booted iOS simulator. none: no screenshots; evidence goes straight to test output and real calls without trying. Unset means unknown: evidence tries once and suggests setting this field.",
+          "description": "Which screenshots evidence can take of the running app. web: a headless browser at run.url. ios-simulator: the booted iOS simulator. android-emulator: the running Android emulator, through adb. none: no screenshots; evidence goes straight to test output and real calls without trying. Unset means unknown: evidence tries once and suggests setting this field.",
           "type": "string",
           "enum": [
             "web",
             "ios-simulator",
+            "android-emulator",
             "none"
           ]
         },
@@ -164,6 +165,7 @@
                 "enum": [
                   "web",
                   "ios-simulator",
+                  "android-emulator",
                   "none"
                 ]
               },
@@ -417,7 +419,7 @@
           "minLength": 1
         },
         "evidence": {
-          "description": "Command that uploads screenshots and prints markdown to embed.",
+          "description": "Where screenshots go for the pull request. github-release: evidence.py upload adds them to a monthly prerelease of this GitHub repository (pr-evidence-YYYY-MM) and never deletes them, so old pull requests keep their images. Any other value is a command that receives the file paths and prints markdown to embed.",
           "type": "string",
           "minLength": 1
         },
