@@ -246,9 +246,7 @@ def auto_merge_lines(label, local_tickets):
 def pr_section(data, start):
     pr = data.get("pr") or {}
     lines = ["### Pull requests", "", f"- Base branch: `{pr.get('base', 'main')}`. A whole spec is built on an integration branch "
-             "named `feature/<spec-slug>`; only its final pull request into the base branch is for the user to review and merge.",
-             "- The summary opens with what the change gains, in plain words someone outside the code follows, before any name "
-             "from the code. When the people using the product see no difference, it says so and names what is gained instead."]
+             "named `feature/<spec-slug>`; only its final pull request into the base branch is for the user to review and merge."]
     template = pr.get("template") or pr_template_on_disk(start)
     if template:
         lines.append(f"- The repository's template `{template}` wins over the `pr` skill's template; put the evidence "

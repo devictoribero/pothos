@@ -199,10 +199,6 @@ class SessionContextTest(unittest.TestCase):
         self.write({"version": 1, "verify": {"full": "npm test"}})
         self.assertNotIn("wins over the `pr` skill's template", self.ctx())
 
-    def test_a_pull_request_opens_with_what_it_gains(self):
-        self.write({"version": 1, "verify": {"full": "npm test"}})
-        self.assertIn("The summary opens with what the change gains", self.ctx())
-
     def test_github_release_evidence_points_at_the_upload_command(self):
         self.write({"version": 1, "verify": {"full": "npm test"}, "pr": {"evidence": "github-release"}})
         self.assertIn("`evidence.py upload`): they go to this month's `pr-evidence-YYYY-MM` prerelease", self.ctx())
