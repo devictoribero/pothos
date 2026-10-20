@@ -182,6 +182,27 @@ class SessionContextTest(unittest.TestCase):
         self.write({"version": 1, "verify": {"full": "npm test"}, "run": {"dev": "npm start", "screenshots": "none"}})
         self.assertIn("Screenshots for evidence: not supported", self.ctx())
 
+    def test_a_template_in_the_repository_wins_even_when_the_contract_does_not_name_it(self):
+        os.makedirs(os.path.join(self.repo, ".github"))
+        open(os.path.join(self.repo, ".github", "pull_request_template.md"), "w").close()
+        self.write({"version": 1, "verify": {"full": "npm test"}})
+        self.assertIn("The repository's template `.github/pull_request_template.md` wins over the `pr` skill's template", self.ctx())
+
+    def test_the_contract_template_comes_before_the_one_on_disk(self):
+        open(os.path.join(self.repo, "pull_request_template.md"), "w").close()
+        self.write({"version": 1, "verify": {"full": "npm test"}, "pr": {"template": "docs/pr.md"}})
+        context_text = self.ctx()
+        self.assertIn("The repository's template `docs/pr.md` wins", context_text)
+        self.assertNotIn("`pull_request_template.md` wins", context_text)
+
+    def test_without_any_template_no_template_line_appears(self):
+        self.write({"version": 1, "verify": {"full": "npm test"}})
+        self.assertNotIn("wins over the `pr` skill's template", self.ctx())
+
+    def test_a_pull_request_opens_with_what_it_gains(self):
+        self.write({"version": 1, "verify": {"full": "npm test"}})
+        self.assertIn("The summary opens with what the change gains", self.ctx())
+
     def test_github_release_evidence_points_at_the_upload_command(self):
         self.write({"version": 1, "verify": {"full": "npm test"}, "pr": {"evidence": "github-release"}})
         self.assertIn("`evidence.py upload`): they go to this month's `pr-evidence-YYYY-MM` prerelease", self.ctx())

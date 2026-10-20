@@ -53,6 +53,14 @@ def pothos_home():
     return os.path.join(config, "pothos")
 
 
+PR_TEMPLATES = [
+    ".github/pull_request_template.md",
+    ".github/PULL_REQUEST_TEMPLATE.md",
+    "docs/pull_request_template.md",
+    "pull_request_template.md",
+]
+
+
 def repo_root(start):
     return git(["rev-parse", "--show-toplevel"], start) or os.path.abspath(start)
 

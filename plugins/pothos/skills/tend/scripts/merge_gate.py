@@ -255,11 +255,21 @@ def delete_remote_branch(root, pr):
     try:
         gh(["api", f"repos/{pr['nameWithOwner']}/git/ref/heads/{branch}"], root)
     except GhError as exc:
-        if "404" in str(exc) or "Not Found" in str(exc):
+        if is_missing(exc):
             return f"{branch} already deleted on the remote"
         return f"kept {branch}: could not read it on the remote ({exc})"
-    gh(["api", "-X", "DELETE", f"repos/{pr['nameWithOwner']}/git/refs/heads/{branch}"], root)
+    # GitHub's own "delete head branches" can remove it between the read and the delete.
+    try:
+        gh(["api", "-X", "DELETE", f"repos/{pr['nameWithOwner']}/git/refs/heads/{branch}"], root)
+    except GhError as exc:
+        if is_missing(exc):
+            return f"{branch} already deleted on the remote"
+        return f"kept {branch}: could not delete it on the remote ({exc})"
     return f"deleted {branch} on the remote"
+
+
+def is_missing(exc):
+    return "404" in str(exc) or "Not Found" in str(exc)
 
 
 def ticket_authorizes(path):

@@ -35,6 +35,10 @@ elif args[:1] == ["api"] and "/git/ref/heads/" in args[-1]:
         sys.exit(0)
     print("gh: Not Found (HTTP 404)" if not os.path.exists(os.path.join(d, "api-down")) else "gh: connect: network is unreachable", file=sys.stderr)
     sys.exit(1)
+elif args[:3] == ["api", "-X", "DELETE"] and os.path.exists(os.path.join(d, "delete-fails")):
+    with open(os.path.join(d, "delete-fails")) as fh:
+        print(fh.read(), file=sys.stderr)
+    sys.exit(1)
 elif args[:2] == ["pr", "merge"] and os.path.exists(os.path.join(d, "merge-fails")):
     print("Head branch was modified", file=sys.stderr); sys.exit(1)
 '''
@@ -233,6 +237,28 @@ class MergeGateCliTest(unittest.TestCase):
         self.assertIn("pr merge 7 --rebase", self.calls())
         self.assertNotIn("DELETE", self.calls())
         self.assertIn("already deleted", result.stdout)
+
+    def test_a_branch_github_deletes_between_the_read_and_the_delete_still_counts_as_merged(self):
+        # GitHub's "delete head branches" removes it right after the merge, often after the gate read it.
+        self.contract(CONTRACT)
+        self.pull_request()
+        open(os.path.join(self.fake, "branch-exists"), "w").close()
+        with open(os.path.join(self.fake, "delete-fails"), "w") as fh:
+            fh.write("gh: Reference does not exist (HTTP 404)")
+        result = self.gate("merge", "7")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("merged: #7", result.stdout)
+        self.assertIn("fix-total already deleted on the remote", result.stdout)
+
+    def test_a_branch_the_api_cannot_delete_is_kept_after_the_merge(self):
+        self.contract(CONTRACT)
+        self.pull_request()
+        open(os.path.join(self.fake, "branch-exists"), "w").close()
+        with open(os.path.join(self.fake, "delete-fails"), "w") as fh:
+            fh.write("gh: Resource not accessible by integration (HTTP 403)")
+        result = self.gate("merge", "7")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("kept fix-total: could not delete it on the remote", result.stdout)
 
     def test_a_branch_the_api_cannot_read_is_kept(self):
         self.contract(CONTRACT)
