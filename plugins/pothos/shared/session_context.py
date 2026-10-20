@@ -243,12 +243,15 @@ def auto_merge_lines(label, local_tickets):
     return lines
 
 
-def pr_section(data):
+def pr_section(data, start):
     pr = data.get("pr") or {}
     lines = ["### Pull requests", "", f"- Base branch: `{pr.get('base', 'main')}`. A whole spec is built on an integration branch "
-             "named `feature/<spec-slug>`; only its final pull request into the base branch is for the user to review and merge."]
-    if pr.get("template"):
-        lines.append(f"- The repository's template `{pr['template']}` wins over the `pr` skill's template; put the evidence "
+             "named `feature/<spec-slug>`; only its final pull request into the base branch is for the user to review and merge.",
+             "- The summary opens with what the change gains, in plain words someone outside the code follows, before any name "
+             "from the code. When the people using the product see no difference, it says so and names what is gained instead."]
+    template = pr.get("template") or pr_template_on_disk(start)
+    if template:
+        lines.append(f"- The repository's template `{template}` wins over the `pr` skill's template; put the evidence "
                      "from `/pothos:evidence` in it.")
     if pr.get("evidence") == "github-release":
         lines.append("- Upload screenshots with `/pothos:evidence` (`evidence.py upload`): they go to this month's "
@@ -260,6 +263,12 @@ def pr_section(data):
         lines += auto_merge_lines(label, ((data.get("tracker") or {}).get("kind") or "none") in ("none", "local"))
     lines.append("- Never merge into the base branch yourself" + (": only tend's merge gate does, for a labelled pull request." if label else "."))
     return "\n".join(lines)
+
+
+def pr_template_on_disk(start):
+    """A template the repository carries counts even when the contract predates the field."""
+    root = contract.repo_root(start)
+    return next((p for p in contract.PR_TEMPLATES if os.path.isfile(os.path.join(root, p))), None)
 
 
 def artifacts_section(start):
@@ -321,10 +330,11 @@ def contract_section(start):
         sections.append("The contract has problems; mention them and suggest `/pothos:plant`:\n" + "\n".join(f"- {e}" for e in errors))
     sections.append(tracker_section(data, start))
     for part in (labels_section, domain_section, verify_section, run_section,
-                 standards_section, review_section, pr_section):
+                 standards_section, review_section):
         text = part(data)
         if text:
             sections.append(text)
+    sections.append(pr_section(data, start))
     return "\n\n".join(sections)
 
 

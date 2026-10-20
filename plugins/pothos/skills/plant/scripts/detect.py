@@ -16,6 +16,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "shared"))
 import ui_check  # noqa: E402
+from contract import PR_TEMPLATES  # noqa: E402
 
 LOCKFILES = [
     ("pnpm-lock.yaml", "pnpm"),
@@ -47,12 +48,6 @@ DOC_CANDIDATES = {
     "prd": ["docs/prd", "docs/prds", "prd"],
 }
 
-PR_TEMPLATES = [
-    ".github/pull_request_template.md",
-    ".github/PULL_REQUEST_TEMPLATE.md",
-    "docs/pull_request_template.md",
-    "pull_request_template.md",
-]
 
 E2E_CONFIGS = {
     "cypress": ["cypress.config.ts", "cypress.config.js", "cypress.config.mjs", "cypress.json"],
