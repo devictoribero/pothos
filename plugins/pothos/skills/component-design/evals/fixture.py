@@ -7,8 +7,9 @@ Copies the eval's fixture project to <dest>, which must not exist yet, links the
 node_modules into it package by package (scripts/toolchain.sh installs the toolchain on first use;
 COMPONENT_DESIGN_TOOLCHAIN overrides where it lives) and prints the eval's prompt with {project}
 replaced by the copy's absolute path. Give that prompt to a fresh agent. Afterwards, score criterion 12
-with reuse_check.py and the eval's `reuse` entry; the exact command is printed on stderr.
-Exit 2 on a usage error (also -h), 1 when the toolchain cannot be installed.
+with `reuse_check.py <eval-id> <dest>`; the exact command is printed on stderr.
+Exit 2 on a usage error (also -h), 1 when the toolchain cannot be installed or lacks a package the
+fixture needs (the copy is removed, since its prompt promises a project that runs).
 """
 import argparse, json, os, shutil, subprocess, sys
 
@@ -72,12 +73,15 @@ def main(argv):
     link_toolchain(toolchain, dest)
     missing = missing_dependencies(dest)
     if missing:
-        print(f"fixture.py: the toolchain lacks {', '.join(missing)}; add them to scripts/toolchain.sh", file=sys.stderr)
+        shutil.rmtree(dest)
+        print(f"fixture.py: the toolchain at {toolchain} lacks {', '.join(missing)}; add them to scripts/toolchain.sh "
+              "(it reinstalls when its package list changes) and run again", file=sys.stderr)
+        return 1
     reuse = ev.get("reuse") or {}
     if reuse.get("components"):
-        score = f"{os.path.join(HERE, 'reuse_check.py')} {fixture} {dest} --components " + ",".join(reuse["components"])
-        if reuse.get("hooks"):
-            score += " --hooks " + ",".join(reuse["hooks"])
+        score = f"{os.path.join(HERE, 'reuse_check.py')} {a.eval_id} {dest}"
+        if os.path.abspath(a.evals) != os.path.join(HERE, "evals.json"):
+            score += f" --evals {os.path.abspath(a.evals)}"
         print(f"Project ready at {dest}. Score criterion 12 afterwards with:\n  {score}", file=sys.stderr)
     else:
         print(f"Project ready at {dest}. Eval {a.eval_id!r} names no `reuse.components`, so criterion 12 has "

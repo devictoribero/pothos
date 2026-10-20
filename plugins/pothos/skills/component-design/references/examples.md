@@ -2,7 +2,7 @@
 
 Each example shows the decision, the good version, the bad one and why. Examples are web React; React Native keeps the same shapes with `onPress` and `accessibilityLabel`.
 
-**Contents:** Comment · Callout · Tabs · Stepper · Chat · Tag · Card in two layers · Line item in two layers · Workbench · AvatarGroup · ChoiceCards · A filled contract · Anti-patterns
+**Contents:** Comment · Callout · Tabs · Stepper · Chat · Tag · Card in two layers · Line item in two layers · Extracting a piece · Workbench · AvatarGroup · ChoiceCards · A filled contract · Anti-patterns
 
 ## Comment: slot props for regions, parts for what varies
 
@@ -180,10 +180,13 @@ export function CartLine({ line, onQuantityChange, onRemove }: CartLineProps) {
 ## Extracting a piece: a second consumer, not shorter JSX
 
 ```tsx
-// features/listings/PhotoUploader: one consumer, one job. Picking, progress, failure and retry stay inline,
-// tangled with photo order and captions. `files` is controlled by default (`files` + `onFilesChange`) because
-// the "Each state" row says so, not because anyone asked for it.
+// features/listings/PhotoUploader: one consumer, one job. Picking, progress, failure and retry stay in the
+// feature, next to photo order and captions. `files` is controlled by default (`files` + `onFilesChange`)
+// because the "Each state" row says so, not because anyone asked for it.
 export function PhotoUploader({ files, onFilesChange, onUpload }: PhotoUploaderProps) { … }
+
+// Day one, a private <UploadQueue> part inside PhotoUploader is fine: one job (each file's status while
+// mounted), tested through the feature, not exported. What leaves the feature is decided by the second consumer.
 
 // Later, features/profile/AvatarUploader needs the same pick → upload → failed → retry cycle. Now the piece has
 // one coherent job and names a consumer would look for: `useUpload` in the shared hooks folder (no UI of its

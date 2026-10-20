@@ -38,15 +38,20 @@ describe('given a button with native attributes and events', () => {
 });
 
 describe('given a pending button', () => {
-  it('announces busy and ignores clicks', async () => {
-    const onClick = vi.fn();
-    render(<Button isPending onClick={onClick}>Save</Button>);
+  it('is aria-busy and aria-disabled', () => {
+    render(<Button isPending>Save</Button>);
     const button = screen.getByRole('button', { name: 'Save' });
-
-    await userEvent.click(button);
 
     expect(button).toHaveAttribute('aria-busy', 'true');
     expect(button).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('does nothing when the user clicks it', async () => {
+    const onClick = vi.fn();
+    render(<Button isPending onClick={onClick}>Save</Button>);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
     expect(onClick).not.toHaveBeenCalled();
   });
 

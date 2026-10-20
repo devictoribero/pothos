@@ -22,7 +22,8 @@
 
 **Accessibility**
 - The element is a native button with the visible text as its name.
-- A pending button is `aria-busy` and `aria-disabled`, and stays in the tab order.
+- A pending button is `aria-busy` and `aria-disabled`.
+- A pending button stays in the tab order.
 
 **Decisions**
 - `isPending` instead of `disabled` while saving, so focus never drops when a save starts.

@@ -36,8 +36,11 @@ fi
 
 PROJECT="$(cd "${1:?usage: verify.sh <project-dir> [overlay-dir]}" && pwd)"
 OVERLAY="${2:-}"
+[[ -d "$PROJECT/node_modules" ]] || { echo "No node_modules in $PROJECT: install the project's dependencies first." >&2; exit 1; }
+if [[ -n "$OVERLAY" ]]; then
+  [[ -d "$OVERLAY/src" ]] || { echo "Overlay $OVERLAY has no src/: put the files to verify under src/ as they sit in the project." >&2; exit 1; }
+fi
 rsync -a --exclude node_modules --exclude .git --exclude build --exclude dist --exclude .next "$PROJECT"/ "$SCRATCH"/
-[[ -d "$PROJECT/node_modules" ]] || { echo "No node_modules in $PROJECT: install the project's dependencies first."; exit 1; }
 mkdir -p "$SCRATCH/node_modules"
 for p in "$PROJECT"/node_modules/* "$PROJECT"/node_modules/.bin; do [[ -e "$p" ]] && ln -s "$p" "$SCRATCH/node_modules/"; done
 TESTS=()
