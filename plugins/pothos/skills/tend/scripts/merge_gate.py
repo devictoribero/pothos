@@ -20,6 +20,8 @@ is open and GitHub can merge it. A commit that reports no checks while a workflo
 this checkout runs on pushes or pull requests is treated as checks not reported yet, never as a repository
 without checks. `merge` then runs `gh pr merge --<method> --match-head-commit <sha>`, so a push between the
 check and the merge makes GitHub refuse it, and deletes the head branch on the remote when GitHub did not.
+Once merged, a branch it cannot delete is kept and reported, never a failure. gh runs without GH_HOST when no
+remote of the checkout points at that host.
 
 Exit codes: 0 ready (status), merged (merge) or labelled (authorize), 1 waiting (checks running, review pending, branch behind),
 2 no contract, 3 not a candidate (or nothing to authorize with), 4 needs a person (changes requested, conflicts with the base),
@@ -60,9 +62,25 @@ class GhError(Exception):
     pass
 
 
+def remote_hosts(root):
+    """The hosts this checkout's remotes point at, with ssh aliases such as github.com-work read as github.com."""
+    urls = (contract.git(["config", "--get-regexp", r"^remote\..*\.url$"], root) or "").splitlines()
+    keys = (contract.remote_key(line.split(None, 1)[1]) for line in urls if len(line.split(None, 1)) == 2)
+    return {key.split("/", 1)[0] for key in keys if key}
+
+
+def gh_env(root):
+    """The environment without GH_HOST when no remote points at it: gh would then talk to a host this
+    repository does not live on (or to an ssh alias, which is no host gh knows) and fail every call."""
+    host = (os.environ.get("GH_HOST") or "").strip().lower()
+    if not host or host in remote_hosts(root):
+        return None
+    return {k: v for k, v in os.environ.items() if k != "GH_HOST"}
+
+
 def gh(args, root):
     try:
-        out = subprocess.run(["gh", *args], cwd=root, capture_output=True, text=True)
+        out = subprocess.run(["gh", *args], cwd=root, capture_output=True, text=True, env=gh_env(root))
     except FileNotFoundError:
         raise GhError("gh is not installed")
     if out.returncode != 0:
@@ -255,21 +273,17 @@ def delete_remote_branch(root, pr):
     try:
         gh(["api", f"repos/{pr['nameWithOwner']}/git/ref/heads/{branch}"], root)
     except GhError as exc:
-        if is_missing(exc):
+        if "404" in str(exc) or "Not Found" in str(exc):
             return f"{branch} already deleted on the remote"
         return f"kept {branch}: could not read it on the remote ({exc})"
-    # GitHub's own "delete head branches" can remove it between the read and the delete.
     try:
         gh(["api", "-X", "DELETE", f"repos/{pr['nameWithOwner']}/git/refs/heads/{branch}"], root)
     except GhError as exc:
-        if is_missing(exc):
+        # GitHub's own branch deletion after the merge can land between the read and the delete.
+        if "Reference does not exist" in str(exc):
             return f"{branch} already deleted on the remote"
         return f"kept {branch}: could not delete it on the remote ({exc})"
     return f"deleted {branch} on the remote"
-
-
-def is_missing(exc):
-    return "404" in str(exc) or "Not Found" in str(exc)
 
 
 def ticket_authorizes(path):

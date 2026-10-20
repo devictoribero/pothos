@@ -21,6 +21,8 @@ d = os.environ["FAKE_GH"]
 args = sys.argv[1:]
 with open(os.path.join(d, "calls.log"), "a") as fh:
     fh.write(" ".join(args) + "\n")
+with open(os.path.join(d, "hosts.log"), "a") as fh:
+    fh.write(os.environ.get("GH_HOST", "-") + "\n")
 def answer(name):
     with open(os.path.join(d, name)) as fh:
         print(fh.read())
@@ -238,27 +240,45 @@ class MergeGateCliTest(unittest.TestCase):
         self.assertNotIn("DELETE", self.calls())
         self.assertIn("already deleted", result.stdout)
 
-    def test_a_branch_github_deletes_between_the_read_and_the_delete_still_counts_as_merged(self):
-        # GitHub's "delete head branches" removes it right after the merge, often after the gate read it.
+    def test_a_branch_github_deletes_between_the_read_and_the_delete_counts_as_deleted(self):
         self.contract(CONTRACT)
         self.pull_request()
         open(os.path.join(self.fake, "branch-exists"), "w").close()
         with open(os.path.join(self.fake, "delete-fails"), "w") as fh:
-            fh.write("gh: Reference does not exist (HTTP 404)")
+            fh.write("gh: Reference does not exist (HTTP 422)")
+        result = self.gate("merge", "7")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("fix-total already deleted on the remote", result.stdout)
+
+    def test_a_branch_the_api_refuses_to_delete_is_kept_after_the_merge(self):
+        self.contract(CONTRACT)
+        self.pull_request()
+        open(os.path.join(self.fake, "branch-exists"), "w").close()
+        with open(os.path.join(self.fake, "delete-fails"), "w") as fh:
+            fh.write("gh: Cannot delete this protected branch (HTTP 422)")
         result = self.gate("merge", "7")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("merged: #7", result.stdout)
-        self.assertIn("fix-total already deleted on the remote", result.stdout)
+        self.assertIn("kept fix-total: could not delete it on the remote (gh: Cannot delete this protected branch", result.stdout)
 
-    def test_a_branch_the_api_cannot_delete_is_kept_after_the_merge(self):
+    def hosts(self, gh_host):
         self.contract(CONTRACT)
         self.pull_request()
-        open(os.path.join(self.fake, "branch-exists"), "w").close()
-        with open(os.path.join(self.fake, "delete-fails"), "w") as fh:
-            fh.write("gh: Resource not accessible by integration (HTTP 403)")
-        result = self.gate("merge", "7")
+        result = subprocess.run([sys.executable, SCRIPT, "status", "7"], cwd=self.repo, capture_output=True, text=True,
+                                env={**self.env, "GH_HOST": gh_host})
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("kept fix-total: could not delete it on the remote", result.stdout)
+        with open(os.path.join(self.fake, "hosts.log")) as fh:
+            return set(fh.read().split())
+
+    def test_a_gh_host_no_remote_points_at_is_left_out_of_gh(self):
+        self.assertEqual(self.hosts("github.example.com"), {"-"})
+
+    def test_a_gh_host_set_to_an_ssh_alias_is_left_out_of_gh(self):
+        self.assertEqual(self.hosts("github.com-work"), {"-"})
+
+    def test_a_gh_host_a_remote_points_at_reaches_gh(self):
+        subprocess.run(["git", "-C", self.repo, "remote", "add", "work", "git@GitHub.example.com:acme/shop.git"], check=True)
+        self.assertEqual(self.hosts("github.example.com"), {"github.example.com"})
 
     def test_a_branch_the_api_cannot_read_is_kept(self):
         self.contract(CONTRACT)
