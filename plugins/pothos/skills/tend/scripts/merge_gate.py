@@ -126,6 +126,19 @@ def check_name(item):
     return item.get("name") or item.get("context") or "?"
 
 
+def latest_checks(checks):
+    """One entry per check name: the most recent run. A commit keeps every run of a check, and a
+    workflow re-triggered before its previous run finished leaves that run cancelled beside the one
+    that counts; GitHub's own view shows only the latest, and so does the gate."""
+    latest = {}
+    for item in checks:
+        name = check_name(item)
+        when = item.get("startedAt") or item.get("createdAt") or ""
+        if name not in latest or when >= latest[name][0]:
+            latest[name] = (when, item)
+    return [item for _, item in latest.values()]
+
+
 def receipt_passed(root, data, commit):
     """A passing, clean verify receipt for this commit: full, and e2e when the contract configures it."""
     folder = os.path.join(contract.pothos_home(), "receipts", contract.key_for(root, "receipts"), commit)
@@ -181,7 +194,7 @@ def evaluate(pr, data, receipt_ok, checks_expected=False):
     label = auto.get("label")
     base = (data.get("pr") or {}).get("base") or "main"
     labels = {(l.get("name") or "").casefold() for l in pr.get("labels") or []}  # GitHub matches labels regardless of case
-    checks = pr.get("statusCheckRollup") or []
+    checks = latest_checks(pr.get("statusCheckRollup") or [])
     states = [(check_name(c), check_state(c)) for c in checks]
     failed = [n for n, s in states if s == "failed"]
     pending = [n for n, s in states if s == "pending"]
