@@ -240,12 +240,21 @@ def alive(pid):
     return True
 
 
+def mutation_allowed(found):
+    """HEAD has a fast or full receipt that passed on a clean tree: never mutate red or uncommitted work."""
+    return any(r.get("status") == "passed" and not r.get("dirty") for r in (found.get("fast"), found.get("full")) if r)
+
+
 def start(root, data, level, env, seconds):
     commit = head(root)
     if not commit:
         print("no commit yet; commit before verifying", file=sys.stderr)
         return 3
-    for one in (("full", "e2e") if level == "all" else (level,)):
+    if level == "mutation":
+        if not mutation_allowed(receipts(root)[1]):
+            print("mutation: run fast or full first")
+            return 1
+    for one in {"all": ("full", "e2e"), "mutation": ()}.get(level, (level,)):
         if one != "e2e" or level == "e2e" or command_for_any_e2e(data):
             command_for(data, one, env)  # exits 3 on an unusable environment, before anything starts
     folder, marker = marker_paths(root)
@@ -313,8 +322,8 @@ def main(argv):
     root = contract.repo_root(os.getcwd())
     cmd = argv[0]
     if cmd == "run":
-        if len(argv) < 2 or argv[1] not in LEVELS + ("all",):
-            print("usage: verify.py run fast|full|e2e|all [--env NAME] [--wait SECONDS]", file=sys.stderr)
+        if len(argv) < 2 or argv[1] not in LEVELS + ("all", "mutation"):
+            print("usage: verify.py run fast|full|e2e|all|mutation [--env NAME] [--wait SECONDS]", file=sys.stderr)
             return 64
         data = load_contract(root)
         return start(root, data, argv[1], option(argv, "--env"), budget(argv))

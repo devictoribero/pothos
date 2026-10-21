@@ -170,6 +170,16 @@ class VerifyTest(unittest.TestCase):
         self.contract({"verify": {"full": "true"}})
         self.assertEqual(self.run_script("wait").returncode, 1)
 
+    def test_mutation_refuses_to_start_without_a_passing_fast_or_full_receipt(self):
+        self.contract({"verify": {"full": "true", "mutation": {"command": "touch mutation-ran"}}})
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+        self.assertIn("mutation: run fast or full first", run.stdout)
+        self.assertFalse(os.path.exists(os.path.join(self.repo, "mutation-ran")))
+        self.assertNotIn("mutation", json.loads(self.run_script("show").stdout)["receipts"])
+
     def test_usage_errors_exit_64(self):
         self.assertEqual(self.run_script("run").returncode, 64)
         self.assertEqual(self.run_script("frobnicate").returncode, 64)
