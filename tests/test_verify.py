@@ -236,6 +236,23 @@ class VerifyTest(unittest.TestCase):
         self.assertFalse(receipt["dirty_before"])
         self.assertFalse(receipt["dirty_after"])
 
+    def test_a_file_moved_and_edited_on_the_branch_is_mutated_under_its_new_path(self):
+        self.contract({"verify": {"full": "true", "mutation": {"command": "true"}}})
+        self.add_file("src/old.py", "a = 1\nb = 2\nc = 3\nd = 4\ne = 5\n")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "seed")
+        self.git("checkout", "-q", "-b", "feature")
+        self.git("mv", "src/old.py", "src/new.py")
+        self.add_file("src/new.py", "a = 1\nb = 2\nc = 3\nd = 4\ne = 6\n")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "move")
+        self.run_script("run", "full")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertEqual(self.mutation_receipt()["files"], ["src/new.py"])
+
     def test_mutation_command_that_fails_yields_an_error_receipt_and_the_log_tail(self):
         self.contract({"verify": {"full": "true", "mutation": {"command": "echo mutant-boom; exit 7"}}})
         self.branch_with("src/a.py")

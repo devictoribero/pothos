@@ -236,8 +236,12 @@ def is_test_file(path):
 
 
 def changed_source_files(root, base, exclude):
-    """Repository-relative files added or modified between base and HEAD, without tests and the contract's exclude globs."""
-    out = contract.git(["-c", "core.quotepath=off", "diff", "--name-only", "--diff-filter=AM", base, "HEAD"], root) or ""
+    """Repository-relative files added or modified between base and HEAD, without tests and the contract's exclude globs.
+
+    Rename detection is off, so a file moved and edited on the branch counts as added under its new path.
+    """
+    out = contract.git(["-c", "core.quotepath=off", "diff", "--no-renames", "--name-only", "--diff-filter=AM", base, "HEAD"],
+                       root) or ""
     return [path for path in out.splitlines()
             if path and not is_test_file(path) and not any(fnmatch.fnmatch(path, glob) for glob in exclude)]
 
