@@ -97,6 +97,9 @@ def domain_section(data):
 def verify_section(data):
     verify = data.get("verify") or {}
     rows = [f"- `{level}`: `{verify[level]}`" for level in ("fast", "full", "e2e") if verify.get(level)]
+    mutation = (verify.get("mutation") or {}).get("command")
+    if mutation:
+        rows.append(f"- `mutation`: `{mutation}`")
     text = ("### Verification\n\nRun `/pothos:verify` before merging anything into an integration or feature branch and "
             "before a pull request leaves draft; it runs these commands and records a receipt for the commit. "
             "With `implement-spec`, the merger subagent runs `verify run all` on the integration branch after each merge and "
@@ -107,6 +110,11 @@ def verify_section(data):
             "another code.\n\n" + "\n".join(rows))
     if not verify.get("e2e"):
         text += "\n\nThis repository has no end-to-end command; skip that step and say so in the pull request."
+    if mutation:
+        text += ("\n\nThis repository has a mutation command: run `verify.py run mutation` once after green and before the "
+                 "pull request, outside `run all`. It is advisory and mutates only the source files the branch changed; "
+                 "each `new` survivor it prints is a missing test or dead code on a line you added. The pull request lists "
+                 "the survivors killed, each with the name of the test that kills it, and the survivors left, each with why.")
     return text
 
 
