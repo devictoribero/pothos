@@ -352,6 +352,26 @@ class VerifyTest(unittest.TestCase):
         self.assertEqual(receipt["counts"], {"Survived": 2})
         self.assertEqual(receipt["report"], os.path.join(os.path.dirname(receipt["log"]), "report.json"))
 
+    def test_report_keys_under_a_project_root_still_match_the_changed_files(self):
+        self.branch_with("src/a.py", "src/b.py")
+        report = {"schemaVersion": "2", "projectRoot": self.repo, "files": {
+            os.path.join(self.repo, "src", "a.py"): {"language": "python", "mutants": [self.mutant(1, "Survived")]},
+            "src/b.py": {"language": "python", "mutants": [self.mutant(1, "NoCoverage", replacement=None)]}}}
+        self.contract({"verify": {"full": "true", "mutation": {
+            "command": self.mutation_tool(report), "report": "$POTHOS_MUTATION_OUT/report.json"}}})
+        self.run_script("run", "full")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertIn("src/a.py:1 ArithmeticOperator: 5 (Survived)", run.stdout)
+        self.assertIn("src/b.py:1 ArithmeticOperator (NoCoverage)", run.stdout)
+        self.assertIn("mutation: 2 new surviving mutant(s) in 2 changed file(s); 0 inherited", run.stdout)
+        receipt = json.loads(self.run_script("show").stdout)["receipts"]["mutation"]
+        self.assertEqual([f["file"] for f in receipt["findings"]], ["src/a.py", "src/b.py"])
+        self.assertNotIn("original", receipt["findings"][0])
+        self.assertNotIn("replacement", receipt["findings"][1])
+
     def test_usage_errors_exit_64(self):
         self.assertEqual(self.run_script("run").returncode, 64)
         self.assertEqual(self.run_script("frobnicate").returncode, 64)
