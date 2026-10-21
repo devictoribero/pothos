@@ -372,6 +372,33 @@ class VerifyTest(unittest.TestCase):
         self.assertNotIn("original", receipt["findings"][0])
         self.assertNotIn("replacement", receipt["findings"][1])
 
+    def test_mutants_outside_the_changed_files_are_dropped_and_every_status_counted(self):
+        self.add_file("src/legacy.py")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "legacy")
+        self.branch_with("src/a.py")
+        statuses = ["Killed", "Survived", "NoCoverage", "Timeout", "Ignored", "CompileError", "RuntimeError", "Pending",
+                    "Ignored"]
+        report = {"schemaVersion": "2", "files": {
+            "src/a.py": {"language": "python", "mutants": [self.mutant(1, status) for status in statuses]},
+            "src/legacy.py": {"language": "python", "mutants": [self.mutant(1, "Survived")]},
+            "src/elsewhere.py": {"language": "python", "mutants": [self.mutant(1, "NoCoverage")]}}}
+        self.contract({"verify": {"full": "true", "mutation": {
+            "command": self.mutation_tool(report), "report": "$POTHOS_MUTATION_OUT/report.json"}}})
+        self.run_script("run", "full")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertNotIn("legacy", run.stdout)
+        self.assertNotIn("elsewhere", run.stdout)
+        self.assertIn("mutation: 2 new surviving mutant(s) in 1 changed file(s); 0 inherited", run.stdout)
+        receipt = json.loads(self.run_script("show").stdout)["receipts"]["mutation"]
+        self.assertEqual(receipt["counts"], {"Killed": 1, "Survived": 1, "NoCoverage": 1, "Timeout": 1, "Ignored": 2,
+                                             "CompileError": 1, "RuntimeError": 1, "Pending": 1})
+        self.assertEqual([(f["file"], f["status"]) for f in receipt["findings"]],
+                         [("src/a.py", "Survived"), ("src/a.py", "NoCoverage")])
+
     def test_usage_errors_exit_64(self):
         self.assertEqual(self.run_script("run").returncode, 64)
         self.assertEqual(self.run_script("frobnicate").returncode, 64)
