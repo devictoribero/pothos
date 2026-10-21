@@ -18,9 +18,7 @@ class VerifyTest(unittest.TestCase):
         self.git("remote", "add", "origin", "https://github.com/acme/shop.git")
         self.commit("first")
         self.env = {**os.environ, "POTHOS_HOME": self.home}
-
-    def tearDown(self):
-        self.tmp.cleanup()
+        self.addCleanup(self.tmp.cleanup)
 
     def git(self, *args, cwd=None):
         return subprocess.run(["git", "-C", cwd or self.repo, "-c", "user.name=t", "-c", "user.email=t@t", *args],
@@ -232,9 +230,26 @@ class VerifyTest(unittest.TestCase):
         self.assertEqual(receipt["files"], ["src/a.py", "src/sp ace.py"])
         self.assertEqual(receipt["exit"], 0)
         self.assertIn("src/a.py,'src/sp ace.py'", receipt["command"])
-        self.assertIsInstance(receipt["seconds"], float)
+        self.assertGreaterEqual(receipt["seconds"], 0)
         self.assertFalse(receipt["dirty_before"])
         self.assertFalse(receipt["dirty_after"])
+
+    def test_a_file_moved_and_edited_on_the_branch_is_mutated_under_its_new_path(self):
+        self.contract({"verify": {"full": "true", "mutation": {"command": "true"}}})
+        self.add_file("src/old.py", "a = 1\nb = 2\nc = 3\nd = 4\ne = 5\n")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "seed")
+        self.git("checkout", "-q", "-b", "feature")
+        self.git("mv", "src/old.py", "src/new.py")
+        self.add_file("src/new.py", "a = 1\nb = 2\nc = 3\nd = 4\ne = 6\n")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "move")
+        self.run_script("run", "full")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertEqual(self.mutation_receipt()["files"], ["src/new.py"])
 
     def test_mutation_command_that_fails_yields_an_error_receipt_and_the_log_tail(self):
         self.contract({"verify": {"full": "true", "mutation": {"command": "echo mutant-boom; exit 7"}}})
@@ -263,6 +278,20 @@ class VerifyTest(unittest.TestCase):
         self.assertFalse(receipt["dirty_before"])
         self.assertTrue(receipt["dirty_after"])
 
+    def test_a_tree_dirty_before_the_command_gets_a_warning_that_says_so(self):
+        self.contract({"verify": {"full": "true", "mutation": {"command": "true"}}})
+        self.branch_with("src/a.py")
+        self.run_script("run", "full")
+        self.add_file("notes.tmp", "uncommitted")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertIn("mutation: the working tree has uncommitted changes, already there before the command", run.stdout)
+        receipt = self.mutation_receipt()
+        self.assertTrue(receipt["dirty_before"])
+        self.assertTrue(receipt["dirty_after"])
+
     def test_mutation_without_a_base_branch_is_an_error(self):
         self.contract({"verify": {"full": "true", "mutation": {"command": "touch mutation-ran"}}})
         self.git("branch", "-m", "main", "trunk")
@@ -275,7 +304,7 @@ class VerifyTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.repo, "mutation-ran")))
         self.assertEqual(json.loads(self.run_script("show").stdout)["receipts"]["mutation"]["status"], "error")
 
-    def test_run_all_never_runs_mutation_and_check_ignores_its_receipt(self):
+    def test_run_all_never_runs_mutation(self):
         self.contract({"verify": {"full": "true", "mutation": {"command": "touch mutation-ran; exit 1"}}})
         self.branch_with("src/a.py")
 
@@ -284,11 +313,18 @@ class VerifyTest(unittest.TestCase):
         self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
         self.assertNotIn("mutation", run.stdout)
         self.assertFalse(os.path.exists(self.repo + "/mutation-ran"))
+
+    def test_check_ignores_a_mutation_receipt_in_error(self):
+        self.contract({"verify": {"full": "true", "mutation": {"command": "exit 1"}}})
+        self.branch_with("src/a.py")
+        self.run_script("run", "full")
         self.assertEqual(self.run_script("run", "mutation").returncode, 1)
-        os.remove(self.repo + "/mutation-ran")
+
         check = self.run_script("check")
+
         self.assertEqual(check.returncode, 0, check.stdout)
         self.assertIn("verified: full passed", check.stdout)
+        self.assertEqual(self.mutation_receipt()["status"], "error")
 
     def test_a_slow_mutation_run_is_picked_up_by_wait(self):
         self.contract({"verify": {"full": "true", "mutation": {"command": "sleep 3 && echo slow mutants"}}})
@@ -372,6 +408,31 @@ class VerifyTest(unittest.TestCase):
         self.assertNotEqual(seen, receipt["cache"])
         self.assertEqual(receipt["env"]["POTHOS_MUTATION_CACHE"], seen)
 
+    def test_a_successful_run_removes_its_private_copy_once_the_cache_is_published(self):
+        self.contract({"verify": {"fast": "echo ok", "mutation": {"command": self.CACHE_COMMAND}}})
+        self.branch_with("src/a.py")
+        self.run_script("run", "fast")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        receipt = self.mutation_receipt()
+        self.assertFalse(os.path.exists(os.path.join(os.path.dirname(receipt["log"]), "mutation-cache")))
+        with open(os.path.join(receipt["cache"], "seen")) as fh:
+            self.assertEqual(fh.read(), "src/a.py")
+
+    def test_a_failing_run_removes_its_private_copy_too(self):
+        self.contract({"verify": {"fast": "echo ok", "mutation": {"command": self.CACHE_COMMAND + "; exit 3"}}})
+        self.branch_with("src/a.py")
+        self.run_script("run", "fast")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+        receipt = self.mutation_receipt()
+        self.assertFalse(os.path.exists(os.path.join(os.path.dirname(receipt["log"]), "mutation-cache")))
+        self.assertEqual(receipt["cache"], os.path.join(self.home, "mutation", "github.com", "acme", "shop"))
+
     def test_publishing_covers_subfolders_and_leaves_no_temporary_name_behind(self):
         command = self.CACHE_COMMAND + '; mkdir -p "$POTHOS_MUTATION_CACHE/nested"; echo deep > "$POTHOS_MUTATION_CACHE/nested/deep"'
         self.contract({"verify": {"fast": "echo ok", "mutation": {"command": command}}})
@@ -413,10 +474,10 @@ class VerifyTest(unittest.TestCase):
         shared = self.mutation_receipt()["cache"]
         other = self.second_worktree("src/b.py")
         os.chmod(shared, 0o555)
+        self.addCleanup(os.chmod, shared, 0o755)
 
         run = self.run_script("run", "mutation", cwd=other)
 
-        os.chmod(shared, 0o755)
         self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
         self.assertIn("mutation: could not publish the cache", run.stdout)
         receipt = self.mutation_receipt(cwd=other)

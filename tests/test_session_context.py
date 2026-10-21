@@ -189,6 +189,7 @@ class SessionContextTest(unittest.TestCase):
         self.assertIn("- `full`: `npm test`\n- `mutation`: `npx stryker run --mutate {files}`", section)
         self.assertIn("run `verify.py run mutation` once after green and before the pull request", section)
         self.assertIn("outside `run all`", section)
+        self.assertIn("what a `new` survivor means is rule 1 of `standards/testing.md`", section)
         self.assertIn("the survivors killed, each with the name of the test that kills it", section)
         self.assertIn("the survivors left, each with why", section)
         self.assertIn("no end-to-end command", section)

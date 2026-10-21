@@ -44,7 +44,8 @@ import ui_check  # noqa: E402
 
 LEVELS = ("fast", "full", "e2e")
 ADVISORY = ("ui", "mutation")
-# The files Stryker's default mutate option leaves out; an explicit --mutate replaces those defaults.
+# The files Stryker's default mutate option leaves out (an explicit --mutate replaces those defaults), plus the
+# common Python layout: a tests/ folder and test_*.py files.
 TEST_FILE_GLOBS = ("*.test.*", "*.spec.*")
 TEST_FOLDERS = ("__tests__", "tests")
 # Every status of the mutation-testing-report-schema: only the first kind is a finding.
@@ -236,8 +237,12 @@ def is_test_file(path):
 
 
 def changed_source_files(root, base, exclude):
-    """Repository-relative files added or modified between base and HEAD, without tests and the contract's exclude globs."""
-    out = contract.git(["-c", "core.quotepath=off", "diff", "--name-only", "--diff-filter=AM", base, "HEAD"], root) or ""
+    """Repository-relative files added or modified between base and HEAD, without tests and the contract's exclude globs.
+
+    Rename detection is off, so a file moved and edited on the branch counts as added under its new path.
+    """
+    out = contract.git(["-c", "core.quotepath=off", "diff", "--no-renames", "--name-only", "--diff-filter=AM", base, "HEAD"],
+                       root) or ""
     return [path for path in out.splitlines()
             if path and not is_test_file(path) and not any(fnmatch.fnmatch(path, glob) for glob in exclude)]
 
@@ -262,49 +267,71 @@ def mutation_level(root, data):
         write_receipt(folder, "mutation", {**receipt, "status": "skipped", "reason": "no source files changed"})
         print("mutation: skipped (no source files changed)")
         return 0
+    receipt.update(run_mutation_with_cache(root, data, settings["command"], files, folder))
+    if receipt["status"] == "ran" and settings.get("report"):
+        receipt.update(read_mutation_report(root, base, settings["report"], receipt))
+    write_receipt(folder, "mutation", receipt)
+    print_mutation_result(receipt)
+    return 1 if receipt["status"] == "error" else 0
+
+
+def run_mutation_with_cache(root, data, command, files, folder):
+    """Run the command on a private copy of the shared cache, publish the copy on exit 0, and return the receipt fields.
+
+    `status` is ran or error. A cache step that fails sets `error`, and the shared folder stays as it was. The private
+    copy is removed either way: it served this run only.
+    """
     shared, private = mutation_cache_dir(root), os.path.join(folder, "mutation-cache")
     try:
         seed_mutation_cache(shared, private)
     except OSError as exc:  # verify's own handling never raises: the receipt says what broke
-        write_receipt(folder, "mutation", {**receipt, "status": "error", "cache": shared, "error": str(exc)})
-        print(f"mutation: could not prepare the cache ({exc})")
-        return 1
-    result = run_mutation_command(root, data, settings["command"], files, folder, env={"POTHOS_MUTATION_CACHE": private})
-    receipt = {**receipt, **result, "cache": shared}
-    status = "ran" if result["exit"] == 0 else "error"
-    if status == "ran":
-        try:
+        return {"status": "error", "cache": shared, "error": f"could not prepare the cache ({exc})"}
+    result = run_mutation_command(root, data, command, files, folder, env={"POTHOS_MUTATION_CACHE": private})
+    fields = {**result, "cache": shared, "status": "ran" if result["exit"] == 0 else "error"}
+    try:
+        if fields["status"] == "ran":
             publish_mutation_cache(private, shared)
-        except OSError as exc:
-            write_receipt(folder, "mutation", {**receipt, "status": "error", "error": str(exc)})
-            print(f"mutation: could not publish the cache ({exc})")
-            return 1
-    report = expand_with(settings.get("report"), result["env"]) if status == "ran" and settings.get("report") else None
-    if report and os.path.isfile(os.path.join(root, report)):
-        report = os.path.join(root, report)
-        try:
-            parsed = report_findings(root, report, files, ui_check.added_lines(root, base))
-        except Exception as exc:  # an advisory level never raises: the receipt says what went wrong
-            status, receipt["error"] = "error", f"could not read the report {report}: {exc}"
-        else:
-            status = "findings" if parsed["findings"] else "clean"
-            receipt.update(parsed, report=report)
-    write_receipt(folder, "mutation", {**receipt, "status": status})
+    except OSError as exc:
+        fields.update(status="error", error=f"could not publish the cache ({exc})")
+    finally:
+        shutil.rmtree(private, ignore_errors=True)
+    return fields
+
+
+def read_mutation_report(root, base, report, receipt):
+    """The receipt fields a report adds: its path, counts and findings, with status clean or findings.
+
+    A report the command never wrote adds nothing, so the status stays at ran; one that cannot be read is an error.
+    """
+    path = os.path.join(root, expand_with(report, receipt["env"]))
+    if not os.path.isfile(path):
+        return {}
+    try:
+        parsed = report_findings(root, path, receipt["files"], ui_check.added_lines(root, base))
+    except Exception as exc:  # an advisory level never raises: the receipt says what went wrong
+        return {"status": "error", "error": f"could not read the report {path}: {exc}"}
+    return {**parsed, "report": path, "status": "findings" if parsed["findings"] else "clean"}
+
+
+def print_mutation_result(receipt):
+    """The new findings one per line and the closing line; otherwise the error, or the log tail and the exit code."""
+    status = receipt["status"]
     if status in ("clean", "findings"):
         new = [f for f in receipt["findings"] if f["kind"] == "new"]
         print("\n".join(describe_mutant(f) for f in new[:TAIL]))
-        print(MUTATION_CLOSING.format(new=len(new), files=len(files), inherited=len(receipt["findings"]) - len(new)))
+        print(MUTATION_CLOSING.format(new=len(new), files=len(receipt["files"]), inherited=len(receipt["findings"]) - len(new)))
     elif "error" in receipt:
         print(f"mutation: {receipt['error']}")
     else:
         if status == "error":
-            with open(result["log"], encoding="utf-8", errors="replace") as fh:
+            with open(receipt["log"], encoding="utf-8", errors="replace") as fh:
                 print("\n".join(fh.read().splitlines()[-TAIL:]))
-        print(f"mutation: {status} in {result['seconds']}s (exit {result['exit']}) on {len(files)} changed file(s); "
-              f"log {result['log']}. Advisory, does not block.")
-    if result["dirty_after"] and not result["dirty_before"]:
-        print("mutation: the command left changes in the working tree; look at them before committing")
-    return 1 if status == "error" else 0
+        print(f"mutation: {status} in {receipt['seconds']}s (exit {receipt['exit']}) on {len(receipt['files'])} changed file(s); "
+              f"log {receipt['log']}. Advisory, does not block.")
+    if receipt.get("dirty_after"):
+        print("mutation: the working tree has uncommitted changes, already there before the command; look at them before committing"
+              if receipt["dirty_before"] else
+              "mutation: the command left changes in the working tree; look at them before committing")
 
 
 def expand_with(path, env):
@@ -397,8 +424,7 @@ def publish_mutation_cache(private, shared):
 def run_mutation_command(root, data, command, files, folder, env=None):
     """Run the mutation command once on the changed files and say what happened, without reading any report.
 
-    This is the seam the next steps build on: a report parser reads the file the command wrote under the output
-    folder after the run, and a cache step adds its own variable through `env` and publishes its copy on exit 0.
+    `env` adds variables to the two every command gets, such as the cache folder.
     Returns command (as run), files, env (the variables exported), exit, seconds, log, dirty_before, dirty_after.
     """
     exported = {"POTHOS_CHANGED_FILES": "\n".join(files), "POTHOS_MUTATION_OUT": folder, **(env or {})}

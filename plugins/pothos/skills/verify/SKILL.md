@@ -38,7 +38,7 @@ After `full`, the UI check runs on the lines the branch adds, when the contract'
    ```bash
    python3 "${CLAUDE_SKILL_DIR}/scripts/verify.py" run mutation
    ```
-   It stays out of `run all` and needs a passing `fast` or `full` receipt for HEAD on a clean tree. Read the receipt: each `new` survivor it prints is a missing test or dead code on a line you added, so add the test that kills it or delete the code, commit, and run `fast` then `mutation` again.
+   It stays out of `run all` and needs a passing `fast` or `full` receipt for HEAD on a clean tree. Read the receipt and act on each `new` survivor it prints as rule 1 of `standards/testing.md` says, commit, and run `fast` then `mutation` again. The pull request lists the survivors killed, each with the test that kills it, and the survivors left, each with why.
 6. **Gate.** Before merging or marking a pull request ready:
    ```bash
    python3 "${CLAUDE_SKILL_DIR}/scripts/verify.py" check
