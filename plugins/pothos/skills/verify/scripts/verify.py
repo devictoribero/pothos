@@ -266,53 +266,71 @@ def mutation_level(root, data):
         write_receipt(folder, "mutation", {**receipt, "status": "skipped", "reason": "no source files changed"})
         print("mutation: skipped (no source files changed)")
         return 0
+    receipt.update(run_mutation_with_cache(root, data, settings["command"], files, folder))
+    if receipt["status"] == "ran" and settings.get("report"):
+        receipt.update(read_mutation_report(root, base, settings["report"], receipt))
+    write_receipt(folder, "mutation", receipt)
+    print_mutation_result(receipt)
+    return 1 if receipt["status"] == "error" else 0
+
+
+def run_mutation_with_cache(root, data, command, files, folder):
+    """Run the command on a private copy of the shared cache, publish the copy on exit 0, and return the receipt fields.
+
+    `status` is ran or error. A cache step that fails sets `error`, and the shared folder stays as it was. The private
+    copy is removed either way: it served this run only.
+    """
     shared, private = mutation_cache_dir(root), os.path.join(folder, "mutation-cache")
     try:
         seed_mutation_cache(shared, private)
     except OSError as exc:  # verify's own handling never raises: the receipt says what broke
-        write_receipt(folder, "mutation", {**receipt, "status": "error", "cache": shared, "error": str(exc)})
-        print(f"mutation: could not prepare the cache ({exc})")
-        return 1
-    result = run_mutation_command(root, data, settings["command"], files, folder, env={"POTHOS_MUTATION_CACHE": private})
-    receipt = {**receipt, **result, "cache": shared}
-    status = "ran" if result["exit"] == 0 else "error"
+        return {"status": "error", "cache": shared, "error": f"could not prepare the cache ({exc})"}
+    result = run_mutation_command(root, data, command, files, folder, env={"POTHOS_MUTATION_CACHE": private})
+    fields = {**result, "cache": shared, "status": "ran" if result["exit"] == 0 else "error"}
     try:
-        if status == "ran":
+        if fields["status"] == "ran":
             publish_mutation_cache(private, shared)
     except OSError as exc:
-        write_receipt(folder, "mutation", {**receipt, "status": "error", "error": str(exc)})
-        print(f"mutation: could not publish the cache ({exc})")
-        return 1
+        fields.update(status="error", error=f"could not publish the cache ({exc})")
     finally:
-        shutil.rmtree(private, ignore_errors=True)  # the copy served this run only; the shared folder keeps the cache
-    report = expand_with(settings.get("report"), result["env"]) if status == "ran" and settings.get("report") else None
-    if report and os.path.isfile(os.path.join(root, report)):
-        report = os.path.join(root, report)
-        try:
-            parsed = report_findings(root, report, files, ui_check.added_lines(root, base))
-        except Exception as exc:  # an advisory level never raises: the receipt says what went wrong
-            status, receipt["error"] = "error", f"could not read the report {report}: {exc}"
-        else:
-            status = "findings" if parsed["findings"] else "clean"
-            receipt.update(parsed, report=report)
-    write_receipt(folder, "mutation", {**receipt, "status": status})
+        shutil.rmtree(private, ignore_errors=True)
+    return fields
+
+
+def read_mutation_report(root, base, report, receipt):
+    """The receipt fields a report adds: its path, counts and findings, with status clean or findings.
+
+    A report the command never wrote adds nothing, so the status stays at ran; one that cannot be read is an error.
+    """
+    path = os.path.join(root, expand_with(report, receipt["env"]))
+    if not os.path.isfile(path):
+        return {}
+    try:
+        parsed = report_findings(root, path, receipt["files"], ui_check.added_lines(root, base))
+    except Exception as exc:  # an advisory level never raises: the receipt says what went wrong
+        return {"status": "error", "error": f"could not read the report {path}: {exc}"}
+    return {**parsed, "report": path, "status": "findings" if parsed["findings"] else "clean"}
+
+
+def print_mutation_result(receipt):
+    """The new findings one per line and the closing line; otherwise the error, or the log tail and the exit code."""
+    status = receipt["status"]
     if status in ("clean", "findings"):
         new = [f for f in receipt["findings"] if f["kind"] == "new"]
         print("\n".join(describe_mutant(f) for f in new[:TAIL]))
-        print(MUTATION_CLOSING.format(new=len(new), files=len(files), inherited=len(receipt["findings"]) - len(new)))
+        print(MUTATION_CLOSING.format(new=len(new), files=len(receipt["files"]), inherited=len(receipt["findings"]) - len(new)))
     elif "error" in receipt:
         print(f"mutation: {receipt['error']}")
     else:
         if status == "error":
-            with open(result["log"], encoding="utf-8", errors="replace") as fh:
+            with open(receipt["log"], encoding="utf-8", errors="replace") as fh:
                 print("\n".join(fh.read().splitlines()[-TAIL:]))
-        print(f"mutation: {status} in {result['seconds']}s (exit {result['exit']}) on {len(files)} changed file(s); "
-              f"log {result['log']}. Advisory, does not block.")
-    if result["dirty_after"]:
+        print(f"mutation: {status} in {receipt['seconds']}s (exit {receipt['exit']}) on {len(receipt['files'])} changed file(s); "
+              f"log {receipt['log']}. Advisory, does not block.")
+    if receipt.get("dirty_after"):
         print("mutation: the working tree has uncommitted changes, already there before the command; look at them before committing"
-              if result["dirty_before"] else
+              if receipt["dirty_before"] else
               "mutation: the command left changes in the working tree; look at them before committing")
-    return 1 if status == "error" else 0
 
 
 def expand_with(path, env):
