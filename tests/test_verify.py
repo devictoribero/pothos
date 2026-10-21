@@ -343,6 +343,21 @@ class VerifyTest(unittest.TestCase):
         self.assertEqual(receipt["cache"], os.path.join(self.home, "mutation", "github.com", "acme", "shop"))
         self.assertEqual(receipt["cache"], self.mutation_receipt()["cache"])
 
+    def test_a_failing_run_leaves_the_shared_cache_untouched(self):
+        self.contract({"verify": {"fast": "echo ok", "mutation": {"command": self.CACHE_COMMAND}}})
+        self.branch_with("src/a.py")
+        self.run_script("run", "fast")
+        self.run_script("run", "mutation")
+        self.contract({"verify": {"fast": "echo ok", "mutation": {"command": self.CACHE_COMMAND + "; exit 3"}}})
+        other = self.second_worktree("src/b.py")
+
+        run = self.run_script("run", "mutation", cwd=other)
+
+        self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+        self.assertEqual(self.output_file(self.mutation_receipt(cwd=other), "cache-before"), "src/a.py")
+        with open(os.path.join(self.mutation_receipt()["cache"], "seen")) as fh:
+            self.assertEqual(fh.read(), "src/a.py")
+
     def test_usage_errors_exit_64(self):
         self.assertEqual(self.run_script("run").returncode, 64)
         self.assertEqual(self.run_script("frobnicate").returncode, 64)
