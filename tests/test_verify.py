@@ -170,6 +170,139 @@ class VerifyTest(unittest.TestCase):
         self.contract({"verify": {"full": "true"}})
         self.assertEqual(self.run_script("wait").returncode, 1)
 
+    def test_mutation_refuses_to_start_without_a_passing_fast_or_full_receipt(self):
+        self.contract({"verify": {"full": "true", "mutation": {"command": "touch mutation-ran"}}})
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+        self.assertIn("mutation: run fast or full first", run.stdout)
+        self.assertFalse(os.path.exists(os.path.join(self.repo, "mutation-ran")))
+        self.assertNotIn("mutation", json.loads(self.run_script("show").stdout)["receipts"])
+
+    def add_file(self, rel, text="x = 1\n"):
+        path = os.path.join(self.repo, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as fh:
+            fh.write(text)
+
+    def branch_with(self, *files, message="change"):
+        self.git("checkout", "-q", "-b", "feature")
+        for rel in files:
+            self.add_file(rel)
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", message)
+
+    def test_mutation_is_skipped_when_only_test_files_or_excluded_files_changed(self):
+        self.contract({"verify": {"full": "true", "mutation": {"command": "touch mutation-ran", "exclude": ["src/generated/*"]}}})
+        self.branch_with("src/a.test.js", "src/b.spec.ts", "src/__tests__/c.js", "tests/d.py", "src/test_e.py",
+                         "src/generated/f.js")
+        self.run_script("run", "full")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertIn("mutation: skipped (no source files changed)", run.stdout)
+        self.assertFalse(os.path.exists(os.path.join(self.repo, "mutation-ran")))
+        receipt = json.loads(self.run_script("show").stdout)["receipts"]["mutation"]
+        self.assertEqual(receipt["status"], "skipped")
+        self.assertEqual(receipt["reason"], "no source files changed")
+
+    def test_mutation_command_receives_the_changed_files_and_the_output_folder(self):
+        command = ('printf "%s" "$POTHOS_CHANGED_FILES" > "$POTHOS_MUTATION_OUT/seen-files"; '
+                   'printf "%s" "$POTHOS_MUTATION_OUT" > "$POTHOS_MUTATION_OUT/seen-out"; '
+                   'printf "%s" {files} > "$POTHOS_MUTATION_OUT/seen-placeholder"')
+        self.contract({"verify": {"full": "true", "mutation": {"command": command}}})
+        self.branch_with("src/a.py", "src/sp ace.py", "src/a.test.py")
+        self.run_script("run", "full")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertIn("mutation: ran in", run.stdout)
+        receipt = json.loads(self.run_script("show").stdout)["receipts"]["mutation"]
+        folder = os.path.dirname(receipt["log"])
+        with open(os.path.join(folder, "seen-files")) as fh:
+            self.assertEqual(fh.read(), "src/a.py\nsrc/sp ace.py")
+        with open(os.path.join(folder, "seen-out")) as fh:
+            self.assertEqual(fh.read(), folder)
+        with open(os.path.join(folder, "seen-placeholder")) as fh:
+            self.assertEqual(fh.read(), "src/a.py,src/sp ace.py")
+        self.assertEqual(receipt["status"], "ran")
+        self.assertEqual(receipt["files"], ["src/a.py", "src/sp ace.py"])
+        self.assertEqual(receipt["exit"], 0)
+        self.assertIn("src/a.py,'src/sp ace.py'", receipt["command"])
+        self.assertIsInstance(receipt["seconds"], float)
+        self.assertFalse(receipt["dirty_before"])
+        self.assertFalse(receipt["dirty_after"])
+
+    def test_mutation_command_that_fails_yields_an_error_receipt_and_the_log_tail(self):
+        self.contract({"verify": {"full": "true", "mutation": {"command": "echo mutant-boom; exit 7"}}})
+        self.branch_with("src/a.py")
+        self.run_script("run", "full")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+        self.assertIn("mutant-boom", run.stdout)
+        self.assertIn("mutation: error in", run.stdout)
+        receipt = json.loads(self.run_script("show").stdout)["receipts"]["mutation"]
+        self.assertEqual(receipt["status"], "error")
+        self.assertEqual(receipt["exit"], 7)
+
+    def test_mutation_command_that_leaves_a_file_behind_is_recorded_as_dirty_after(self):
+        self.contract({"verify": {"full": "true", "mutation": {"command": "touch leftover.tmp"}}})
+        self.branch_with("src/a.py")
+        self.run_script("run", "full")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertIn("mutation: the command left changes in the working tree", run.stdout)
+        receipt = json.loads(self.run_script("show").stdout)["receipts"]["mutation"]
+        self.assertFalse(receipt["dirty_before"])
+        self.assertTrue(receipt["dirty_after"])
+
+    def test_mutation_without_a_base_branch_is_an_error(self):
+        self.contract({"verify": {"full": "true", "mutation": {"command": "touch mutation-ran"}}})
+        self.git("branch", "-m", "main", "trunk")
+        self.run_script("run", "full")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+        self.assertIn("mutation: no base branch found", run.stdout)
+        self.assertFalse(os.path.exists(os.path.join(self.repo, "mutation-ran")))
+        self.assertEqual(json.loads(self.run_script("show").stdout)["receipts"]["mutation"]["status"], "error")
+
+    def test_run_all_never_runs_mutation_and_check_ignores_its_receipt(self):
+        self.contract({"verify": {"full": "true", "mutation": {"command": "touch mutation-ran; exit 1"}}})
+        self.branch_with("src/a.py")
+
+        run = self.run_script("run", "all")
+
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertNotIn("mutation", run.stdout)
+        self.assertFalse(os.path.exists(self.repo + "/mutation-ran"))
+        self.assertEqual(self.run_script("run", "mutation").returncode, 1)
+        os.remove(self.repo + "/mutation-ran")
+        check = self.run_script("check")
+        self.assertEqual(check.returncode, 0, check.stdout)
+        self.assertIn("verified: full passed", check.stdout)
+
+    def test_a_slow_mutation_run_is_picked_up_by_wait(self):
+        self.contract({"verify": {"full": "true", "mutation": {"command": "sleep 3 && echo slow mutants"}}})
+        self.branch_with("src/a.py")
+        self.run_script("run", "full")
+
+        first = self.run_script("run", "mutation", "--wait", "1")
+
+        self.assertEqual(first.returncode, 4, first.stdout)
+        waited = self.run_script("wait", "--wait", "30")
+        self.assertEqual(waited.returncode, 0, waited.stdout)
+        self.assertIn("mutation: ran in", waited.stdout)
+        self.assertEqual(json.loads(self.run_script("show").stdout)["receipts"]["mutation"]["status"], "ran")
+
     def test_usage_errors_exit_64(self):
         self.assertEqual(self.run_script("run").returncode, 64)
         self.assertEqual(self.run_script("frobnicate").returncode, 64)

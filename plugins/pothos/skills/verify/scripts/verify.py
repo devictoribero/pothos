@@ -3,7 +3,8 @@
 
 Usage:
   verify.py run LEVEL [--env NAME] [--wait SECONDS]
-                                     LEVEL is fast, full, e2e or all (full, then e2e when configured)
+                                     LEVEL is fast, full, e2e, all (full, then e2e when configured)
+                                     or mutation (the contract's mutation command on the changed files)
   verify.py wait [--wait SECONDS]    keep waiting for HEAD's run that is still going
   verify.py check [--no-e2e]         exit 0 when HEAD has a passing full receipt (and e2e, when configured)
   verify.py show                     print HEAD's receipts as JSON
@@ -12,6 +13,9 @@ Receipts live in $POTHOS_HOME/receipts/<host>/<owner>/<repo>/<commit>/<level>.js
 to them. A run on a dirty working tree is recorded but never counts as a pass: commit first.
 After full, the contract's ui check runs on the branch's added lines and writes ui.json. It is advisory:
 it never changes an exit code, and check only mentions it.
+`run mutation` is advisory too and stays out of `run all`: it needs a passing clean fast or full receipt
+for HEAD, runs the contract's mutation command on the source files added or modified since the merge-base
+with the pull request base, and writes mutation.json (ran, error or skipped). check ignores it.
 
 The checks run in a detached process, so a slow suite outlives the caller. `run` waits up to --wait
 seconds (default 540, under an agent's ten-minute command limit) and exits 4 when the run is still
@@ -21,6 +25,7 @@ Exit codes: 0 passed (or skipped because the level is not configured), 1 failed 
 2 no contract, 3 the contract or the environment is unusable, 4 still running, 64 usage.
 """
 import datetime
+import fnmatch
 import json
 import os
 import shlex
@@ -34,6 +39,10 @@ import contract  # noqa: E402
 import ui_check  # noqa: E402
 
 LEVELS = ("fast", "full", "e2e")
+ADVISORY = ("ui", "mutation")
+# The files Stryker's default mutate option leaves out; an explicit --mutate replaces those defaults.
+TEST_FILE_GLOBS = ("*.test.*", "*.spec.*")
+TEST_FOLDERS = ("__tests__", "tests")
 TAIL = 60
 WAIT = 540
 
@@ -133,7 +142,7 @@ def receipts(root):
         return None, {}
     folder = receipt_dir(root, commit)
     found = {}
-    for level in LEVELS + ("ui",):
+    for level in LEVELS + ADVISORY:
         path = os.path.join(folder, f"{level}.json")
         if os.path.isfile(path):
             with open(path, encoding="utf-8") as fh:
@@ -207,8 +216,79 @@ def ui_level(root, data):
         print("ui: clean")
 
 
+def is_test_file(path):
+    name = os.path.basename(path)
+    return (any(fnmatch.fnmatch(name, glob) for glob in TEST_FILE_GLOBS)
+            or any(part in TEST_FOLDERS for part in path.split("/")[:-1])
+            or (name.startswith("test_") and name.endswith(".py")))
+
+
+def changed_source_files(root, base, exclude):
+    """Repository-relative files added or modified between base and HEAD, without tests and the contract's exclude globs."""
+    out = contract.git(["-c", "core.quotepath=off", "diff", "--name-only", "--diff-filter=AM", base, "HEAD"], root) or ""
+    return [path for path in out.splitlines()
+            if path and not is_test_file(path) and not any(fnmatch.fnmatch(path, glob) for glob in exclude)]
+
+
+def mutation_level(root, data):
+    """Advisory: the contract's mutation command on the source files the branch changed. Exit 1 only on error."""
+    commit = head(root)
+    folder = receipt_dir(root, commit)
+    settings = (data.get("verify") or {}).get("mutation") or {}
+    receipt = {"commit": commit, "level": "mutation", "at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")}
+    if not settings.get("command"):
+        write_receipt(folder, "mutation", {**receipt, "status": "skipped", "reason": "no mutation command"})
+        print("mutation: skipped (the contract has no mutation command)")
+        return 0
+    base = ui_check.base_ref(root, data, None)
+    if not base:
+        write_receipt(folder, "mutation", {**receipt, "status": "error", "error": "no base branch found"})
+        print("mutation: no base branch found")
+        return 1
+    files = changed_source_files(root, base, settings.get("exclude") or [])
+    if not files:
+        write_receipt(folder, "mutation", {**receipt, "status": "skipped", "reason": "no source files changed"})
+        print("mutation: skipped (no source files changed)")
+        return 0
+    result = run_mutation_command(root, data, settings["command"], files, folder)
+    status = "ran" if result["exit"] == 0 else "error"
+    write_receipt(folder, "mutation", {**receipt, **result, "status": status})
+    if status == "error":
+        with open(result["log"], encoding="utf-8", errors="replace") as fh:
+            print("\n".join(fh.read().splitlines()[-TAIL:]))
+    print(f"mutation: {status} in {result['seconds']}s (exit {result['exit']}) on {len(files)} changed file(s); "
+          f"log {result['log']}. Advisory, does not block.")
+    if result["dirty_after"] and not result["dirty_before"]:
+        print("mutation: the command left changes in the working tree; look at them before committing")
+    return 0 if status == "ran" else 1
+
+
+def run_mutation_command(root, data, command, files, folder, env=None):
+    """Run the mutation command once on the changed files and say what happened, without reading any report.
+
+    This is the seam the next steps build on: a report parser reads the file the command wrote under the output
+    folder after the run, and a cache step adds its own variable through `env` and publishes its copy on exit 0.
+    Returns command (as run), files, env (the variables exported), exit, seconds, log, dirty_before, dirty_after.
+    """
+    exported = {"POTHOS_CHANGED_FILES": "\n".join(files), "POTHOS_MUTATION_OUT": folder, **(env or {})}
+    command = command.replace("{files}", ",".join(shlex.quote(path) for path in files))
+    os.makedirs(folder, exist_ok=True)
+    log_path = os.path.join(folder, "mutation.log")
+    dirty_before = dirty(root, data)
+    print(f"mutation: {command}", flush=True)
+    started = time.monotonic()
+    with open(log_path, "w", encoding="utf-8") as log:
+        proc = subprocess.run(command, shell=True, cwd=root, stdout=log, stderr=subprocess.STDOUT, text=True,
+                              env={**os.environ, **exported})
+    return {"command": command, "files": files, "env": exported, "exit": proc.returncode,
+            "seconds": round(time.monotonic() - started, 1), "log": log_path,
+            "dirty_before": dirty_before, "dirty_after": dirty(root, data)}
+
+
 def execute(root, data, level, env):
     """The checks themselves, run inside the detached process."""
+    if level == "mutation":
+        return mutation_level(root, data)
     if level == "full":
         status = run_level(root, data, "full", env)
         ui_level(root, data)
@@ -240,12 +320,21 @@ def alive(pid):
     return True
 
 
+def mutation_allowed(found):
+    """HEAD has a fast or full receipt that passed on a clean tree: never mutate red or uncommitted work."""
+    return any(r.get("status") == "passed" and not r.get("dirty") for r in (found.get("fast"), found.get("full")) if r)
+
+
 def start(root, data, level, env, seconds):
     commit = head(root)
     if not commit:
         print("no commit yet; commit before verifying", file=sys.stderr)
         return 3
-    for one in (("full", "e2e") if level == "all" else (level,)):
+    if level == "mutation":
+        if not mutation_allowed(receipts(root)[1]):
+            print("mutation: run fast or full first")
+            return 1
+    for one in {"all": ("full", "e2e"), "mutation": ()}.get(level, (level,)):
         if one != "e2e" or level == "e2e" or command_for_any_e2e(data):
             command_for(data, one, env)  # exits 3 on an unusable environment, before anything starts
     folder, marker = marker_paths(root)
@@ -313,8 +402,8 @@ def main(argv):
     root = contract.repo_root(os.getcwd())
     cmd = argv[0]
     if cmd == "run":
-        if len(argv) < 2 or argv[1] not in LEVELS + ("all",):
-            print("usage: verify.py run fast|full|e2e|all [--env NAME] [--wait SECONDS]", file=sys.stderr)
+        if len(argv) < 2 or argv[1] not in LEVELS + ("all", "mutation"):
+            print("usage: verify.py run fast|full|e2e|all|mutation [--env NAME] [--wait SECONDS]", file=sys.stderr)
             return 64
         data = load_contract(root)
         return start(root, data, argv[1], option(argv, "--env"), budget(argv))
