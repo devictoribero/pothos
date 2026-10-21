@@ -1,6 +1,6 @@
 ---
 name: verify
-description: Runs the repository's checks from its private Pothos contract (fast, full, end-to-end) and records a receipt for the current commit, outside the repository. Use before merging a ticket into an integration or feature branch, before a pull request leaves draft, when asked to "verify", "run the checks" or "is this green?", and whenever you are about to claim that work passes. A claim of green without a passing receipt for the current commit is not allowed.
+description: Runs the repository's checks from its private Pothos contract (fast, full, end-to-end, and advisory mutation testing) and records a receipt for the current commit, outside the repository. Use before merging a ticket into an integration or feature branch, before a pull request leaves draft, when asked to "verify", "run the checks" or "is this green?", and whenever you are about to claim that work passes. A claim of green without a passing receipt for the current commit is not allowed.
 ---
 
 # Verify
