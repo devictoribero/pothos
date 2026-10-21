@@ -358,6 +358,34 @@ class VerifyTest(unittest.TestCase):
         with open(os.path.join(self.mutation_receipt()["cache"], "seen")) as fh:
             self.assertEqual(fh.read(), "src/a.py")
 
+    def test_the_command_works_on_a_private_copy_under_its_own_receipt_folder(self):
+        self.contract({"verify": {"fast": "echo ok", "mutation": {"command": self.CACHE_COMMAND}}})
+        self.branch_with("src/a.py")
+        self.run_script("run", "fast")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        receipt = self.mutation_receipt()
+        seen = self.output_file(receipt, "cache-path")
+        self.assertEqual(seen, os.path.join(os.path.dirname(receipt["log"]), "mutation-cache"))
+        self.assertNotEqual(seen, receipt["cache"])
+        self.assertEqual(receipt["env"]["POTHOS_MUTATION_CACHE"], seen)
+
+    def test_publishing_covers_subfolders_and_leaves_no_temporary_name_behind(self):
+        command = self.CACHE_COMMAND + '; mkdir -p "$POTHOS_MUTATION_CACHE/nested"; echo deep > "$POTHOS_MUTATION_CACHE/nested/deep"'
+        self.contract({"verify": {"fast": "echo ok", "mutation": {"command": command}}})
+        self.branch_with("src/a.py")
+        self.run_script("run", "fast")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        shared = self.mutation_receipt()["cache"]
+        published = sorted(os.path.relpath(os.path.join(folder, name), shared)
+                           for folder, _, names in os.walk(shared) for name in names)
+        self.assertEqual(published, ["nested/deep", "seen"])
+
     def test_usage_errors_exit_64(self):
         self.assertEqual(self.run_script("run").returncode, 64)
         self.assertEqual(self.run_script("frobnicate").returncode, 64)
