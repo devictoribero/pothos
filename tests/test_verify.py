@@ -386,6 +386,25 @@ class VerifyTest(unittest.TestCase):
                            for folder, _, names in os.walk(shared) for name in names)
         self.assertEqual(published, ["nested/deep", "seen"])
 
+    def test_a_broken_shared_cache_is_an_error_receipt_and_the_command_never_runs(self):
+        self.contract({"verify": {"fast": "echo ok", "mutation": {"command": "touch mutation-ran"}}})
+        self.branch_with("src/a.py")
+        self.run_script("run", "fast")
+        shared = os.path.join(self.home, "mutation", "github.com", "acme", "shop")
+        os.makedirs(os.path.dirname(shared))
+        with open(shared, "w") as fh:
+            fh.write("not a folder")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+        self.assertIn("mutation: could not prepare the cache", run.stdout)
+        self.assertFalse(os.path.exists(os.path.join(self.repo, "mutation-ran")))
+        receipt = self.mutation_receipt()
+        self.assertEqual(receipt["status"], "error")
+        self.assertEqual(receipt["cache"], shared)
+        self.assertIn("File exists", receipt["error"])
+
     def test_usage_errors_exit_64(self):
         self.assertEqual(self.run_script("run").returncode, 64)
         self.assertEqual(self.run_script("frobnicate").returncode, 64)

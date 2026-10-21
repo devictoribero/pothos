@@ -252,7 +252,12 @@ def mutation_level(root, data):
         print("mutation: skipped (no source files changed)")
         return 0
     shared, private = mutation_cache_dir(root), os.path.join(folder, "mutation-cache")
-    seed_mutation_cache(shared, private)
+    try:
+        seed_mutation_cache(shared, private)
+    except OSError as exc:  # verify's own handling never raises: the receipt says what broke
+        write_receipt(folder, "mutation", {**receipt, "status": "error", "cache": shared, "error": str(exc)})
+        print(f"mutation: could not prepare the cache ({exc})")
+        return 1
     result = run_mutation_command(root, data, settings["command"], files, folder, env={"POTHOS_MUTATION_CACHE": private})
     status = "ran" if result["exit"] == 0 else "error"
     if status == "ran":
