@@ -405,6 +405,27 @@ class VerifyTest(unittest.TestCase):
         self.assertEqual(receipt["cache"], shared)
         self.assertIn("File exists", receipt["error"])
 
+    def test_a_cache_that_cannot_be_published_is_an_error_receipt(self):
+        self.contract({"verify": {"fast": "echo ok", "mutation": {"command": self.CACHE_COMMAND}}})
+        self.branch_with("src/a.py")
+        self.run_script("run", "fast")
+        self.run_script("run", "mutation")
+        shared = self.mutation_receipt()["cache"]
+        other = self.second_worktree("src/b.py")
+        os.chmod(shared, 0o555)
+
+        run = self.run_script("run", "mutation", cwd=other)
+
+        os.chmod(shared, 0o755)
+        self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+        self.assertIn("mutation: could not publish the cache", run.stdout)
+        receipt = self.mutation_receipt(cwd=other)
+        self.assertEqual(receipt["status"], "error")
+        self.assertEqual(receipt["exit"], 0)
+        self.assertIn("Permission denied", receipt["error"])
+        with open(os.path.join(shared, "seen")) as fh:
+            self.assertEqual(fh.read(), "src/a.py")
+
     def test_usage_errors_exit_64(self):
         self.assertEqual(self.run_script("run").returncode, 64)
         self.assertEqual(self.run_script("frobnicate").returncode, 64)

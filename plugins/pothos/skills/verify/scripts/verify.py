@@ -261,7 +261,12 @@ def mutation_level(root, data):
     result = run_mutation_command(root, data, settings["command"], files, folder, env={"POTHOS_MUTATION_CACHE": private})
     status = "ran" if result["exit"] == 0 else "error"
     if status == "ran":
-        publish_mutation_cache(private, shared)
+        try:
+            publish_mutation_cache(private, shared)
+        except OSError as exc:
+            write_receipt(folder, "mutation", {**receipt, **result, "cache": shared, "status": "error", "error": str(exc)})
+            print(f"mutation: could not publish the cache ({exc})")
+            return 1
     write_receipt(folder, "mutation", {**receipt, **result, "cache": shared, "status": status})
     if status == "error":
         with open(result["log"], encoding="utf-8", errors="replace") as fh:
