@@ -113,8 +113,9 @@ def verify_section(data):
     if mutation:
         text += ("\n\nThis repository has a mutation command: run `verify.py run mutation` once after green and before the "
                  "pull request, outside `run all`. It is advisory and mutates only the source files the branch changed; "
-                 "each `new` survivor it prints is a missing test or dead code on a line you added. The pull request lists "
-                 "the survivors killed, each with the name of the test that kills it, and the survivors left, each with why.")
+                 "what a `new` survivor means is rule 1 of `standards/testing.md`, listed under Coding standards. The pull "
+                 "request lists the survivors killed, each with the name of the test that kills it, and the survivors left, "
+                 "each with why.")
     return text
 
 
