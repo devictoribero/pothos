@@ -62,6 +62,8 @@ MUTATION_CONFIGS = {
                 "stryker.conf.js", "stryker.conf.json"],
     "cosmic-ray": ["cosmic-ray.toml", "cosmic-ray.conf"],
 }
+# The folder each tool leaves inside the repository, which the ignore file should name.
+MUTATION_TEMP_FOLDERS = {"stryker": ".stryker-tmp", "mutmut": "mutants", "cosmic-ray": ".cosmic-ray", "pit": "target/pit-reports"}
 # Build files that load the PIT plugin, and the words that show it.
 PIT_BUILD_FILES = {"pom.xml": re.compile(r"pitest-maven"), "build.gradle": re.compile(r"info\.solidsoft\.pitest|pitest"),
                    "build.gradle.kts": re.compile(r"info\.solidsoft\.pitest|pitest")}
@@ -273,6 +275,20 @@ def mutation_tools(root, pkg):
     return sorted(tools)
 
 
+def mutation_temp_ignored(root, tools):
+    """Whether .gitignore names the temp folder of every detected tool, or a parent of it. None without a tool."""
+    if not tools:
+        return None
+    lines = [line.strip() for line in (read(os.path.join(root, ".gitignore")) or "").splitlines()]
+    ignored = {re.sub(r"^(\*\*/|/)|/$", "", line) for line in lines if line and not line.startswith("#")}
+
+    def covered(folder):
+        parts = folder.split("/")
+        return any("/".join(parts[:n]) in ignored for n in range(1, len(parts) + 1))
+
+    return all(covered(MUTATION_TEMP_FOLDERS[tool]) for tool in tools)
+
+
 def default_branch(root):
     head = run(["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"], root)
     if head and "/" in head:
@@ -336,7 +352,7 @@ def detect(root):
     report["e2e_tools"] = [tool for tool, paths in e2e_found.items() if paths]
     report["e2e_config_paths"] = sorted(p for paths in e2e_found.values() for p in paths)
     report["mutation_tools"] = mutation_tools(root, pkg)
-    report["mutation_temp_ignored"] = None
+    report["mutation_temp_ignored"] = mutation_temp_ignored(root, report["mutation_tools"])
 
     workflows_dir = os.path.join(root, ".github", "workflows")
     ci = []

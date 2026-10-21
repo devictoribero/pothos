@@ -190,6 +190,20 @@ class DetectTest(unittest.TestCase):
         os.remove(os.path.join(self.repo, "pom.xml"))
         self.write("build.gradle.kts", "plugins {\n    id(\"info.solidsoft.pitest\") version \"1.15.0\"\n}\n")
         self.assertEqual(detect(self.repo)["mutation_tools"], ["cosmic-ray", "pit"])
+    def test_temp_folder_ignored_only_when_the_ignore_file_names_every_tools_folder(self):
+        self.write("stryker.config.json", "{}")
+        self.assertFalse(detect(self.repo)["mutation_temp_ignored"])
+        self.write(".gitignore", "node_modules\n# stryker leaves a sandbox behind on a crash\n.stryker-tmp/\n")
+        self.assertTrue(detect(self.repo)["mutation_temp_ignored"])
+        self.write("pyproject.toml", "[tool.mutmut]\n")
+        self.assertFalse(detect(self.repo)["mutation_temp_ignored"])
+        self.write(".gitignore", "/.stryker-tmp\n**/mutants\n")
+        self.assertTrue(detect(self.repo)["mutation_temp_ignored"])
+
+    def test_an_ignored_parent_folder_covers_the_pit_reports(self):
+        self.write("pom.xml", "<plugin><artifactId>pitest-maven</artifactId></plugin>")
+        self.write(".gitignore", "target/\n")
+        self.assertTrue(detect(self.repo)["mutation_temp_ignored"])
 
 if __name__ == "__main__":
     unittest.main()
