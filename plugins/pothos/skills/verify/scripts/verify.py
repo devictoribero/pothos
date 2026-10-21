@@ -246,7 +246,39 @@ def mutation_level(root, data):
         write_receipt(folder, "mutation", {**receipt, "status": "skipped", "reason": "no source files changed"})
         print("mutation: skipped (no source files changed)")
         return 0
-    return 0
+    result = run_mutation_command(root, data, settings["command"], files, folder)
+    status = "ran" if result["exit"] == 0 else "error"
+    write_receipt(folder, "mutation", {**receipt, **result, "status": status})
+    if status == "error":
+        with open(result["log"], encoding="utf-8", errors="replace") as fh:
+            print("\n".join(fh.read().splitlines()[-TAIL:]))
+    print(f"mutation: {status} in {result['seconds']}s (exit {result['exit']}) on {len(files)} changed file(s); "
+          f"log {result['log']}. Advisory, does not block.")
+    if result["dirty_after"] and not result["dirty_before"]:
+        print("mutation: the command left changes in the working tree; look at them before committing")
+    return 0 if status == "ran" else 1
+
+
+def run_mutation_command(root, data, command, files, folder, env=None):
+    """Run the mutation command once on the changed files and say what happened, without reading any report.
+
+    This is the seam the next steps build on: a report parser reads the file the command wrote under the output
+    folder after the run, and a cache step adds its own variable through `env` and publishes its copy on exit 0.
+    Returns command (as run), files, env (the variables exported), exit, seconds, log, dirty_before, dirty_after.
+    """
+    exported = {"POTHOS_CHANGED_FILES": "\n".join(files), "POTHOS_MUTATION_OUT": folder, **(env or {})}
+    command = command.replace("{files}", ",".join(shlex.quote(path) for path in files))
+    os.makedirs(folder, exist_ok=True)
+    log_path = os.path.join(folder, "mutation.log")
+    dirty_before = dirty(root, data)
+    print(f"mutation: {command}", flush=True)
+    started = time.monotonic()
+    with open(log_path, "w", encoding="utf-8") as log:
+        proc = subprocess.run(command, shell=True, cwd=root, stdout=log, stderr=subprocess.STDOUT, text=True,
+                              env={**os.environ, **exported})
+    return {"command": command, "files": files, "env": exported, "exit": proc.returncode,
+            "seconds": round(time.monotonic() - started, 1), "log": log_path,
+            "dirty_before": dirty_before, "dirty_after": dirty(root, data)}
 
 
 def execute(root, data, level, env):

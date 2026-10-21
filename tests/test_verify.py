@@ -208,6 +208,34 @@ class VerifyTest(unittest.TestCase):
         self.assertEqual(receipt["status"], "skipped")
         self.assertEqual(receipt["reason"], "no source files changed")
 
+    def test_mutation_command_receives_the_changed_files_and_the_output_folder(self):
+        command = ('printf "%s" "$POTHOS_CHANGED_FILES" > "$POTHOS_MUTATION_OUT/seen-files"; '
+                   'printf "%s" "$POTHOS_MUTATION_OUT" > "$POTHOS_MUTATION_OUT/seen-out"; '
+                   'printf "%s" {files} > "$POTHOS_MUTATION_OUT/seen-placeholder"')
+        self.contract({"verify": {"full": "true", "mutation": {"command": command}}})
+        self.branch_with("src/a.py", "src/sp ace.py", "src/a.test.py")
+        self.run_script("run", "full")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertIn("mutation: ran in", run.stdout)
+        receipt = json.loads(self.run_script("show").stdout)["receipts"]["mutation"]
+        folder = os.path.dirname(receipt["log"])
+        with open(os.path.join(folder, "seen-files")) as fh:
+            self.assertEqual(fh.read(), "src/a.py\nsrc/sp ace.py")
+        with open(os.path.join(folder, "seen-out")) as fh:
+            self.assertEqual(fh.read(), folder)
+        with open(os.path.join(folder, "seen-placeholder")) as fh:
+            self.assertEqual(fh.read(), "src/a.py,src/sp ace.py")
+        self.assertEqual(receipt["status"], "ran")
+        self.assertEqual(receipt["files"], ["src/a.py", "src/sp ace.py"])
+        self.assertEqual(receipt["exit"], 0)
+        self.assertIn("src/a.py,'src/sp ace.py'", receipt["command"])
+        self.assertIsInstance(receipt["seconds"], float)
+        self.assertFalse(receipt["dirty_before"])
+        self.assertFalse(receipt["dirty_after"])
+
     def test_usage_errors_exit_64(self):
         self.assertEqual(self.run_script("run").returncode, 64)
         self.assertEqual(self.run_script("frobnicate").returncode, 64)
