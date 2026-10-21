@@ -3,7 +3,8 @@
 
 Usage:
   verify.py run LEVEL [--env NAME] [--wait SECONDS]
-                                     LEVEL is fast, full, e2e or all (full, then e2e when configured)
+                                     LEVEL is fast, full, e2e, all (full, then e2e when configured)
+                                     or mutation (the contract's mutation command on the changed files)
   verify.py wait [--wait SECONDS]    keep waiting for HEAD's run that is still going
   verify.py check [--no-e2e]         exit 0 when HEAD has a passing full receipt (and e2e, when configured)
   verify.py show                     print HEAD's receipts as JSON
@@ -12,6 +13,9 @@ Receipts live in $POTHOS_HOME/receipts/<host>/<owner>/<repo>/<commit>/<level>.js
 to them. A run on a dirty working tree is recorded but never counts as a pass: commit first.
 After full, the contract's ui check runs on the branch's added lines and writes ui.json. It is advisory:
 it never changes an exit code, and check only mentions it.
+`run mutation` is advisory too and stays out of `run all`: it needs a passing clean fast or full receipt
+for HEAD, runs the contract's mutation command on the source files added or modified since the merge-base
+with the pull request base, and writes mutation.json (ran, error or skipped). check ignores it.
 
 The checks run in a detached process, so a slow suite outlives the caller. `run` waits up to --wait
 seconds (default 540, under an agent's ten-minute command limit) and exits 4 when the run is still
