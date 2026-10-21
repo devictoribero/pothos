@@ -451,6 +451,22 @@ class VerifyTest(unittest.TestCase):
         self.assertIn("report.json", receipt["error"])
         self.assertEqual(receipt["exit"], 0)
 
+    def test_check_passes_and_its_verified_line_ends_with_the_mutation_note_when_new_survivors_exist(self):
+        source = "a = 1\nb = 2\n"
+        self.modify_on_a_branch("src/a.py", "a = 1\n", source)
+        report = {"schemaVersion": "2", "files": {"src/a.py": {"language": "python", "source": source,
+                  "mutants": [self.mutant(1, "Survived"), self.mutant(2, "Survived"), self.mutant(2, "NoCoverage")]}}}
+        self.contract({"verify": {"full": "true", "mutation": {
+            "command": self.mutation_tool(report), "report": "$POTHOS_MUTATION_OUT/report.json"}}})
+        self.run_script("run", "full")
+        self.run_script("run", "mutation")
+
+        check = self.run_script("check")
+
+        self.assertEqual(check.returncode, 0, check.stdout)
+        self.assertTrue(check.stdout.endswith("; mutation: 2 new survivor(s), see verify.py show\n"), check.stdout)
+        self.assertIn("verified: full passed on", check.stdout)
+
     def test_usage_errors_exit_64(self):
         self.assertEqual(self.run_script("run").returncode, 64)
         self.assertEqual(self.run_script("frobnicate").returncode, 64)

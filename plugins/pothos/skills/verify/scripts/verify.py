@@ -177,6 +177,9 @@ def check(root, data, need_e2e):
         return 1
     ui = found.get("ui") or {}
     note = f"; ui: {len(ui['findings'])} advisory finding(s), see `verify.py show`" if ui.get("status") == "findings" else ""
+    new = [f for f in (found.get("mutation") or {}).get("findings") or [] if f["kind"] == "new"]
+    if new:
+        note += f"; mutation: {len(new)} new survivor(s), see verify.py show"
     print(f"verified: {', '.join(wanted)} passed on {commit[:12]}{note}")
     return 0
 
