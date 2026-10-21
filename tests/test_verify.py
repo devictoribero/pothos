@@ -403,6 +403,31 @@ class VerifyTest(unittest.TestCase):
         self.assertNotEqual(seen, receipt["cache"])
         self.assertEqual(receipt["env"]["POTHOS_MUTATION_CACHE"], seen)
 
+    def test_a_successful_run_removes_its_private_copy_once_the_cache_is_published(self):
+        self.contract({"verify": {"fast": "echo ok", "mutation": {"command": self.CACHE_COMMAND}}})
+        self.branch_with("src/a.py")
+        self.run_script("run", "fast")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        receipt = self.mutation_receipt()
+        self.assertFalse(os.path.exists(os.path.join(os.path.dirname(receipt["log"]), "mutation-cache")))
+        with open(os.path.join(receipt["cache"], "seen")) as fh:
+            self.assertEqual(fh.read(), "src/a.py")
+
+    def test_a_failing_run_removes_its_private_copy_too(self):
+        self.contract({"verify": {"fast": "echo ok", "mutation": {"command": self.CACHE_COMMAND + "; exit 3"}}})
+        self.branch_with("src/a.py")
+        self.run_script("run", "fast")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+        receipt = self.mutation_receipt()
+        self.assertFalse(os.path.exists(os.path.join(os.path.dirname(receipt["log"]), "mutation-cache")))
+        self.assertEqual(receipt["cache"], os.path.join(self.home, "mutation", "github.com", "acme", "shop"))
+
     def test_publishing_covers_subfolders_and_leaves_no_temporary_name_behind(self):
         command = self.CACHE_COMMAND + '; mkdir -p "$POTHOS_MUTATION_CACHE/nested"; echo deep > "$POTHOS_MUTATION_CACHE/nested/deep"'
         self.contract({"verify": {"fast": "echo ok", "mutation": {"command": command}}})
