@@ -62,6 +62,8 @@ MUTATION_CONFIGS = {
                 "stryker.conf.js", "stryker.conf.json"],
 }
 STRYKER_PACKAGE = "@stryker-mutator/core"
+# Section headers that configure mutmut: a table in the Python project file or a section in setup.cfg.
+MUTMUT_SECTIONS = {"pyproject.toml": re.compile(r"^\[tool\.mutmut\]", re.M), "setup.cfg": re.compile(r"^\[mutmut\]", re.M)}
 
 TRACKER_PATTERNS = {
     "jira": re.compile(r"atlassian\.net|\bjira\b", re.I),
@@ -260,6 +262,8 @@ def mutation_tools(root, pkg):
     deps = {**((pkg or {}).get("dependencies") or {}), **((pkg or {}).get("devDependencies") or {})}
     if STRYKER_PACKAGE in deps:
         tools.add("stryker")
+    if any(pattern.search(read(os.path.join(root, name)) or "") for name, pattern in MUTMUT_SECTIONS.items()):
+        tools.add("mutmut")
     return sorted(tools)
 
 

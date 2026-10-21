@@ -175,6 +175,14 @@ class DetectTest(unittest.TestCase):
         os.remove(os.path.join(self.repo, "stryker.config.mjs"))
         self.write("package.json", json.dumps({"devDependencies": {"@stryker-mutator/core": "8.0.0"}}))
         self.assertEqual(detect(self.repo)["mutation_tools"], ["stryker"])
+    def test_mutmut_table_or_section_reports_mutmut(self):
+        self.write("pyproject.toml", "[tool.pytest.ini_options]\nx = 1\n[tool.mutmut]\npaths_to_mutate = [\"src/\"]\n")
+        self.assertEqual(detect(self.repo)["mutation_tools"], ["mutmut"])
+        os.remove(os.path.join(self.repo, "pyproject.toml"))
+        self.write("setup.cfg", "[flake8]\nmax-line-length = 100\n[mutmut]\npaths_to_mutate=src/\n")
+        self.assertEqual(detect(self.repo)["mutation_tools"], ["mutmut"])
+        self.write("setup.cfg", "[flake8]\n# mutmut is not configured here\n")
+        self.assertEqual(detect(self.repo)["mutation_tools"], [])
 
 if __name__ == "__main__":
     unittest.main()
