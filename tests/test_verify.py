@@ -180,6 +180,34 @@ class VerifyTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.repo, "mutation-ran")))
         self.assertNotIn("mutation", json.loads(self.run_script("show").stdout)["receipts"])
 
+    def add_file(self, rel, text="x = 1\n"):
+        path = os.path.join(self.repo, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as fh:
+            fh.write(text)
+
+    def branch_with(self, *files, message="change"):
+        self.git("checkout", "-q", "-b", "feature")
+        for rel in files:
+            self.add_file(rel)
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", message)
+
+    def test_mutation_is_skipped_when_only_test_files_or_excluded_files_changed(self):
+        self.contract({"verify": {"full": "true", "mutation": {"command": "touch mutation-ran", "exclude": ["src/generated/*"]}}})
+        self.branch_with("src/a.test.js", "src/b.spec.ts", "src/__tests__/c.js", "tests/d.py", "src/test_e.py",
+                         "src/generated/f.js")
+        self.run_script("run", "full")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertIn("mutation: skipped (no source files changed)", run.stdout)
+        self.assertFalse(os.path.exists(os.path.join(self.repo, "mutation-ran")))
+        receipt = json.loads(self.run_script("show").stdout)["receipts"]["mutation"]
+        self.assertEqual(receipt["status"], "skipped")
+        self.assertEqual(receipt["reason"], "no source files changed")
+
     def test_usage_errors_exit_64(self):
         self.assertEqual(self.run_script("run").returncode, 64)
         self.assertEqual(self.run_script("frobnicate").returncode, 64)

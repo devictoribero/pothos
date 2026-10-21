@@ -21,6 +21,7 @@ Exit codes: 0 passed (or skipped because the level is not configured), 1 failed 
 2 no contract, 3 the contract or the environment is unusable, 4 still running, 64 usage.
 """
 import datetime
+import fnmatch
 import json
 import os
 import shlex
@@ -34,6 +35,10 @@ import contract  # noqa: E402
 import ui_check  # noqa: E402
 
 LEVELS = ("fast", "full", "e2e")
+ADVISORY = ("ui", "mutation")
+# The files Stryker's default mutate option leaves out; an explicit --mutate replaces those defaults.
+TEST_FILE_GLOBS = ("*.test.*", "*.spec.*")
+TEST_FOLDERS = ("__tests__", "tests")
 TAIL = 60
 WAIT = 540
 
@@ -133,7 +138,7 @@ def receipts(root):
         return None, {}
     folder = receipt_dir(root, commit)
     found = {}
-    for level in LEVELS + ("ui",):
+    for level in LEVELS + ADVISORY:
         path = os.path.join(folder, f"{level}.json")
         if os.path.isfile(path):
             with open(path, encoding="utf-8") as fh:
@@ -207,8 +212,47 @@ def ui_level(root, data):
         print("ui: clean")
 
 
+def is_test_file(path):
+    name = os.path.basename(path)
+    return (any(fnmatch.fnmatch(name, glob) for glob in TEST_FILE_GLOBS)
+            or any(part in TEST_FOLDERS for part in path.split("/")[:-1])
+            or (name.startswith("test_") and name.endswith(".py")))
+
+
+def changed_source_files(root, base, exclude):
+    """Repository-relative files added or modified between base and HEAD, without tests and the contract's exclude globs."""
+    out = contract.git(["-c", "core.quotepath=off", "diff", "--name-only", "--diff-filter=AM", base, "HEAD"], root) or ""
+    return [path for path in out.splitlines()
+            if path and not is_test_file(path) and not any(fnmatch.fnmatch(path, glob) for glob in exclude)]
+
+
+def mutation_level(root, data):
+    """Advisory: the contract's mutation command on the source files the branch changed. Exit 1 only on error."""
+    commit = head(root)
+    folder = receipt_dir(root, commit)
+    settings = (data.get("verify") or {}).get("mutation") or {}
+    receipt = {"commit": commit, "level": "mutation", "at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")}
+    if not settings.get("command"):
+        write_receipt(folder, "mutation", {**receipt, "status": "skipped", "reason": "no mutation command"})
+        print("mutation: skipped (the contract has no mutation command)")
+        return 0
+    base = ui_check.base_ref(root, data, None)
+    if not base:
+        write_receipt(folder, "mutation", {**receipt, "status": "error", "error": "no base branch found"})
+        print("mutation: no base branch found")
+        return 1
+    files = changed_source_files(root, base, settings.get("exclude") or [])
+    if not files:
+        write_receipt(folder, "mutation", {**receipt, "status": "skipped", "reason": "no source files changed"})
+        print("mutation: skipped (no source files changed)")
+        return 0
+    return 0
+
+
 def execute(root, data, level, env):
     """The checks themselves, run inside the detached process."""
+    if level == "mutation":
+        return mutation_level(root, data)
     if level == "full":
         status = run_level(root, data, "full", env)
         ui_level(root, data)
