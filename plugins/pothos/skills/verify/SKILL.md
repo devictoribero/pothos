@@ -16,6 +16,7 @@ Every command goes through `"${CLAUDE_SKILL_DIR}/scripts/verify.py"`. Run it fro
 | `fast` | While working, after each meaningful edit. Seconds. | No |
 | `full` | Before any merge and before a pull request leaves draft. Everything CI checks. | Yes |
 | `e2e` | With `full`, when the contract has an end-to-end command. | Yes, when configured |
+| `mutation` | Once after green and before the pull request, when the contract has a mutation command. | No |
 
 A level the contract does not configure is recorded as skipped and does not block. Say so in the pull request.
 
@@ -33,7 +34,12 @@ After `full`, the UI check runs on the lines the branch adds, when the contract'
 
    Run it in the foreground, never as a background command: a background command dies when your turn or your subagent ends, and nobody gets notified. The checks run in a detached process, and `run` returns within about nine minutes. Exit `4` means they are still going: run `verify.py wait` (also in the foreground) until it returns another code. Never start a second run for the same commit; `run` attaches to the one in progress anyway.
 4. **On failure**, read the tail the script prints, then open the log it names if you need more. Fix the cause, commit, and run again. Never weaken, skip or delete a check to get a pass. If the failure is unrelated to the change and also fails on the base branch, say so with evidence (the base commit's receipt) and stop. Do not paper over it.
-5. **Gate.** Before merging or marking a pull request ready:
+5. **Mutation**, once after green and before the pull request, when the contract has a mutation command:
+   ```bash
+   python3 "${CLAUDE_SKILL_DIR}/scripts/verify.py" run mutation
+   ```
+   It stays out of `run all` and needs a passing `fast` or `full` receipt for HEAD on a clean tree. Read the receipt: each `new` survivor it prints is a missing test or dead code on a line you added, so add the test that kills it or delete the code, commit, and run `fast` then `mutation` again.
+6. **Gate.** Before merging or marking a pull request ready:
    ```bash
    python3 "${CLAUDE_SKILL_DIR}/scripts/verify.py" check
    ```
@@ -41,7 +47,7 @@ After `full`, the UI check runs on the lines the branch adds, when the contract'
 
 ## Reporting
 
-State the level, the commit and the result in one line each. Quote the script's own output rather than paraphrasing it, for example `verified: full, e2e passed on 3f2a91c04b1e`. If something was skipped, say what and why.
+State the level, the commit and the result in one line each. Quote the script's own output rather than paraphrasing it, for example `verified: full, e2e passed on 3f2a91c04b1e`. For `mutation`, quote its closing line, for example `mutation: 1 new surviving mutant(s) in 2 changed file(s); 4 inherited, see verify.py show. Advisory, does not block. Each new one is a missing test or dead code.` If something was skipped, say what and why.
 
 ## Exit codes
 
