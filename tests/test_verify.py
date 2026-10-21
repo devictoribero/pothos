@@ -399,6 +399,58 @@ class VerifyTest(unittest.TestCase):
         self.assertEqual([(f["file"], f["status"]) for f in receipt["findings"]],
                          [("src/a.py", "Survived"), ("src/a.py", "NoCoverage")])
 
+    def test_an_empty_report_is_clean_and_check_carries_no_note(self):
+        self.branch_with("src/a.py")
+        self.contract({"verify": {"full": "true", "mutation": {
+            "command": self.mutation_tool({"schemaVersion": "2", "files": {}}),
+            "report": "$POTHOS_MUTATION_OUT/report.json"}}})
+        self.run_script("run", "full")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertIn("mutation: 0 new surviving mutant(s) in 1 changed file(s); 0 inherited", run.stdout)
+        receipt = json.loads(self.run_script("show").stdout)["receipts"]["mutation"]
+        self.assertEqual(receipt["status"], "clean")
+        self.assertEqual(receipt["findings"], [])
+        self.assertEqual(receipt["counts"], {})
+        check = self.run_script("check")
+        self.assertEqual(check.returncode, 0, check.stdout)
+        self.assertNotIn("mutation", check.stdout)
+
+    def test_a_report_the_command_never_wrote_keeps_the_receipt_at_ran(self):
+        self.branch_with("src/a.py")
+        self.contract({"verify": {"full": "true", "mutation": {
+            "command": self.mutation_tool({"schemaVersion": "2", "files": {}}, name="elsewhere.json"),
+            "report": "$POTHOS_MUTATION_OUT/report.json"}}})
+        self.run_script("run", "full")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertIn("mutation: ran in", run.stdout)
+        receipt = json.loads(self.run_script("show").stdout)["receipts"]["mutation"]
+        self.assertEqual(receipt["status"], "ran")
+        self.assertNotIn("findings", receipt)
+        self.assertNotIn("report", receipt)
+
+    def test_a_report_that_is_not_json_is_an_error_without_a_traceback(self):
+        self.branch_with("src/a.py")
+        self.contract({"verify": {"full": "true", "mutation": {
+            "command": 'echo "not json" > "$POTHOS_MUTATION_OUT/report.json"',
+            "report": "$POTHOS_MUTATION_OUT/report.json"}}})
+        self.run_script("run", "full")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+        self.assertIn("mutation: could not read the report", run.stdout)
+        self.assertNotIn("Traceback", run.stdout + run.stderr)
+        receipt = json.loads(self.run_script("show").stdout)["receipts"]["mutation"]
+        self.assertEqual(receipt["status"], "error")
+        self.assertIn("report.json", receipt["error"])
+        self.assertEqual(receipt["exit"], 0)
+
     def test_usage_errors_exit_64(self):
         self.assertEqual(self.run_script("run").returncode, 64)
         self.assertEqual(self.run_script("frobnicate").returncode, 64)
