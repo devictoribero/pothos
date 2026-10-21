@@ -280,6 +280,20 @@ class VerifyTest(unittest.TestCase):
         self.assertFalse(receipt["dirty_before"])
         self.assertTrue(receipt["dirty_after"])
 
+    def test_a_tree_dirty_before_the_command_gets_a_warning_that_says_so(self):
+        self.contract({"verify": {"full": "true", "mutation": {"command": "true"}}})
+        self.branch_with("src/a.py")
+        self.run_script("run", "full")
+        self.add_file("notes.tmp", "uncommitted")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertIn("mutation: the working tree has uncommitted changes, already there before the command", run.stdout)
+        receipt = self.mutation_receipt()
+        self.assertTrue(receipt["dirty_before"])
+        self.assertTrue(receipt["dirty_after"])
+
     def test_mutation_without_a_base_branch_is_an_error(self):
         self.contract({"verify": {"full": "true", "mutation": {"command": "touch mutation-ran"}}})
         self.git("branch", "-m", "main", "trunk")

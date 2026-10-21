@@ -306,8 +306,10 @@ def mutation_level(root, data):
                 print("\n".join(fh.read().splitlines()[-TAIL:]))
         print(f"mutation: {status} in {result['seconds']}s (exit {result['exit']}) on {len(files)} changed file(s); "
               f"log {result['log']}. Advisory, does not block.")
-    if result["dirty_after"] and not result["dirty_before"]:
-        print("mutation: the command left changes in the working tree; look at them before committing")
+    if result["dirty_after"]:
+        print("mutation: the working tree has uncommitted changes, already there before the command; look at them before committing"
+              if result["dirty_before"] else
+              "mutation: the command left changes in the working tree; look at them before committing")
     return 1 if status == "error" else 0
 
 
