@@ -183,6 +183,13 @@ class DetectTest(unittest.TestCase):
         self.assertEqual(detect(self.repo)["mutation_tools"], ["mutmut"])
         self.write("setup.cfg", "[flake8]\n# mutmut is not configured here\n")
         self.assertEqual(detect(self.repo)["mutation_tools"], [])
+    def test_cosmic_ray_config_and_pit_plugin_report_both_tools_sorted(self):
+        self.write("cosmic-ray.toml", "[cosmic-ray]\nmodule-path = \"src\"\n")
+        self.write("pom.xml", "<project><build><plugins><plugin><artifactId>pitest-maven</artifactId></plugin></plugins></build></project>")
+        self.assertEqual(detect(self.repo)["mutation_tools"], ["cosmic-ray", "pit"])
+        os.remove(os.path.join(self.repo, "pom.xml"))
+        self.write("build.gradle.kts", "plugins {\n    id(\"info.solidsoft.pitest\") version \"1.15.0\"\n}\n")
+        self.assertEqual(detect(self.repo)["mutation_tools"], ["cosmic-ray", "pit"])
 
 if __name__ == "__main__":
     unittest.main()

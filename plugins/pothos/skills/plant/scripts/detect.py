@@ -60,7 +60,11 @@ E2E_CONFIGS = {
 MUTATION_CONFIGS = {
     "stryker": ["stryker.config.js", "stryker.config.mjs", "stryker.config.cjs", "stryker.config.json",
                 "stryker.conf.js", "stryker.conf.json"],
+    "cosmic-ray": ["cosmic-ray.toml", "cosmic-ray.conf"],
 }
+# Build files that load the PIT plugin, and the words that show it.
+PIT_BUILD_FILES = {"pom.xml": re.compile(r"pitest-maven"), "build.gradle": re.compile(r"info\.solidsoft\.pitest|pitest"),
+                   "build.gradle.kts": re.compile(r"info\.solidsoft\.pitest|pitest")}
 STRYKER_PACKAGE = "@stryker-mutator/core"
 # Section headers that configure mutmut: a table in the Python project file or a section in setup.cfg.
 MUTMUT_SECTIONS = {"pyproject.toml": re.compile(r"^\[tool\.mutmut\]", re.M), "setup.cfg": re.compile(r"^\[mutmut\]", re.M)}
@@ -264,6 +268,8 @@ def mutation_tools(root, pkg):
         tools.add("stryker")
     if any(pattern.search(read(os.path.join(root, name)) or "") for name, pattern in MUTMUT_SECTIONS.items()):
         tools.add("mutmut")
+    if any(pattern.search(read(os.path.join(root, name)) or "") for name, pattern in PIT_BUILD_FILES.items()):
+        tools.add("pit")
     return sorted(tools)
 
 
