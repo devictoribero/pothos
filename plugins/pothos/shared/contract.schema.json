@@ -59,7 +59,7 @@
           "additionalProperties": false,
           "properties": {
             "command": {
-              "description": "Command that mutates the changed files. {files} is replaced by the comma-separated, shell-quoted list; POTHOS_CHANGED_FILES carries the same list newline-separated and POTHOS_MUTATION_OUT the commit's receipt folder.",
+              "description": "Command that mutates the changed files. {files} is replaced by the comma-separated, shell-quoted list; POTHOS_CHANGED_FILES carries the same list newline-separated, POTHOS_MUTATION_OUT the commit's receipt folder and POTHOS_MUTATION_CACHE a folder for what the tool reuses between runs, shared by every clone and worktree of the repository.",
               "type": "string",
               "minLength": 1
             },

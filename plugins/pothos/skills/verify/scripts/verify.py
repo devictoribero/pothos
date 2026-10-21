@@ -44,7 +44,8 @@ import ui_check  # noqa: E402
 
 LEVELS = ("fast", "full", "e2e")
 ADVISORY = ("ui", "mutation")
-# The files Stryker's default mutate option leaves out; an explicit --mutate replaces those defaults.
+# The files Stryker's default mutate option leaves out (an explicit --mutate replaces those defaults), plus the
+# common Python layout: a tests/ folder and test_*.py files.
 TEST_FILE_GLOBS = ("*.test.*", "*.spec.*")
 TEST_FOLDERS = ("__tests__", "tests")
 # Every status of the mutation-testing-report-schema: only the first kind is a finding.
@@ -423,8 +424,7 @@ def publish_mutation_cache(private, shared):
 def run_mutation_command(root, data, command, files, folder, env=None):
     """Run the mutation command once on the changed files and say what happened, without reading any report.
 
-    This is the seam the next steps build on: a report parser reads the file the command wrote under the output
-    folder after the run, and a cache step adds its own variable through `env` and publishes its copy on exit 0.
+    `env` adds variables to the two every command gets, such as the cache folder.
     Returns command (as run), files, env (the variables exported), exit, seconds, log, dirty_before, dirty_after.
     """
     exported = {"POTHOS_CHANGED_FILES": "\n".join(files), "POTHOS_MUTATION_OUT": folder, **(env or {})}
