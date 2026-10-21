@@ -56,6 +56,21 @@ E2E_CONFIGS = {
     "detox": [".detoxrc.js", ".detoxrc.json", "detox.config.js"],
 }
 
+# Mutation tools, by the config file that declares them, at the root or in a monorepo app.
+MUTATION_CONFIGS = {
+    "stryker": ["stryker.config.js", "stryker.config.mjs", "stryker.config.cjs", "stryker.config.json",
+                "stryker.conf.js", "stryker.conf.json"],
+    "cosmic-ray": ["cosmic-ray.toml", "cosmic-ray.conf"],
+}
+# The folder each tool leaves inside the repository, which the ignore file should name.
+MUTATION_TEMP_FOLDERS = {"stryker": ".stryker-tmp", "mutmut": "mutants", "cosmic-ray": ".cosmic-ray", "pit": "target/pit-reports"}
+# Build files that load the PIT plugin, and the words that show it.
+PIT_BUILD_FILES = {"pom.xml": re.compile(r"pitest-maven"), "build.gradle": re.compile(r"info\.solidsoft\.pitest|pitest"),
+                   "build.gradle.kts": re.compile(r"info\.solidsoft\.pitest|pitest")}
+STRYKER_PACKAGE = "@stryker-mutator/core"
+# Section headers that configure mutmut: a table in the Python project file or a section in setup.cfg.
+MUTMUT_SECTIONS = {"pyproject.toml": re.compile(r"^\[tool\.mutmut\]", re.M), "setup.cfg": re.compile(r"^\[mutmut\]", re.M)}
+
 TRACKER_PATTERNS = {
     "jira": re.compile(r"atlassian\.net|\bjira\b", re.I),
     "linear": re.compile(r"linear\.app|\blinear\b", re.I),
@@ -247,6 +262,33 @@ def ui_facts(root, pkg, pm):
     }
 
 
+def mutation_tools(root, pkg):
+    """Mutation tools declared on disk, sorted. Only what a config file or manifest says; never a guess."""
+    tools = {tool for tool, files in MUTATION_CONFIGS.items() if find_upwards_of_depth(root, files)}
+    deps = {**((pkg or {}).get("dependencies") or {}), **((pkg or {}).get("devDependencies") or {})}
+    if STRYKER_PACKAGE in deps:
+        tools.add("stryker")
+    if any(pattern.search(read(os.path.join(root, name)) or "") for name, pattern in MUTMUT_SECTIONS.items()):
+        tools.add("mutmut")
+    if any(pattern.search(read(os.path.join(root, name)) or "") for name, pattern in PIT_BUILD_FILES.items()):
+        tools.add("pit")
+    return sorted(tools)
+
+
+def mutation_temp_ignored(root, tools):
+    """Whether .gitignore names the temp folder of every detected tool, or a parent of it. None without a tool."""
+    if not tools:
+        return None
+    lines = [line.strip() for line in (read(os.path.join(root, ".gitignore")) or "").splitlines()]
+    ignored = {re.sub(r"^(\*\*/|/)|/$", "", line) for line in lines if line and not line.startswith("#")}
+
+    def covered(folder):
+        parts = folder.split("/")
+        return any("/".join(parts[:n]) in ignored for n in range(1, len(parts) + 1))
+
+    return all(covered(MUTATION_TEMP_FOLDERS[tool]) for tool in tools)
+
+
 def default_branch(root):
     head = run(["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"], root)
     if head and "/" in head:
@@ -309,6 +351,8 @@ def detect(root):
     e2e_found = {tool: find_upwards_of_depth(root, files) for tool, files in E2E_CONFIGS.items()}
     report["e2e_tools"] = [tool for tool, paths in e2e_found.items() if paths]
     report["e2e_config_paths"] = sorted(p for paths in e2e_found.values() for p in paths)
+    report["mutation_tools"] = mutation_tools(root, pkg)
+    report["mutation_temp_ignored"] = mutation_temp_ignored(root, report["mutation_tools"])
 
     workflows_dir = os.path.join(root, ".github", "workflows")
     ci = []
