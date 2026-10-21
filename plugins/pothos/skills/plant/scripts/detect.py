@@ -56,6 +56,13 @@ E2E_CONFIGS = {
     "detox": [".detoxrc.js", ".detoxrc.json", "detox.config.js"],
 }
 
+# Mutation tools, by the config file that declares them, at the root or in a monorepo app.
+MUTATION_CONFIGS = {
+    "stryker": ["stryker.config.js", "stryker.config.mjs", "stryker.config.cjs", "stryker.config.json",
+                "stryker.conf.js", "stryker.conf.json"],
+}
+STRYKER_PACKAGE = "@stryker-mutator/core"
+
 TRACKER_PATTERNS = {
     "jira": re.compile(r"atlassian\.net|\bjira\b", re.I),
     "linear": re.compile(r"linear\.app|\blinear\b", re.I),
@@ -247,6 +254,15 @@ def ui_facts(root, pkg, pm):
     }
 
 
+def mutation_tools(root, pkg):
+    """Mutation tools declared on disk, sorted. Only what a config file or manifest says; never a guess."""
+    tools = {tool for tool, files in MUTATION_CONFIGS.items() if find_upwards_of_depth(root, files)}
+    deps = {**((pkg or {}).get("dependencies") or {}), **((pkg or {}).get("devDependencies") or {})}
+    if STRYKER_PACKAGE in deps:
+        tools.add("stryker")
+    return sorted(tools)
+
+
 def default_branch(root):
     head = run(["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"], root)
     if head and "/" in head:
@@ -309,6 +325,8 @@ def detect(root):
     e2e_found = {tool: find_upwards_of_depth(root, files) for tool, files in E2E_CONFIGS.items()}
     report["e2e_tools"] = [tool for tool, paths in e2e_found.items() if paths]
     report["e2e_config_paths"] = sorted(p for paths in e2e_found.values() for p in paths)
+    report["mutation_tools"] = mutation_tools(root, pkg)
+    report["mutation_temp_ignored"] = None
 
     workflows_dir = os.path.join(root, ".github", "workflows")
     ci = []

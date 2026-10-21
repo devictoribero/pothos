@@ -164,6 +164,17 @@ class DetectTest(unittest.TestCase):
         self.assertEqual(report["tracker_hints"]["issue_keys"], ["ABC"])
         self.assertEqual(report["existing_contract"], contract)
 
+    def test_no_mutation_tool_means_an_empty_list_and_no_ignore_verdict(self):
+        report = detect(self.repo)
+        self.assertEqual(report["mutation_tools"], [])
+        self.assertIsNone(report["mutation_temp_ignored"])
+
+    def test_stryker_config_or_core_package_reports_stryker(self):
+        self.write("stryker.config.mjs", "export default {}")
+        self.assertEqual(detect(self.repo)["mutation_tools"], ["stryker"])
+        os.remove(os.path.join(self.repo, "stryker.config.mjs"))
+        self.write("package.json", json.dumps({"devDependencies": {"@stryker-mutator/core": "8.0.0"}}))
+        self.assertEqual(detect(self.repo)["mutation_tools"], ["stryker"])
 
 if __name__ == "__main__":
     unittest.main()
