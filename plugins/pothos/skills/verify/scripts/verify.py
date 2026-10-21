@@ -43,6 +43,11 @@ ADVISORY = ("ui", "mutation")
 # The files Stryker's default mutate option leaves out; an explicit --mutate replaces those defaults.
 TEST_FILE_GLOBS = ("*.test.*", "*.spec.*")
 TEST_FOLDERS = ("__tests__", "tests")
+# Every status of the mutation-testing-report-schema: only the first kind is a finding.
+MUTANT_STATUSES = {"Survived": "finding", "NoCoverage": "finding", "Killed": "killed", "Timeout": "killed",
+                   "Ignored": "ignored", "CompileError": "noise", "RuntimeError": "noise", "Pending": "noise"}
+MUTATION_CLOSING = ("mutation: {new} new surviving mutant(s) in {files} changed file(s); {inherited} inherited, "
+                    "see verify.py show. Advisory, does not block. Each new one is a missing test or dead code.")
 TAIL = 60
 WAIT = 540
 
@@ -251,16 +256,96 @@ def mutation_level(root, data):
         print("mutation: skipped (no source files changed)")
         return 0
     result = run_mutation_command(root, data, settings["command"], files, folder)
+    receipt = {**receipt, **result}
     status = "ran" if result["exit"] == 0 else "error"
-    write_receipt(folder, "mutation", {**receipt, **result, "status": status})
-    if status == "error":
-        with open(result["log"], encoding="utf-8", errors="replace") as fh:
-            print("\n".join(fh.read().splitlines()[-TAIL:]))
-    print(f"mutation: {status} in {result['seconds']}s (exit {result['exit']}) on {len(files)} changed file(s); "
-          f"log {result['log']}. Advisory, does not block.")
+    report = expand_with(settings.get("report"), result["env"]) if status == "ran" and settings.get("report") else None
+    if report and os.path.isfile(os.path.join(root, report)):
+        report = os.path.join(root, report)
+        try:
+            parsed = report_findings(root, report, files, ui_check.added_lines(root, base))
+        except Exception as exc:  # an advisory level never raises: the receipt says what went wrong
+            status, receipt["error"] = "error", f"could not read the report {report}: {exc}"
+        else:
+            status = "findings" if parsed["findings"] else "clean"
+            receipt.update(parsed, report=report)
+    write_receipt(folder, "mutation", {**receipt, "status": status})
+    if status in ("clean", "findings"):
+        new = [f for f in receipt["findings"] if f["kind"] == "new"]
+        print("\n".join(describe_mutant(f) for f in new[:TAIL]))
+        print(MUTATION_CLOSING.format(new=len(new), files=len(files), inherited=len(receipt["findings"]) - len(new)))
+    elif "error" in receipt:
+        print(f"mutation: {receipt['error']}")
+    else:
+        if status == "error":
+            with open(result["log"], encoding="utf-8", errors="replace") as fh:
+                print("\n".join(fh.read().splitlines()[-TAIL:]))
+        print(f"mutation: {status} in {result['seconds']}s (exit {result['exit']}) on {len(files)} changed file(s); "
+              f"log {result['log']}. Advisory, does not block.")
     if result["dirty_after"] and not result["dirty_before"]:
         print("mutation: the command left changes in the working tree; look at them before committing")
-    return 0 if status == "ran" else 1
+    return 1 if status == "error" else 0
+
+
+def expand_with(path, env):
+    """os.path.expandvars reads os.environ, so lend it the variables the command got for the call."""
+    previous = {name: os.environ.get(name) for name in env}
+    os.environ.update(env)
+    try:
+        return os.path.expandvars(path)
+    finally:
+        for name, value in previous.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+
+def report_findings(root, report, files, added):
+    """Read a mutation-testing-report-schema file: counts per status and the findings in the changed files, new first.
+
+    Keys are joined with the report's projectRoot and made relative to the repository; mutants elsewhere are dropped.
+    A finding is a surviving or uncovered mutant; it is `new` when its line is one the branch added.
+    """
+    with open(report, encoding="utf-8") as fh:
+        data = json.load(fh)
+    project_root = data.get("projectRoot") or root
+    added = {path: {number for number, _ in lines} for path, lines in added.items()}
+    counts, findings = {}, []
+    for key, entry in (data.get("files") or {}).items():
+        path = os.path.relpath(os.path.realpath(os.path.join(project_root, key)), os.path.realpath(root))
+        if path not in files:
+            continue
+        for mutant in entry.get("mutants") or []:
+            status = mutant["status"]
+            counts[status] = counts.get(status, 0) + 1
+            if MUTANT_STATUSES.get(status) != "finding":
+                continue
+            line = mutant["location"]["start"]["line"]
+            finding = {"file": path, "line": line, "kind": "new" if line in added.get(path, ()) else "inherited",
+                       "mutator": mutant.get("mutatorName")}
+            if entry.get("source") is not None:
+                finding["original"] = slice_source(entry["source"], mutant["location"])
+            if mutant.get("replacement") is not None:
+                finding["replacement"] = mutant["replacement"]
+            finding["status"] = status
+            findings.append(finding)
+    findings.sort(key=lambda f: f["kind"] != "new")
+    return {"counts": counts, "findings": findings}
+
+
+def slice_source(source, location):
+    """The text at a location: lines and columns are 1-based, the end column exclusive."""
+    lines = source.split("\n")
+    start, end = location["start"], location["end"]
+    if start["line"] == end["line"]:
+        return lines[start["line"] - 1][start["column"] - 1:end["column"] - 1]
+    middle = lines[start["line"]:end["line"] - 1]
+    return "\n".join([lines[start["line"] - 1][start["column"] - 1:], *middle, lines[end["line"] - 1][:end["column"] - 1]])
+
+
+def describe_mutant(finding):
+    change = " -> ".join(finding[key] for key in ("original", "replacement") if key in finding)
+    return f"{finding['file']}:{finding['line']} {finding['mutator']}{': ' + change if change else ''} ({finding['status']})"
 
 
 def run_mutation_command(root, data, command, files, folder, env=None):

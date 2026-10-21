@@ -303,6 +303,55 @@ class VerifyTest(unittest.TestCase):
         self.assertIn("mutation: ran in", waited.stdout)
         self.assertEqual(json.loads(self.run_script("show").stdout)["receipts"]["mutation"]["status"], "ran")
 
+    def mutation_tool(self, report, name="report.json"):
+        """A fake mutation command: a shell script that writes the given report into the run's output folder."""
+        script = os.path.join(self.tmp.name, "mutate.sh")
+        with open(script, "w") as fh:
+            fh.write('#!/bin/sh\ncat > "$POTHOS_MUTATION_OUT/%s" <<\'REPORT\'\n%s\nREPORT\n' % (name, json.dumps(report)))
+        os.chmod(script, 0o755)
+        return script
+
+    def modify_on_a_branch(self, rel, before, after):
+        """A file committed on main with `before`, then changed to `after` on a feature branch."""
+        self.add_file(rel, before)
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "seed " + rel)
+        self.git("checkout", "-q", "-b", "feature")
+        self.add_file(rel, after)
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "change " + rel)
+
+    @staticmethod
+    def mutant(line, status, column=5, mutator="ArithmeticOperator", replacement="5"):
+        return {"id": f"{line}-{status}", "mutatorName": mutator, "replacement": replacement, "status": status,
+                "location": {"start": {"line": line, "column": column}, "end": {"line": line, "column": column + 1}}}
+
+    def test_survivors_on_added_lines_are_new_and_printed_and_the_rest_inherited(self):
+        source = "a = 1\nb = 2\nc = 3\nd = 4\n"
+        self.modify_on_a_branch("src/a.py", "a = 1\nb = 2\nc = 3\n", source)
+        report = {"schemaVersion": "2", "files": {"src/a.py": {"language": "python", "source": source,
+                  "mutants": [self.mutant(1, "Survived"), self.mutant(4, "Survived")]}}}
+        self.contract({"verify": {"full": "true", "mutation": {
+            "command": self.mutation_tool(report), "report": "$POTHOS_MUTATION_OUT/report.json"}}})
+        self.run_script("run", "full")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertIn("src/a.py:4 ArithmeticOperator: 4 -> 5 (Survived)", run.stdout)
+        self.assertNotIn("src/a.py:1", run.stdout)
+        self.assertIn("mutation: 1 new surviving mutant(s) in 1 changed file(s); 1 inherited, see verify.py show. "
+                      "Advisory, does not block. Each new one is a missing test or dead code.", run.stdout)
+        receipt = json.loads(self.run_script("show").stdout)["receipts"]["mutation"]
+        self.assertEqual(receipt["status"], "findings")
+        self.assertEqual(receipt["findings"], [
+            {"file": "src/a.py", "line": 4, "kind": "new", "mutator": "ArithmeticOperator",
+             "original": "4", "replacement": "5", "status": "Survived"},
+            {"file": "src/a.py", "line": 1, "kind": "inherited", "mutator": "ArithmeticOperator",
+             "original": "1", "replacement": "5", "status": "Survived"}])
+        self.assertEqual(receipt["counts"], {"Survived": 2})
+        self.assertEqual(receipt["report"], os.path.join(os.path.dirname(receipt["log"]), "report.json"))
+
     def test_usage_errors_exit_64(self):
         self.assertEqual(self.run_script("run").returncode, 64)
         self.assertEqual(self.run_script("frobnicate").returncode, 64)
