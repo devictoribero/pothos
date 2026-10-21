@@ -15,7 +15,10 @@ After full, the contract's ui check runs on the branch's added lines and writes 
 it never changes an exit code, and check only mentions it.
 `run mutation` is advisory too and stays out of `run all`: it needs a passing clean fast or full receipt
 for HEAD, runs the contract's mutation command on the source files added or modified since the merge-base
-with the pull request base, and writes mutation.json (ran, error or skipped). check ignores it.
+with the pull request base, and writes mutation.json. When the contract names a report and the command
+wrote it, the receipt lists the surviving mutants in the changed files, `new` on a line the branch added
+or `inherited`, and its status is clean or findings; otherwise ran, error or skipped. Only new findings
+print, and check mentions them without failing.
 
 The checks run in a detached process, so a slow suite outlives the caller. `run` waits up to --wait
 seconds (default 540, under an agent's ten-minute command limit) and exits 4 when the run is still
