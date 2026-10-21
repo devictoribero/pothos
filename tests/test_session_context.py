@@ -164,6 +164,35 @@ class SessionContextTest(unittest.TestCase):
         self.assertIn("no end-to-end command", text)
         self.assertIn("only through verify, in the foreground", text)
 
+    VERIFICATION_WITHOUT_MUTATION = (
+        "### Verification\n\nRun `/pothos:verify` before merging anything into an integration or feature branch and "
+        "before a pull request leaves draft; it runs these commands and records a receipt for the commit. With "
+        "`implement-spec`, the merger subagent runs `verify run all` on the integration branch after each merge and hands "
+        "a red result back to an implementer instead of moving on. Run the `fast` command yourself while working. Run "
+        "`full` and `e2e` only through verify, in the foreground: a background command dies when your turn or subagent "
+        "ends and nobody is notified. verify keeps slow checks alive in a detached process; when it exits 4 they are "
+        "still going, so run `verify.py wait` until it returns another code.\n\n- `fast`: `npm run lint`\n- `full`: "
+        "`npm test`\n\nThis repository has no end-to-end command; skip that step and say so in the pull request.")
+
+    def verification_section(self):
+        text = self.ctx()
+        return "### Verification" + text.split("### Verification")[1].split("\n\n### ")[0]
+
+    def test_without_a_mutation_command_the_verification_text_is_unchanged(self):
+        self.write({"version": 1, "verify": {"fast": "npm run lint", "full": "npm test"}})
+        self.assertEqual(self.verification_section(), self.VERIFICATION_WITHOUT_MUTATION)
+
+    def test_a_mutation_command_is_listed_with_when_to_run_it_and_what_the_pull_request_lists(self):
+        self.write({"version": 1, "verify": {"fast": "npm run lint", "full": "npm test",
+                                             "mutation": {"command": "npx stryker run --mutate {files}"}}})
+        section = self.verification_section()
+        self.assertIn("- `full`: `npm test`\n- `mutation`: `npx stryker run --mutate {files}`", section)
+        self.assertIn("run `verify.py run mutation` once after green and before the pull request", section)
+        self.assertIn("outside `run all`", section)
+        self.assertIn("the survivors killed, each with the name of the test that kills it", section)
+        self.assertIn("the survivors left, each with why", section)
+        self.assertIn("no end-to-end command", section)
+
     def test_setup_command_runs_first_in_every_worktree(self):
         self.write({"version": 1, "verify": {"full": "npm test"}, "run": {"setup": "npm ci && npm run codegen"}})
         text = self.ctx()
