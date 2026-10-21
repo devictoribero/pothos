@@ -29,6 +29,7 @@ import fnmatch
 import json
 import os
 import shlex
+import shutil
 import subprocess
 import sys
 import time
@@ -250,9 +251,13 @@ def mutation_level(root, data):
         write_receipt(folder, "mutation", {**receipt, "status": "skipped", "reason": "no source files changed"})
         print("mutation: skipped (no source files changed)")
         return 0
-    result = run_mutation_command(root, data, settings["command"], files, folder)
+    shared, private = mutation_cache_dir(root), os.path.join(folder, "mutation-cache")
+    seed_mutation_cache(shared, private)
+    result = run_mutation_command(root, data, settings["command"], files, folder, env={"POTHOS_MUTATION_CACHE": private})
     status = "ran" if result["exit"] == 0 else "error"
-    write_receipt(folder, "mutation", {**receipt, **result, "status": status})
+    if status == "ran":
+        publish_mutation_cache(private, shared)
+    write_receipt(folder, "mutation", {**receipt, **result, "cache": shared, "status": status})
     if status == "error":
         with open(result["log"], encoding="utf-8", errors="replace") as fh:
             print("\n".join(fh.read().splitlines()[-TAIL:]))
@@ -261,6 +266,31 @@ def mutation_level(root, data):
     if result["dirty_after"] and not result["dirty_before"]:
         print("mutation: the command left changes in the working tree; look at them before committing")
     return 0 if status == "ran" else 1
+
+
+def mutation_cache_dir(root):
+    """The tool's cache, one folder per repository under the Pothos home, shared by every clone and worktree."""
+    return os.path.join(contract.pothos_home(), "mutation", contract.key_for(root, "mutation"))
+
+
+def seed_mutation_cache(shared, private):
+    """Copy the shared cache into this run's private folder: the tool never reads or writes the shared one."""
+    os.makedirs(shared, exist_ok=True)
+    if os.path.isdir(private):
+        shutil.rmtree(private)
+    shutil.copytree(shared, private)
+
+
+def publish_mutation_cache(private, shared):
+    """Each file of the private copy replaces its counterpart in the shared folder: written under a temporary name
+    in the same folder, then renamed over the target. Last writer wins between runs; a torn file is impossible."""
+    for current, _, names in os.walk(private):
+        target = os.path.normpath(os.path.join(shared, os.path.relpath(current, private)))
+        os.makedirs(target, exist_ok=True)
+        for name in names:
+            tmp = os.path.join(target, f".{name}.{os.getpid()}.tmp")
+            shutil.copyfile(os.path.join(current, name), tmp)
+            os.replace(tmp, os.path.join(target, name))
 
 
 def run_mutation_command(root, data, command, files, folder, env=None):

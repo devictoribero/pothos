@@ -22,8 +22,8 @@ class VerifyTest(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def git(self, *args):
-        return subprocess.run(["git", "-C", self.repo, "-c", "user.name=t", "-c", "user.email=t@t", *args],
+    def git(self, *args, cwd=None):
+        return subprocess.run(["git", "-C", cwd or self.repo, "-c", "user.name=t", "-c", "user.email=t@t", *args],
                               check=True, capture_output=True, text=True).stdout.strip()
 
     def commit(self, name):
@@ -38,8 +38,8 @@ class VerifyTest(unittest.TestCase):
         with open(path, "w") as fh:
             json.dump({"version": 1, **data}, fh)
 
-    def run_script(self, *args):
-        return subprocess.run([sys.executable, SCRIPT, *args], cwd=self.repo, env=self.env, capture_output=True, text=True)
+    def run_script(self, *args, cwd=None):
+        return subprocess.run([sys.executable, SCRIPT, *args], cwd=cwd or self.repo, env=self.env, capture_output=True, text=True)
 
     def test_without_contract_exits_2(self):
         self.assertEqual(self.run_script("run", "full").returncode, 2)
@@ -180,8 +180,8 @@ class VerifyTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.repo, "mutation-ran")))
         self.assertNotIn("mutation", json.loads(self.run_script("show").stdout)["receipts"])
 
-    def add_file(self, rel, text="x = 1\n"):
-        path = os.path.join(self.repo, rel)
+    def add_file(self, rel, text="x = 1\n", cwd=None):
+        path = os.path.join(cwd or self.repo, rel)
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w") as fh:
             fh.write(text)
@@ -302,6 +302,46 @@ class VerifyTest(unittest.TestCase):
         self.assertEqual(waited.returncode, 0, waited.stdout)
         self.assertIn("mutation: ran in", waited.stdout)
         self.assertEqual(json.loads(self.run_script("show").stdout)["receipts"]["mutation"]["status"], "ran")
+
+    # A fake mutation tool: records what it finds in the cache, where the cache is, then writes its own entry.
+    CACHE_COMMAND = ('cat "$POTHOS_MUTATION_CACHE/seen" > "$POTHOS_MUTATION_OUT/cache-before" 2>/dev/null; '
+                     'printf "%s" "$POTHOS_MUTATION_CACHE" > "$POTHOS_MUTATION_OUT/cache-path"; '
+                     'printf "%s" "$POTHOS_CHANGED_FILES" > "$POTHOS_MUTATION_CACHE/seen"')
+
+    def second_worktree(self, *files):
+        """Another worktree of the same repository, on its own branch off main, with its own passing fast receipt."""
+        path = os.path.join(self.tmp.name, "worktree-2")
+        self.git("worktree", "add", "-q", "-b", "feature-2", path, "main")
+        for rel in files:
+            self.add_file(rel, cwd=path)
+        self.git("add", "-A", cwd=path)
+        self.git("commit", "-q", "-m", "change in the second worktree", cwd=path)
+        self.run_script("run", "fast", cwd=path)
+        return path
+
+    def mutation_receipt(self, cwd=None):
+        return json.loads(self.run_script("show", cwd=cwd).stdout)["receipts"]["mutation"]
+
+    def output_file(self, receipt, name):
+        with open(os.path.join(os.path.dirname(receipt["log"]), name)) as fh:
+            return fh.read()
+
+    def test_a_second_worktree_sees_the_cache_a_successful_run_left_behind(self):
+        self.contract({"verify": {"fast": "echo ok", "mutation": {"command": self.CACHE_COMMAND}}})
+        self.branch_with("src/a.py")
+        self.run_script("run", "fast")
+        first = self.run_script("run", "mutation")
+        self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+        other = self.second_worktree("src/b.py")
+
+        run = self.run_script("run", "mutation", cwd=other)
+
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        receipt = self.mutation_receipt(cwd=other)
+        self.assertEqual(self.output_file(receipt, "cache-before"), "src/a.py")
+        self.assertEqual(self.output_file(self.mutation_receipt(), "cache-before"), "")
+        self.assertEqual(receipt["cache"], os.path.join(self.home, "mutation", "github.com", "acme", "shop"))
+        self.assertEqual(receipt["cache"], self.mutation_receipt()["cache"])
 
     def test_usage_errors_exit_64(self):
         self.assertEqual(self.run_script("run").returncode, 64)
