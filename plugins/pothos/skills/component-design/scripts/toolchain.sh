@@ -9,6 +9,7 @@
 # (network, registry, disk) leaves no half-installed cache that a later run would accept.
 set -euo pipefail
 TC="${COMPONENT_DESIGN_TOOLCHAIN:-$HOME/.cache/component-design/toolchain}"
+TC="${TC%/}"  # a trailing slash would put the staging folder inside the destination
 PKG='{ "private": true, "type": "module", "devDependencies": {
   "@testing-library/dom": "^10.4.0", "@testing-library/jest-dom": "^6.6.3", "@testing-library/react": "^16.1.0",
   "@testing-library/user-event": "^14.5.2", "@types/react": "^18.3.12", "@types/react-dom": "^18.3.1",
@@ -30,4 +31,4 @@ if [[ ! -d "$TC/node_modules" || ( -f "$TC/package.json" && "$(cat "$TC/package.
   rm -rf "$TC"
   mv "$STAGE" "$TC"
 fi
-echo "$TC"
+cd "$TC" && pwd  # absolute: verify.sh links it after changing directory

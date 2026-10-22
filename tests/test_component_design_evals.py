@@ -119,13 +119,51 @@ class ReuseCheckTest(unittest.TestCase):
         self.assertEqual(result["score"], 0)
 
     def test_an_example_consumer_cannot_earn_the_score_for_the_feature(self):
+        """The prompt asks for an example consumer; whatever the run names it (a folder, a dotted suffix or a
+        CamelCase one), it is not the feature."""
         p = self.project("o")
         write(p, "src/features/projects/NameEditor.tsx", "export function NameEditor() { return <span role=\"button\" />; }\n")
-        write(p, "src/features/projects/NameEditorUsage.tsx", FEATURE)
+        for consumer in ("NameEditorUsage.tsx", "ProjectNameExample.tsx", "Demo.tsx", "examples/Usage.tsx", "NameEditor.example.tsx"):
+            write(p, f"src/features/projects/{consumer}", FEATURE)
         result, _ = self.check(p)
-        self.assertEqual(result["score"], 2)  # both files are code; the reviewer sees where each name is used
-        self.assertEqual(result["used_in"]["Button"], ["src/features/projects/NameEditorUsage.tsx"])
-        self.assertNotIn("src/features/projects/NameEditor.tsx", result["used_in"]["Button"])
+        self.assertEqual(result["code_files"], ["src/features/projects/NameEditor.tsx"])
+        self.assertEqual(result["score"], 0)
+        self.assertEqual(result["used_in"], {})
+
+    def test_a_render_spread_over_lines_counts_like_one_on_a_line(self):
+        """`<Button` alone occurs in the fixture file; a new multi-line `<Button …>` is still an addition."""
+        one_line = "export const b = <Button variant=\"primary\" onClick={rename}>Rename</Button>;\n"
+        spread = "export const b = (\n  <Button\n    variant=\"primary\"\n    onClick={rename}\n  >\n    Rename\n  </Button>\n);\n"
+        scores = []
+        for name, body in (("one", one_line), ("spread", spread)):
+            p = self.project(name)
+            write(p, "src/features/projects/ProjectActions.tsx", "import { Button } from '../../ui';\nexport const a = <Button />;\n" + body)
+            result, _ = self.check(p)
+            scores.append((result["score"], result["components"]["Button"]))
+        self.assertEqual(scores, [(1, True), (1, True)])
+
+    def test_a_feature_local_ui_folder_is_not_the_shared_one(self):
+        p = self.project("v")
+        write(p, "src/features/projects/ui/EditControls.tsx", "export function EditControls() { return <><button /><input /></>; }\n")
+        write(p, "src/features/projects/ui/Button.tsx", "export function Button() { return <button />; }\n")
+        write(p, "src/features/projects/NameEditor.tsx",
+              "import { EditControls } from './ui/EditControls';\nimport { Button } from './ui/Button';\n"
+              "export function NameEditor() { return <><EditControls /><Button /></>; }\n")
+        result, _ = self.check(p)
+        self.assertEqual(result["components"], {"Button": False, "TextField": False})
+        self.assertEqual(result["raw_controls"], {"button": 2, "input": 1})
+        self.assertEqual(result["second_copies"], ["src/features/projects/ui/Button.tsx"])
+        self.assertEqual(result["score"], 0)
+
+    def test_an_apostrophe_inside_a_word_is_not_a_quote(self):
+        p = self.project("w")
+        write(p, "src/features/projects/NameEditor.tsx",
+              "import { Button, TextField } from '../../ui';\nimport { useControllableState } from '../../hooks/useControllableState';\n"
+              "export function NameEditor() { useControllableState(); "
+              "return <><TextField /><p>Couldn't save the project's name</p> <Button>Retry</Button></>; }\n")
+        result, _ = self.check(p)
+        self.assertEqual(result["components"], {"Button": True, "TextField": True})
+        self.assertEqual(result["score"], 2)
 
     def test_scores_code_added_to_an_existing_fixture_file(self):
         p = self.project("h")
@@ -411,6 +449,20 @@ class ToolchainTest(unittest.TestCase):
             self.assertIn("install", self.npm_calls(log))  # a different list reinstalls
             self.assertEqual(sorted(os.listdir(tmp)), ["bin", "npm.log", "tc"])  # no staging folder left behind
 
+    def test_a_trailing_slash_or_a_relative_override_installs_in_place_and_prints_an_absolute_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder, log = os.path.join(tmp, "tc"), os.path.join(tmp, "npm.log")
+            self.run_toolchain(folder, log, "mkdir -p node_modules")  # writes the npm stub into tmp/bin
+            shutil.rmtree(folder)
+            for override in (folder + "/", "tc"):
+                env = dict(os.environ, COMPONENT_DESIGN_TOOLCHAIN=override, PATH=os.path.join(tmp, "bin") + os.pathsep + os.environ["PATH"])
+                out = subprocess.run(["/bin/bash", TOOLCHAIN], capture_output=True, text=True, env=env, cwd=tmp)
+                self.assertEqual(out.returncode, 0, out.stderr)
+                self.assertEqual(os.path.realpath(out.stdout.strip()), os.path.realpath(folder), override)
+                self.assertTrue(os.path.isdir(os.path.join(folder, "node_modules")), override)
+                self.assertEqual(sorted(os.listdir(tmp)), ["bin", "npm.log", "tc"], override)  # no staging folder inside or beside
+                shutil.rmtree(folder)
+
     def test_a_failed_install_leaves_no_cache_and_the_next_run_installs_again(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder, log = os.path.join(tmp, "tc"), os.path.join(tmp, "npm.log")
@@ -467,6 +519,13 @@ class VerifyShTest(unittest.TestCase):
         self.assertEqual(out.returncode, 0, out.stderr)
         self.assertEqual(self.calls(), ["tsc --noEmit", "vitest run src/features/x/B test.test.tsx"])
         self.assertEqual(tree(self.project), before)
+
+    def test_an_overlay_without_test_files_runs_every_test(self):
+        overlay = os.path.join(self.tmp.name, "overlay")
+        write(overlay, "src/features/x/B.tsx", "export const b = 1;\n")
+        out = self.verify(self.project, overlay)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual(self.calls(), ["tsc --noEmit", "vitest run"])
 
     def test_a_failing_type_check_or_test_fails_the_run(self):
         self.assertEqual(self.verify(self.project, VERIFY_TSC_EXIT="2").returncode, 2)

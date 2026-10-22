@@ -4,6 +4,7 @@
 #   verify.sh <project-dir> [overlay-dir]   copy the project to a scratch folder, link node_modules
 #                                           package by package, lay overlay-dir/src over it, run the
 #                                           project's type-check and the tests of the overlaid files
+#                                           (every test when the overlay holds no test file)
 #   verify.sh --minimal <dir>               no project: run <dir>/src in a throwaway React 18 +
 #                                           TypeScript + Vitest + Testing Library project (toolchain
 #                                           cached by scripts/toolchain.sh)

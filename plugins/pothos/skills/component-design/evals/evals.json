@@ -31,7 +31,7 @@
   {
    "id": "reuse-existing",
    "fixture": "fixtures/reuse-existing",
-   "prompt": "In the project at {project} (dependencies installed; `npm run typecheck` and `npm test` work), build an inline edit for a project's name under src/features/projects: at rest it shows the name with an Edit action; editing shows a text field with Save and Cancel; saving is asynchronous (the consumer provides it), can fail and can be retried; Escape cancels. Save the component, its contract, tests, an example consumer and a static preview.html inside the project, and write NOTES.md at the project root with what you assumed and what you ran. Do not change files outside your feature folder unless the change is additive and the feature needs it.",
+   "prompt": "In the project at {project} (dependencies installed; `npm run typecheck` and `npm test` work), build an inline edit for a project's name under src/features/projects: at rest it shows the name with an Edit action; editing shows a text field with Save and Cancel; saving is asynchronous (the consumer provides it), can fail and can be retried; Escape cancels. Save the component, its contract, tests, an example consumer (under an examples/ folder next to the component) and a static preview.html inside the project, and write NOTES.md at the project root with what you assumed and what you ran. Do not change files outside your feature folder unless the change is additive and the feature needs it.",
    "business_words": "project,workspace",
    "reuse": { "components": ["Button", "TextField"], "hooks": ["useControllableState"] }
   }

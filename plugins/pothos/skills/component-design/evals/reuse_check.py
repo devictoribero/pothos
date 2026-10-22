@@ -3,10 +3,12 @@
 
 Usage: reuse_check.py <eval-id> <project-dir> [--evals evals.json] [--json]
        reuse_check.py <fixture-dir> <project-dir> --components Button,TextField [--hooks useControllableState]
-                      [--ui ui] [--hooks-dir hooks] [--json]
+                      [--ui src/ui] [--hooks-dir src/hooks] [--json]
 
-With an eval id, the fixture and the `reuse` entry (components and hooks the task calls for) come from
-evals.json; the flags override them. Compares the agent's copy of the project with the fixture it started
+With an eval id, the fixture and the `reuse` entry (components and hooks the task calls for, and optionally
+`ui` and `hooks_dir`, the shared folders from the project root; `src/ui` and `src/hooks` otherwise) come from
+evals.json; the flags override them. A shared folder is matched from the project root, so a feature's own
+`ui/` subfolder is not the shared one. Compares the agent's copy of the project with the fixture it started
 from and reports:
   - the files the run added, and the fixture files it changed or removed;
   - which named components and hooks the code the run wrote uses, file by file: a component counts when
@@ -14,9 +16,12 @@ from and reports:
     namespace, `import * as UI` then `<UI.Button>`) and renders it; a hook counts when one file imports it
     from the shared hooks folder and calls it. A relative import is resolved against the importing file, so
     `'../Button/Button'` from inside the shared folder counts. The code the run wrote is every new code
-    file plus the lines added to a fixture file (whitespace-only changes do not count); tests, previews,
-    stories and example consumers are left out; comments and string contents are ignored, and a default
-    import does not count;
+    file plus the code added to a fixture file, compared token by token so a reformat adds nothing however
+    the lines are split;
+    tests, previews, stories and example consumers are left out, the last by folder (`examples/`, `demo/`,
+    `preview/`), by prefix (`preview*`, `example*`) or by suffix (`.example.tsx`, `*Example.tsx`, `*Demo.tsx`,
+    `*Usage.tsx`), never by substring, so `ProjectNamePreview.tsx` is code; comments and string contents are
+    ignored (an apostrophe inside a word, `Couldn't`, is not a quote), and a default import does not count;
   - raw controls (`<button`, `<input`, `<select`, `<textarea`) in that code that stand in for a named
     component, outside the shared UI folder (an additive change to a primitive touches its own element);
   - second copies: a new file under the shared UI or hooks folder named like a named component or
@@ -35,7 +40,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SKIP_DIRS = {"node_modules", ".vite-cache", ".git", "dist", "build", ".next"}
 CONSUMER_DIRS = {"example", "examples", "demo", "demos", "preview", "previews", "stories", "__tests__"}
 TEST_FILE = re.compile(r"\.(test|spec|stories)\.[jt]sx?$")
-CONSUMER_FILE = re.compile(r"\.(preview|example)\.[jt]sx?$")
+CONSUMER_FILE = re.compile(r"(\.(preview|example)|(^|/|[a-z0-9])(Example|Demo|Usage))\.[jt]sx?$")
+TOKEN = re.compile(r"\w+|[^\w\s]")
 IMPORT = re.compile(r"import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+['\"]([^'\"]+)['\"]")
 NS_IMPORT = re.compile(r"import\s+\*\s+as\s+(\w+)\s+from\s+['\"]([^'\"]+)['\"]")
 RAW_TAGS = {"button": ("Button",), "input": ("Field", "Input", "Checkbox", "Radio", "Switch"),
@@ -73,7 +79,7 @@ def strip_noise(text, strings=True):
         elif c == "/" and nxt == "*":
             end = text.find("*/", i + 2)
             i = n if end < 0 else end + 2
-        elif c in "'\"`":
+        elif c in "'\"`" and not (c == "'" and i and (text[i - 1].isalnum() or text[i - 1] == "_")):
             end = i + 1
             while end < n and text[end] != c and (c == "`" or text[end] != "\n"):
                 end += 2 if text[end] == "\\" else 1
@@ -97,15 +103,22 @@ def is_code(rel):
 
 
 def in_folder(path, folder):
-    return re.search(rf"(^|/){re.escape(folder)}(/|$)", path) is not None
+    """Whether `path` (from the project root) is `folder` or lies under it. A path that starts with `/` came
+    from an aliased import (`@/ui`, `~/ui`) and is compared against the folder without its first segment
+    (`src/ui` → `ui`), since an alias usually maps to `src/`."""
+    if path.startswith("/"):
+        path, folder = path[1:], folder.split("/", 1)[-1]
+    return path == folder or path.startswith(folder + "/")
 
 
 def module_path(specifier, importer):
-    """Where an import points, as a path in the project for a relative specifier; otherwise the specifier
-    without an alias prefix (`@/ui`, `~/ui`, `@ui`), so a folder segment can be read off it."""
+    """Where an import points: a path from the project root for a relative specifier; `/`-prefixed for an
+    aliased one (`@/ui`, `~/ui`, `@ui` → `/ui`); a package specifier as it is, which no project folder matches."""
     if specifier.startswith("."):
         return posixpath.normpath(posixpath.join(posixpath.dirname(importer), specifier))
-    return specifier.lstrip("@~")
+    if specifier.startswith(("@/", "~/", "~")) or (specifier.startswith("@") and "/" not in specifier):
+        return "/" + specifier.lstrip("@~/")
+    return specifier
 
 
 def local_names(text, name, folder, importer):
@@ -129,31 +142,31 @@ def local_names(text, name, folder, importer):
     return names
 
 
+def spaced(name):
+    """`name` as a pattern that tolerates the spaces token-joined code puts around dots."""
+    return r"\s*\.\s*".join(re.escape(part) for part in name.split("."))
+
+
 def renders(text, local):
-    return re.search(rf"<{re.escape(local)}(?![\w.])", text) is not None
+    return re.search(rf"<\s*{spaced(local)}(?![\w.])", text) is not None
 
 
 def calls(text, local):
-    return re.search(rf"(?<![\w.]){re.escape(local)}\s*\(", text) is not None
+    return re.search(rf"(?<![\w.]){spaced(local)}\s*\(", text) is not None
 
 
 def camel_words(name):
     return re.findall(r"[A-Z][a-z0-9]*|[a-z0-9]+", name)
 
 
-def normalized(line):
-    return " ".join(line.split())
-
-
-def added_lines(before, after):
-    """The lines `after` has that `before` had not, ignoring whitespace: a reformat (re-indenting, or
-    splitting one line into several) adds nothing."""
-    old = [normalized(l) for l in before.splitlines()]
-    new = [normalized(l) for l in after.splitlines()]
-    old_blob = re.sub(r"\s+", "", before)
-    diff = difflib.unified_diff(old, new, lineterm="", n=0)
-    return [line[1:] for line in diff
-            if line.startswith("+") and not line.startswith("+++") and re.sub(r"\s+", "", line[1:]) not in old_blob]
+def added_code(before, after):
+    """The code `after` has that `before` had not, as tokens joined by spaces, one line per inserted run.
+    Comments and strings are stripped first, then the two token sequences are compared, so neither
+    indentation nor where a line breaks changes what counts: a reformat adds nothing, and a `<Button …>`
+    spread over five lines is one insertion."""
+    old, new = TOKEN.findall(strip_noise(before)), TOKEN.findall(strip_noise(after))
+    matcher = difflib.SequenceMatcher(None, old, new, autojunk=False)
+    return "\n".join(" ".join(new[j1:j2]) for tag, _, _, j1, j2 in matcher.get_opcodes() if tag in ("insert", "replace"))
 
 
 def second_copy(rel, components, hooks, ui, hooks_dir):
@@ -161,7 +174,7 @@ def second_copy(rel, components, hooks, ui, hooks_dir):
     base = os.path.splitext(parts[-1])[0]
     if base in components or base in hooks:
         return True
-    if not any(p in (ui, hooks_dir) for p in parts[:-1]):
+    if not (in_folder(rel, ui) or in_folder(rel, hooks_dir)):
         return False
     if any(base == c or base.endswith(c) or base.endswith(camel_words(c)[-1]) for c in components):
         return True
@@ -171,17 +184,18 @@ def second_copy(rel, components, hooks, ui, hooks_dir):
 def resolve(a):
     """The fixture folder, components and hooks: from evals.json when the first argument is an eval id."""
     if os.path.isdir(a.target):
-        return a.target, a.components, a.hooks, None
+        return a.target, a.components, a.hooks, None, a.ui or "src/ui", a.hooks_dir or "src/hooks"
     with open(a.evals, encoding="utf-8") as fh:
         evals = {e["id"]: e for e in json.load(fh)["evals"]}
     ev = evals.get(a.target)
     if not ev:
-        return None, None, None, f"no folder or eval named {a.target!r} (evals: {a.evals})"
+        return None, None, None, f"no folder or eval named {a.target!r} (evals: {a.evals})", None, None
     if not ev.get("fixture"):
-        return None, None, None, f"eval {a.target!r} has no fixture"
+        return None, None, None, f"eval {a.target!r} has no fixture", None, None
     fixture = os.path.join(os.path.dirname(os.path.abspath(a.evals)), ev["fixture"])
     reuse = ev.get("reuse") or {}
-    return fixture, a.components or ",".join(reuse.get("components") or []), a.hooks or ",".join(reuse.get("hooks") or []), None
+    return (fixture, a.components or ",".join(reuse.get("components") or []), a.hooks or ",".join(reuse.get("hooks") or []),
+            None, a.ui or reuse.get("ui") or "src/ui", a.hooks_dir or reuse.get("hooks_dir") or "src/hooks")
 
 
 def score_file(rel, whole, written, components, hooks, ui, hooks_dir):
@@ -195,7 +209,7 @@ def score_file(rel, whole, written, components, hooks, ui, hooks_dir):
     if not in_folder(rel, ui):
         for tag, keys in RAW_TAGS.items():
             if any(key in c for c in components for key in keys):
-                count = len(re.findall(rf"<{tag}\b", code))
+                count = len(re.findall(rf"<\s*{tag}\b", code))
                 if count:
                     raw[tag] = count
     return used, hooks_used, raw
@@ -208,8 +222,8 @@ def main(argv):
     ap.add_argument("--evals", default=os.path.join(HERE, "evals.json"))
     ap.add_argument("--components", default="")
     ap.add_argument("--hooks", default="")
-    ap.add_argument("--ui", default="ui")
-    ap.add_argument("--hooks-dir", default="hooks")
+    ap.add_argument("--ui", default="")
+    ap.add_argument("--hooks-dir", default="")
     ap.add_argument("--json", action="store_true")
     if "-h" in argv or "--help" in argv:
         print(__doc__)
@@ -221,7 +235,7 @@ def main(argv):
     if a is None or not a.target or not a.project:
         print(__doc__)
         return 2
-    fixture, components, hooks, error = resolve(a)
+    fixture, components, hooks, error, ui, hooks_dir = resolve(a)
     if error:
         print(f"reuse_check.py: {error}", file=sys.stderr)
         return 2
@@ -249,18 +263,18 @@ def main(argv):
         if rel in code:
             written = whole
         else:
-            written = "\n".join(added_lines(text_of(os.path.join(fixture, rel)), whole))
+            written = added_code(text_of(os.path.join(fixture, rel)), whole)
             if not written.strip():
-                continue  # a reformat, or a change in whitespace only
+                continue  # a reformat, or a change in comments, strings or whitespace only
             changed_code.append(rel)
-        used, hooks_used, raw_here = score_file(rel, whole, written, components, hooks, a.ui, a.hooks_dir)
+        used, hooks_used, raw_here = score_file(rel, whole, written, components, hooks, ui, hooks_dir)
         for c in used:
             uses[c].append(rel)
         for h in hooks_used:
             hook_uses[h].append(rel)
         for tag, count in raw_here.items():
             raw[tag] = raw.get(tag, 0) + count
-    copies = [f for f in new if second_copy(f, components, hooks, a.ui, a.hooks_dir)]
+    copies = [f for f in new if second_copy(f, components, hooks, ui, hooks_dir)]
     scored = bool(code or changed_code)
 
     reused = sum(1 for v in uses.values() if v) + sum(1 for v in hook_uses.values() if v)
@@ -285,9 +299,9 @@ def main(argv):
         return 0
     print(f"Reuse: {score}")
     for c, where in uses.items():
-        print(f"  {c}: " + (f"rendered in {', '.join(where)}" if where else f"not imported from {a.ui} and rendered"))
+        print(f"  {c}: " + (f"rendered in {', '.join(where)}" if where else f"not imported from {ui} and rendered"))
     for h, where in hook_uses.items():
-        print(f"  {h}: " + (f"called in {', '.join(where)}" if where else f"not imported from {a.hooks_dir} and called"))
+        print(f"  {h}: " + (f"called in {', '.join(where)}" if where else f"not imported from {hooks_dir} and called"))
     for tag, count in raw.items():
         print(f"  raw <{tag}>: {count} in the code the run wrote")
     for f in copies:
