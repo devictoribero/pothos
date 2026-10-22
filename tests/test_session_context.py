@@ -176,7 +176,7 @@ class SessionContextTest(unittest.TestCase):
         text = self.ctx()
         self.assertIn("### Verification\n\nTwo tiers.", text)
         self.assertIn("`implement`, `tdd`, `implement-spec`'s implementers", text)
-        self.assertIn("after every coherent edit", text)
+        self.assertIn("Write one source file per command or tool call and run the check before you write the next one", text)
         self.assertIn("two source files mean two runs", text)
         self.assertIn("`fast check: picked <command> because <why>`", text)
         self.assertIn("executed nothing counts only for a docs or config change", text)
@@ -236,7 +236,7 @@ class SessionContextTest(unittest.TestCase):
         section = text.split("### Verification")[1].split("\n### ")[0]
         self.assertIn("**Fast check: `pnpm run check:fast`**", section)
         self.assertLess(len(section), 2500, f"the verification section is {len(section)} characters")
-        self.assertLess(len(text), 9800, f"the session context is {len(text)} characters")
+        self.assertLess(len(text), 9900, f"the session context is {len(text)} characters")
 
     def test_setup_command_runs_first_in_every_worktree(self):
         self.write({"version": 1, "verify": {"full": "npm test"}, "run": {"setup": "npm ci && npm run codegen"}})
