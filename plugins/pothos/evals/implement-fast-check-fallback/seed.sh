@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The implement-fast-check repo without a root `check:fast`: only `lint`, `test:unit` (jest) and `type-check`
-# scripts, stand-ins that log to .loop/log and exit 0, plus the same `validate` gate, a pre-push hook that runs
-# validate, a pull request template with a test plan, and a local
+# scripts, each real (node --check and node --test) and logging to .loop/log, plus the same `validate` gate, a pre-push
+# hook that runs validate, a pull request template with a test plan, and a local
 # ticket that needs edits in two source files. Pushes go to a local bare repository whose post-receive hook
 # logs the push and the commit messages; gh is a logging stand-in that saves the pull request body.
 # The graders read the logs, so they check what ran and in which order, not what the agent says.
@@ -81,7 +81,8 @@ HOOK
 chmod +x .git/hooks/post-commit .git/hooks/pre-push
 cat > scripts/loop-log.sh <<'SH'
 #!/bin/sh
-# Stand-in for a check: logs its name, the source files changed since the base commit, whether anything is committed yet, and its arguments.
+# Appends one line per check run to .loop/log: the check, the source files changed since the base commit, whether anything is
+# committed yet, and the arguments.
 name="$1"; shift
 base=$(cat .loop/base)
 changed=$( { git diff --name-only "$base" -- src; git ls-files --others --exclude-standard -- src; } | sort -u | paste -sd, -)
@@ -90,27 +91,36 @@ echo "$name changed=$changed committed=$committed args=$*" >> .loop/log
 SH
 cat > scripts/lint.sh <<'SH'
 #!/bin/sh
+# Lint: the files given, or every source file.
+set -e
 sh scripts/loop-log.sh lint "$@"
-echo "lint: 0 problems"
+files=$(printf '%s\n' "$@" | grep -E '\.js$' || true)
+node --check ${files:-src/*.js test/*.js} && echo "lint: 0 problems"
 SH
 cat > scripts/jest.sh <<'SH'
 #!/bin/sh
-# The unit runner is jest here, so the fallback passes --findRelatedTests with the changed files.
+# Unit tests through the jest-style runner: accepts --findRelatedTests <files> and runs the suite.
+set -e
 sh scripts/loop-log.sh test:unit "$@"
-echo "unit: 4 passed, 0 failed"
+out=$(node --test 2>&1) || { echo "$out"; exit 1; }
+echo "unit: $(echo "$out" | sed -n 's/^# pass \(.*\)/\1/p') passed, $(echo "$out" | sed -n 's/^# fail \(.*\)/\1/p') failed"
 SH
 cat > scripts/type-check.sh <<'SH'
 #!/bin/sh
+# Type-check: syntax of every file, since the project has no type annotations.
+set -e
 sh scripts/loop-log.sh type-check "$@"
-echo "type-check: 0 errors"
+node --check src/*.js test/*.js && echo "type-check: 0 errors"
 SH
 cat > scripts/validate.sh <<'SH'
 #!/bin/sh
-# The full gate: everything CI runs. A stand-in that logs and reports green with counts.
+# The full gate: everything CI runs. Minutes on a real project.
+set -e
 echo "validate" >> .loop/log
-echo "lint: 0 problems in 6 files"
-echo "type-check: 0 errors"
-echo "unit: 6 passed, 0 failed"
+node --check src/*.js && echo "lint: 0 problems in $(ls src/*.js test/*.js | wc -l | tr -d ' ') files"
+node --check src/*.js test/*.js && echo "type-check: 0 errors"
+out=$(node --test 2>&1) || { echo "$out"; exit 1; }
+echo "unit: $(echo "$out" | sed -n 's/^# pass \(.*\)/\1/p') passed, $(echo "$out" | sed -n 's/^# fail \(.*\)/\1/p') failed"
 echo "build: ok"
 SH
 cat > package.json <<'JSON'
