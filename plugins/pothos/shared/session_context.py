@@ -133,6 +133,10 @@ def run_section(data):
         lines.append(f"- How to log in: see `{run['login']}`")
     if run.get("screenshots"):
         lines.append(f"- Screenshots for evidence: {SCREENSHOTS[run['screenshots']]}")
+    if (run.get("capture") or {}).get("command"):
+        lines.append(f"- Screenshots without a device: `{run['capture']['command']} <screen> --lang <code>` renders one screen and prints "
+                     "the image paths; `/pothos:evidence` runs it through `evidence.py capture`" +
+                     (f" (read `{run['capture']['doc']}` for what it can and cannot show)." if run["capture"].get("doc") else "."))
     apps = run.get("apps") or []
     if apps:
         lines.append("- Apps in this monorepo (verify and setup above cover all of them; evidence uses the apps the change touches):")
@@ -141,7 +145,9 @@ def run_section(data):
             served = f" at {app['url']}" if app.get("url") else ""
             mocked = ", mocked backend" if app.get("mocked") else ""
             shots = f"; screenshots: {SCREENSHOTS[app['screenshots']]}" if app.get("screenshots") else ""
-            lines.append(f"  - `{app['name']}` in `{app['path']}`: {start}{served}{mocked}{shots}")
+            capture = (f"; without a device: `{app['capture']['command']} <screen> --lang <code>` through `evidence.py capture`"
+                       if (app.get("capture") or {}).get("command") else "")
+            lines.append(f"  - `{app['name']}` in `{app['path']}`: {start}{served}{mocked}{shots}{capture}")
     envs = run.get("environments") or []
     if envs:
         lines.append("- Backend environments (ask the user which one to use at the start of a feature; never pick one yourself):")
@@ -161,6 +167,14 @@ def ui_facts(ui):
         facts.append(f"Design tokens and theme: {quote(ui['tokens'])}. Use these values instead of raw colors, sizes or breakpoints.")
     if ui.get("icons"):
         facts.append(f"Icons come from `{ui['icons']}`; do not add another icon set.")
+    if ui.get("screens"):
+        facts.append(f"Screens and layouts: {quote(ui['screens'])}. A change there, under the components or the tokens above, "
+                     "or in the copy, touches what the user sees: `/pothos:evidence` captures the affected screens (`evidence.py screens` lists them).")
+    if ui.get("locales"):
+        facts.append(f"User-facing copy per language: {quote(ui['locales'])}.")
+    if ui.get("languages"):
+        facts.append(f"Screenshot languages: `{ui['languages'][0]}` always" +
+                     (", " + quote(ui['languages'][1:]) + " when the change edits copy." if len(ui['languages']) > 1 else "."))
     preview = ui.get("preview") or {}
     if preview.get("command"):
         served = f", answering at {preview['url']}" if preview.get("url") else ""

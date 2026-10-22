@@ -37,6 +37,7 @@ Use the first `candidates.e2e` script, preferring a headless variant. `e2e_tools
 - `run.url`: only when the script body or the docs state the port.
 - `run.login`: only when a doc explains how to sign in as a test user.
 - `run.screenshots`: whether evidence can take screenshots of the running app: `web` (headless browser at `run.url`), `ios-simulator`, `android-emulator` or `none`. Detection cannot settle this, so always ask, with a proposal: `web` for a web app with `run.dev` and `run.url`, `none` for a backend or library, and ask without proposing for a mobile app. Without a user, leave it out and list it as an assumption.
+- `run.capture` (and `capture` per app): a repository command that renders one screen without a device and prints image paths, such as a web export of a mobile app opened in a headless browser. Detection cannot find it; set it only when the repository documents one (`command`, run from the root, taking `<screen> --lang <code> --out <dir> [--base <ref>]`; `doc`, the file that lists the screens). Leave it out otherwise.
 - `run.apps`: only when `monorepo` is true. One entry per folder in `apps` that a change can touch and that someone would look at running (skip shared packages): `name`, `path`, and its own `dev`, `url`, `mocked` and `screenshots`, with the same rules as the top-level fields. `dev` runs from the repository root, so use a filtered command such as `pnpm --filter <package> dev`. Leave `run.dev` and `run.url` at the top level for the app most changes touch, or out when no app clearly dominates. `verify` and `run.setup` stay at the top level: they cover the whole repository.
 
 ## docs
@@ -70,6 +71,9 @@ In a monorepo, each app gets its own `ui` inside its `run.apps` entry, built fro
 - `components`: the folders whose components every feature may use, such as design-system primitives and common UI. Never take a `feature_scoped` folder: it belongs to one feature. When a parent and its child are both listed (`src/components` and `src/components/primitives`), keep the folders a reader would search first, usually the children that hold primitives and common pieces, and ask when it is not clear.
 - `tokens`: the files that define the theme or the tokens new code must use. Open each candidate: a file that only consumes values, or a single component's local tokens, does not count. Leave the field out when no file defines a shared scale.
 - `icons`: the package in `icon_packages` with clearly the most imports. When two packages are both in real use, ask which one new code takes; without a user, leave it out and list it as an assumption.
+- `screens`: the folders or globs of the files a user sees as screens or layouts, such as `features/*/screens` and `app/**/_layout.tsx` in a file-routed mobile app, or `src/pages` on the web. A change under them makes `evidence` capture the screen. Ask when the layout does not make it obvious; without a user, leave it out.
+- `locales`: the folder of user-facing copy per language, one file per language named by its code (`es.ts`, `ca.json`), when the app ships more than one. `evidence` captures the languages whose files a change edits.
+- `languages`: the codes to capture screenshots in, the app's primary language first; the rest are captured only when copy changes. Set it with `locales`, from the file names, and ask which comes first.
 - `preview`: a `preview_scripts` entry, with `command` as given and `url` only when it carries a port. `storybook_config` without a script means the preview cannot be started; leave it out and report the gap.
 
 ## pr

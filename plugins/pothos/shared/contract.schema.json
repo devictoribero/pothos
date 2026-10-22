@@ -125,6 +125,26 @@
             "none"
           ]
         },
+        "capture": {
+          "description": "How an agent captures a screenshot of one screen without a device: a repository command that renders the screen (a web export of a mobile app, a component page) and prints the image paths. evidence runs it as `<command> <screen> --lang <code> --out <dir>` (plus `--base <ref>` for a before-and-after pair) and expects one absolute path per line on stdout; an image named `*-base.png` is the base branch's. Unset means no such tier: evidence falls back to run.screenshots.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command"
+          ],
+          "properties": {
+            "command": {
+              "description": "Run from the repository root; receives the screen name and the flags above.",
+              "type": "string",
+              "minLength": 1
+            },
+            "doc": {
+              "description": "Repository doc that explains the tier: which screens it names, what it cannot show.",
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
         "apps": {
           "description": "Monorepos only: one entry per app a change can touch, with how to start it and show it. verify and run.setup stay at the top level because they cover the whole repository. evidence uses the entries whose path the change touches.",
           "type": "array",
@@ -169,6 +189,26 @@
                   "none"
                 ]
               },
+              "capture": {
+                "description": "Same as run.capture, for this app.",
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "command"
+                ],
+                "properties": {
+                  "command": {
+                    "description": "Run from the repository root; receives the screen name and the flags above.",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "doc": {
+                    "description": "Repository doc that explains the tier: which screens it names, what it cannot show.",
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
               "ui": {
                 "description": "This app's UI building blocks, same fields as the top-level ui. In a monorepo it replaces the top-level ui for files under the app's path.",
                 "type": "object",
@@ -185,6 +225,33 @@
                   },
                   "tokens": {
                     "description": "Repository-relative files or folders that define design tokens or the theme: colors, spacing, type scale, breakpoints.",
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "uniqueItems": true
+                  },
+                  "screens": {
+                    "description": "Repository-relative folders or globs of the files that are screens or layouts the user sees (`apps/mobile/features/*/screens`, `apps/mobile/app/**/_layout.tsx`). A change under them touches a screen, and evidence captures it.",
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "uniqueItems": true
+                  },
+                  "locales": {
+                    "description": "Repository-relative folders or files that hold the user-facing copy per language, one file per language named by its code (`es.ts`, `ca.json`). A change there means copy changed, and evidence captures the languages whose files changed.",
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "uniqueItems": true
+                  },
+                  "languages": {
+                    "description": "Language codes to capture screenshots in. The first is captured always; the others only when the change edits copy. Unset means the app's default language only.",
                     "type": "array",
                     "items": {
                       "type": "string",
@@ -369,6 +436,33 @@
         },
         "tokens": {
           "description": "Repository-relative files or folders that define design tokens or the theme: colors, spacing, type scale, breakpoints.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "screens": {
+          "description": "Repository-relative folders or globs of the files that are screens or layouts the user sees (`apps/mobile/features/*/screens`, `apps/mobile/app/**/_layout.tsx`). A change under them touches a screen, and evidence captures it.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "locales": {
+          "description": "Repository-relative folders or files that hold the user-facing copy per language, one file per language named by its code (`es.ts`, `ca.json`). A change there means copy changed, and evidence captures the languages whose files changed.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "languages": {
+          "description": "Language codes to capture screenshots in. The first is captured always; the others only when the change edits copy. Unset means the app's default language only.",
           "type": "array",
           "items": {
             "type": "string",

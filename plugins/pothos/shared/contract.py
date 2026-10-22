@@ -182,7 +182,7 @@ def path_errors(data, root):
     standards = lookup(data, "review.standards")
     if isinstance(standards, list):
         checks += [(f"review.standards[{i}]", rel) for i, rel in enumerate(standards)]
-    for key in ("ui.components", "ui.tokens"):
+    for key in ("ui.components", "ui.tokens", "ui.locales"):
         items = lookup(data, key)
         if isinstance(items, list):
             checks += [(f"{key}[{i}]", rel) for i, rel in enumerate(items)]
@@ -190,7 +190,7 @@ def path_errors(data, root):
     if isinstance(apps, list):
         checks += [(f"run.apps[{i}].path", app.get("path")) for i, app in enumerate(apps) if isinstance(app, dict)]
         for i, app in enumerate(apps):
-            for key in ("components", "tokens"):
+            for key in ("components", "tokens", "locales"):
                 items = lookup(app, f"ui.{key}") if isinstance(app, dict) else None
                 if isinstance(items, list):
                     checks += [(f"run.apps[{i}].ui.{key}[{j}]", rel) for j, rel in enumerate(items)]
