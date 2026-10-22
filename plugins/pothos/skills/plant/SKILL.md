@@ -43,7 +43,7 @@ If the user says the repository follows its own workflow, skip the steps: save `
 ## Audit mode
 
 1. Run `python3 "${CLAUDE_PLUGIN_ROOT}/shared/contract.py" validate --strict` and the detection script.
-2. Compare them. Drift means a command that names a script that no longer exists, a path that no longer exists (including `ui` folders and token files), a UI the contract has no `ui` section for, CI that now runs scripts `verify.full` does not, or a new e2e tool or docs folder the contract ignores.
+2. Compare them. Drift means a command that names a script that no longer exists, a path that no longer exists (including `ui` folders and token files), a UI the contract has no `ui` section for, CI that now runs scripts `verify.full` does not, or a new e2e tool, mutation tool or docs folder the contract ignores.
 3. Report each drift with a proposed fix. Apply the fixes with `contract.py write` only after the user confirms. Without a user, change nothing and report.
 4. End with the readiness report.
 

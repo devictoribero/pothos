@@ -238,6 +238,26 @@ class SessionContextTest(unittest.TestCase):
         self.assertLess(len(section), 2500, f"the verification section is {len(section)} characters")
         self.assertLess(len(text), 9900, f"the session context is {len(text)} characters")
 
+    def verification_section(self):
+        text = self.ctx()
+        return "### Verification" + text.split("### Verification")[1].split("\n\n### ")[0]
+
+    def test_without_a_mutation_command_the_gate_does_not_mention_mutation(self):
+        self.write({"version": 1, "verify": {"fast": "npm run lint", "full": "npm test"}})
+        self.assertNotIn("mutation", self.verification_section().lower())
+
+    def test_a_mutation_command_is_listed_with_when_to_run_it_and_what_the_pull_request_lists(self):
+        self.write({"version": 1, "verify": {"fast": "npm run lint", "full": "npm test",
+                                             "mutation": {"command": "npx stryker run --mutate {files}"}}})
+        section = self.verification_section()
+        self.assertIn("- Mutation command `npx stryker run --mutate {files}`: run `verify.py run mutation` once after green "
+                      "and before the pull request", section)
+        self.assertIn("outside `run all`", section)
+        self.assertIn("what a `new` survivor means is rule 1 of `standards/testing.md`", section)
+        self.assertIn("the survivors killed, each with the name of the test that kills it", section)
+        self.assertIn("the survivors left, each with why", section)
+        self.assertIn("No end-to-end command here", section)
+
     def test_setup_command_runs_first_in_every_worktree(self):
         self.write({"version": 1, "verify": {"full": "npm test"}, "run": {"setup": "npm ci && npm run codegen"}})
         text = self.ctx()

@@ -49,6 +49,35 @@
           "description": "End-to-end suite over the critical flows. Optional while the repo has none.",
           "type": "string",
           "minLength": 1
+        },
+        "mutation": {
+          "description": "Mutation testing on the source files a branch changed, run by verify as an advisory level of its own, never inside run all. Optional while the repo has no mutation tool.",
+          "type": "object",
+          "required": [
+            "command"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "description": "Command that mutates the changed files. {files} is replaced by the comma-separated, shell-quoted list; POTHOS_CHANGED_FILES carries the same list newline-separated, POTHOS_MUTATION_OUT the commit's receipt folder and POTHOS_MUTATION_CACHE a folder for what the tool reuses between runs, shared by every clone and worktree of the repository.",
+              "type": "string",
+              "minLength": 1
+            },
+            "report": {
+              "description": "Where the command writes its report in the mutation-testing-report schema, usually under $POTHOS_MUTATION_OUT. Without it the receipt records only the exit code.",
+              "type": "string",
+              "minLength": 1
+            },
+            "exclude": {
+              "description": "Repository-relative globs of files never to mutate, such as generated code. Test files are already excluded.",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            }
+          }
         }
       }
     },
