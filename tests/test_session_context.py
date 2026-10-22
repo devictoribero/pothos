@@ -160,9 +160,59 @@ class SessionContextTest(unittest.TestCase):
     def test_verify_commands_and_missing_e2e(self):
         self.write({"version": 1, "verify": {"fast": "npm run lint", "full": "npm test"}})
         text = self.ctx()
-        self.assertIn("`fast`: `npm run lint`", text)
+        self.assertIn("the fast check: `npm run lint`**, because the contract's `verify.fast` names it", text)
+        self.assertIn("runs `full`: `npm test` and records a receipt", text)
         self.assertIn("no end-to-end command", text)
         self.assertIn("only through verify, in the foreground", text)
+
+    def repo_file(self, rel, data):
+        path = os.path.join(self.repo, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as fh:
+            fh.write(data if isinstance(data, str) else json.dumps(data))
+
+    def test_two_tiers_name_the_skills_that_edit_and_the_rules_of_each(self):
+        self.write({"version": 1, "verify": {"fast": "npm run lint", "full": "npm test"}})
+        text = self.ctx()
+        self.assertIn("### Verification\n\nTwo tiers.", text)
+        self.assertIn("`implement`, `tdd`, `implement-spec`'s implementer subagents", text)
+        self.assertIn("after every coherent edit", text)
+        self.assertIn("`fast check: picked <command> because <why>`", text)
+        self.assertIn("executed nothing counts only for a docs or config change", text)
+        self.assertIn("After three red runs on the same step", text)
+        self.assertIn("A commit needs a green fast check, not a green gate", text)
+        self.assertIn("never mentioned in a commit message or in the pull request", text)
+        self.assertIn("**Tier 2, the gate: `/pothos:verify`**", text)
+        self.assertIn("Add no row for the fast check and none for the gate command as a whole", text)
+        self.assertIn("mark that step skipped (⏭️) with the reason", text)
+        self.assertIn("push with `--no-verify` only when `verify.py check` passes", text)
+        self.assertIn("Run it once before a push", text)
+
+    def test_a_root_check_fast_script_wins_over_the_contract(self):
+        self.repo_file("package.json", {"scripts": {"check:fast": "turbo lint type-check"}})
+        self.repo_file("pnpm-lock.yaml", "")
+        self.write({"version": 1, "verify": {"fast": "pnpm run type-check", "full": "pnpm run validate"}})
+        text = self.ctx()
+        self.assertIn("the fast check: `pnpm run check:fast`**, because the root package.json declares `check:fast`", text)
+        self.assertIn("The contract's `verify.fast` is `pnpm run type-check`; the repository's script wins", text)
+        self.assertNotIn("picked `", text)  # the eval counts the session's own line, so the template carries no backticks
+
+    def test_without_a_fast_command_the_fallback_is_listed_per_package(self):
+        self.repo_file("package.json", {"name": "shop", "workspaces": ["apps/*"], "scripts": {"validate": "turbo validate"}})
+        self.repo_file("apps/api/package.json", {"name": "api", "scripts": {"lint": "eslint .", "test:unit": "jest", "type-check": "tsc"}})
+        self.write({"version": 1, "verify": {"full": "npm run validate"}})
+        text = self.ctx()
+        self.assertIn("the fast check: no single command.**", text)
+        self.assertIn("- `apps/api`: `npm run lint --workspace apps/api -- <changed files>`; "
+                      "`npm run test:unit --workspace apps/api -- --findRelatedTests <changed files>` (jest); "
+                      "`npm run type-check --workspace apps/api`", text)
+        self.assertIn("a root `check:fast` script would replace it", text)
+
+    def test_with_nothing_to_run_the_gate_guards_each_commit(self):
+        self.write({"version": 1, "verify": {"full": "make check"}})
+        text = self.ctx()
+        self.assertIn("the fast check: none here.**", text)
+        self.assertIn("run the gate below before each commit instead", text)
 
     def test_setup_command_runs_first_in_every_worktree(self):
         self.write({"version": 1, "verify": {"full": "npm test"}, "run": {"setup": "npm ci && npm run codegen"}})

@@ -17,6 +17,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import contract  # noqa: E402
+import fast_check  # noqa: E402
 
 TEMPLATES = os.path.join(HERE, "vendor", "pocock-setup")
 PLUGIN = os.path.dirname(HERE)
@@ -94,20 +95,83 @@ def domain_section(data):
     return "### Domain docs\n\n" + prefix + demote(template("domain.md"), 2)
 
 
-def verify_section(data):
-    verify = data.get("verify") or {}
-    rows = [f"- `{level}`: `{verify[level]}`" for level in ("fast", "full", "e2e") if verify.get(level)]
-    text = ("### Verification\n\nRun `/pothos:verify` before merging anything into an integration or feature branch and "
-            "before a pull request leaves draft; it runs these commands and records a receipt for the commit. "
-            "With `implement-spec`, the merger subagent runs `verify run all` on the integration branch after each merge and "
-            "hands a red result back to an implementer instead of moving on. "
-            "Run the `fast` command yourself while working. Run `full` and `e2e` only through verify, in the foreground: "
-            "a background command dies when your turn or subagent ends and nobody is notified. verify keeps slow checks "
-            "alive in a detached process; when it exits 4 they are still going, so run `verify.py wait` until it returns "
-            "another code.\n\n" + "\n".join(rows))
+SKILLS_THAT_EDIT = ("`implement`, `tdd`, `implement-spec`'s implementer subagents (including the one that fixes "
+                    "`code-review`'s findings), `prototype`, `diagnosing-bugs` and `tend`")
+
+
+def fast_check_lines(pick):
+    """Tier 1: the command the repository names, or the per-package fallback, with the rules of the edit loop."""
+    if pick["command"]:
+        lines = [f"**Tier 1, the fast check: `{pick['command']}`**, because {pick['why']}. "
+                 "When this repository's CLAUDE.md names a command to run while working, that command wins."]
+        if pick.get("drift"):
+            lines.append(f"The contract's `verify.fast` is `{pick['drift']}`; the repository's script wins, and "
+                         "`/pothos:plant audit` would update the contract.")
+    elif pick["fallback"]:
+        lines = ["**Tier 1, the fast check: no single command.** The root package.json has no `check:fast` script and "
+                 "the contract has no `verify.fast`, so the fast check is a fallback. When this repository's CLAUDE.md "
+                 "names a command to run while working, that command wins instead."]
+        lines += fast_check.fallback_lines(pick["fallback"])
+        lines.append("In your final message say in one line which fallback you ran and that a root `check:fast` "
+                     "script would replace it. Never write that script yourself and never open a ticket for it.")
+    else:
+        lines = ["**Tier 1, the fast check: none here.** The repository declares no `check:fast`, no `verify.fast` and "
+                 "no lint, unit test or type-check script. Unless CLAUDE.md names a command to run while working, "
+                 "run the gate below before each commit instead, and say so in your final message. Never set up a "
+                 "fast check yourself."]
+    lines += [
+        "- Run it after every coherent edit: once the edits that make one test pass or complete one function are in. "
+        "Not mid-edit on a file that does not compile yet, and not after every tool call. Always before the next "
+        "ticket step, before a commit and before reporting a step done.",
+        "- On its first run in this session, say in one line which command you picked and why, in the form "
+        "`fast check: picked <command> because <why>`. Later runs just run.",
+        "- A green run that executed nothing counts only for a docs or config change. For a code change in a package "
+        "the command did not cover, run that package's fallback (lint on the changed files, unit tests, type-check) "
+        "and say so.",
+        "- Red is work, not a status: fix, run again, continue. Never go green by deleting, skipping or weakening a "
+        "test. After three red runs on the same step, or when the red is in code this branch did not touch, stop and "
+        "report it with the failing step's output instead of pushing on.",
+        "- A commit needs a green fast check, not a green gate, unless this repository's own rules ask for the gate "
+        "before every commit; then the repository wins.",
+        "- It never decides that work is ready to push, and it is never mentioned in a commit message or in the pull "
+        "request.",
+    ]
+    return lines
+
+
+def gate_lines(verify):
+    """Tier 2: the contract's full validation through verify, once before a push."""
+    rows = [f"`{level}`: `{verify[level]}`" for level in ("full", "e2e") if verify.get(level)]
+    lines = [
+        "**Tier 2, the gate: `/pothos:verify`** (`verify.py run all`), which runs " + "; ".join(rows) +
+        " and records a receipt for the commit. Run it once before a push, before merging into an integration or "
+        "feature branch and before a pull request leaves draft. The fast check never replaces it, and the gate "
+        "never replaces the fast check. With `implement-spec`, the merger subagent runs it on the integration branch "
+        "after each merge and hands a red result back to an implementer instead of moving on.",
+        "- Keep its output (the receipt names the log): a pull request's test plan takes its rows and counts from "
+        "this run. Add no row for the fast check and none for the gate command as a whole.",
+        "- A step of the gate that cannot run here (no database, no network, a missing tool) is not replaced by the "
+        "fast check: run the gate, mark that step skipped (⏭️) with the reason in the test plan, name it in your "
+        "final message and let CI be the gate. A step that could run and is red blocks the push.",
+        "- When the repository's pre-push hook runs the same gate command, push with `--no-verify` only when "
+        "`verify.py check` passes for the commit you push: the hook would repeat the run that just passed, and CI "
+        "stays the gate nobody skips. Any edit after the green run means the gate runs again. A hook that does "
+        "anything else runs.",
+        "- Run `full` and `e2e` only through verify, in the foreground: a background command dies when your turn "
+        "or subagent ends and nobody is notified. verify keeps slow checks alive in a detached process; when it "
+        "exits 4 they are still going, so run `verify.py wait` until it returns another code.",
+    ]
     if not verify.get("e2e"):
-        text += "\n\nThis repository has no end-to-end command; skip that step and say so in the pull request."
-    return text
+        lines.append("- This repository has no end-to-end command; skip that step and say so in the pull request.")
+    return lines
+
+
+def verify_section(data, start):
+    verify = data.get("verify") or {}
+    pick = fast_check.discover(contract.repo_root(start), data)
+    intro = ("### Verification\n\nTwo tiers. Every skill step that edits or writes a source file runs the fast check: "
+             + SKILLS_THAT_EDIT + ". A push runs the gate once.")
+    return "\n\n".join([intro, "\n".join(fast_check_lines(pick)), "\n".join(gate_lines(verify))])
 
 
 SCREENSHOTS = {
@@ -327,8 +391,8 @@ def contract_section(start):
     if errors:
         sections.append("The contract has problems; mention them and suggest `/pothos:plant`:\n" + "\n".join(f"- {e}" for e in errors))
     sections.append(tracker_section(data, start))
-    for part in (labels_section, domain_section, verify_section, run_section,
-                 standards_section, review_section):
+    sections += [labels_section(data), domain_section(data), verify_section(data, start)]
+    for part in (run_section, standards_section, review_section):
         text = part(data)
         if text:
             sections.append(text)

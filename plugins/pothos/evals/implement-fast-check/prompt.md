@@ -1,0 +1,1 @@
+Implement the ticket `.scratch/refunds/issues/01-refunded-lines.md` on the current branch `refunds`. Nobody is here to answer questions: decide yourself and keep going. When it is done, commit, push the branch and open the pull request with `gh pr create`.
