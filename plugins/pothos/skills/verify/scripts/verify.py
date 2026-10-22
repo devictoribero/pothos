@@ -44,10 +44,9 @@ import ui_check  # noqa: E402
 
 LEVELS = ("fast", "full", "e2e")
 ADVISORY = ("ui", "mutation")
-# The files Stryker's default mutate option leaves out (an explicit --mutate replaces those defaults), plus the
-# common Python layout: a tests/ folder and test_*.py files.
+# The files Stryker's default mutate option leaves out (an explicit --mutate replaces those defaults).
 TEST_FILE_GLOBS = ("*.test.*", "*.spec.*")
-TEST_FOLDERS = ("__tests__", "tests")
+TEST_FOLDERS = ("__tests__",)
 # Every status of the mutation-testing-report-schema: only the first kind is a finding.
 MUTANT_STATUSES = {"Survived": "finding", "NoCoverage": "finding", "Killed": "killed", "Timeout": "killed",
                    "Ignored": "ignored", "CompileError": "noise", "RuntimeError": "noise", "Pending": "noise"}
@@ -232,8 +231,7 @@ def ui_level(root, data):
 def is_test_file(path):
     name = os.path.basename(path)
     return (any(fnmatch.fnmatch(name, glob) for glob in TEST_FILE_GLOBS)
-            or any(part in TEST_FOLDERS for part in path.split("/")[:-1])
-            or (name.startswith("test_") and name.endswith(".py")))
+            or any(part in TEST_FOLDERS for part in path.split("/")[:-1]))
 
 
 def changed_source_files(root, base, exclude):

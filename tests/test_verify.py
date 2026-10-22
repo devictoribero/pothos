@@ -193,8 +193,7 @@ class VerifyTest(unittest.TestCase):
 
     def test_mutation_is_skipped_when_only_test_files_or_excluded_files_changed(self):
         self.contract({"verify": {"full": "true", "mutation": {"command": "touch mutation-ran", "exclude": ["src/generated/*"]}}})
-        self.branch_with("src/a.test.js", "src/b.spec.ts", "src/__tests__/c.js", "tests/d.py", "src/test_e.py",
-                         "src/generated/f.js")
+        self.branch_with("src/a.test.js", "src/b.spec.ts", "src/__tests__/c.js", "src/generated/f.js")
         self.run_script("run", "full")
 
         run = self.run_script("run", "mutation")

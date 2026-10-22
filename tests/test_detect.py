@@ -175,35 +175,16 @@ class DetectTest(unittest.TestCase):
         os.remove(os.path.join(self.repo, "stryker.config.mjs"))
         self.write("package.json", json.dumps({"devDependencies": {"@stryker-mutator/core": "8.0.0"}}))
         self.assertEqual(detect(self.repo)["mutation_tools"], ["stryker"])
-    def test_mutmut_table_or_section_reports_mutmut(self):
-        self.write("pyproject.toml", "[tool.pytest.ini_options]\nx = 1\n[tool.mutmut]\npaths_to_mutate = [\"src/\"]\n")
-        self.assertEqual(detect(self.repo)["mutation_tools"], ["mutmut"])
-        os.remove(os.path.join(self.repo, "pyproject.toml"))
-        self.write("setup.cfg", "[flake8]\nmax-line-length = 100\n[mutmut]\npaths_to_mutate=src/\n")
-        self.assertEqual(detect(self.repo)["mutation_tools"], ["mutmut"])
-        self.write("setup.cfg", "[flake8]\n# mutmut is not configured here\n")
-        self.assertEqual(detect(self.repo)["mutation_tools"], [])
-    def test_cosmic_ray_config_and_pit_plugin_report_both_tools_sorted(self):
-        self.write("cosmic-ray.toml", "[cosmic-ray]\nmodule-path = \"src\"\n")
-        self.write("pom.xml", "<project><build><plugins><plugin><artifactId>pitest-maven</artifactId></plugin></plugins></build></project>")
-        self.assertEqual(detect(self.repo)["mutation_tools"], ["cosmic-ray", "pit"])
-        os.remove(os.path.join(self.repo, "pom.xml"))
-        self.write("build.gradle.kts", "plugins {\n    id(\"info.solidsoft.pitest\") version \"1.15.0\"\n}\n")
-        self.assertEqual(detect(self.repo)["mutation_tools"], ["cosmic-ray", "pit"])
-    def test_temp_folder_ignored_only_when_the_ignore_file_names_every_tools_folder(self):
+
+    def test_temp_folder_ignored_only_when_the_ignore_file_names_the_tools_folder(self):
         self.write("stryker.config.json", "{}")
         self.assertFalse(detect(self.repo)["mutation_temp_ignored"])
         self.write(".gitignore", "node_modules\n# stryker leaves a sandbox behind on a crash\n.stryker-tmp/\n")
         self.assertTrue(detect(self.repo)["mutation_temp_ignored"])
-        self.write("pyproject.toml", "[tool.mutmut]\n")
+        self.write(".gitignore", "/.stryker-tmp\n")
+        self.assertTrue(detect(self.repo)["mutation_temp_ignored"])
+        self.write(".gitignore", "node_modules\n")
         self.assertFalse(detect(self.repo)["mutation_temp_ignored"])
-        self.write(".gitignore", "/.stryker-tmp\n**/mutants\n")
-        self.assertTrue(detect(self.repo)["mutation_temp_ignored"])
-
-    def test_an_ignored_parent_folder_covers_the_pit_reports(self):
-        self.write("pom.xml", "<plugin><artifactId>pitest-maven</artifactId></plugin>")
-        self.write(".gitignore", "target/\n")
-        self.assertTrue(detect(self.repo)["mutation_temp_ignored"])
 
 if __name__ == "__main__":
     unittest.main()

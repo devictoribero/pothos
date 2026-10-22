@@ -56,20 +56,15 @@ E2E_CONFIGS = {
     "detox": [".detoxrc.js", ".detoxrc.json", "detox.config.js"],
 }
 
-# Mutation tools, by the config file that declares them, at the root or in a monorepo app.
+# Mutation tools, by the config file that declares them, at the root or in a monorepo app. Stryker is the only one
+# Pothos knows; another tool is set by hand in the contract.
 MUTATION_CONFIGS = {
     "stryker": ["stryker.config.js", "stryker.config.mjs", "stryker.config.cjs", "stryker.config.json",
                 "stryker.conf.js", "stryker.conf.json"],
-    "cosmic-ray": ["cosmic-ray.toml", "cosmic-ray.conf"],
 }
 # The folder each tool leaves inside the repository, which the ignore file should name.
-MUTATION_TEMP_FOLDERS = {"stryker": ".stryker-tmp", "mutmut": "mutants", "cosmic-ray": ".cosmic-ray", "pit": "target/pit-reports"}
-# Build files that load the PIT plugin, and the words that show it.
-PIT_BUILD_FILES = {"pom.xml": re.compile(r"pitest-maven"), "build.gradle": re.compile(r"info\.solidsoft\.pitest|pitest"),
-                   "build.gradle.kts": re.compile(r"info\.solidsoft\.pitest|pitest")}
+MUTATION_TEMP_FOLDERS = {"stryker": ".stryker-tmp"}
 STRYKER_PACKAGE = "@stryker-mutator/core"
-# Section headers that configure mutmut: a table in the Python project file or a section in setup.cfg.
-MUTMUT_SECTIONS = {"pyproject.toml": re.compile(r"^\[tool\.mutmut\]", re.M), "setup.cfg": re.compile(r"^\[mutmut\]", re.M)}
 
 TRACKER_PATTERNS = {
     "jira": re.compile(r"atlassian\.net|\bjira\b", re.I),
@@ -268,10 +263,6 @@ def mutation_tools(root, pkg):
     deps = {**((pkg or {}).get("dependencies") or {}), **((pkg or {}).get("devDependencies") or {})}
     if STRYKER_PACKAGE in deps:
         tools.add("stryker")
-    if any(pattern.search(read(os.path.join(root, name)) or "") for name, pattern in MUTMUT_SECTIONS.items()):
-        tools.add("mutmut")
-    if any(pattern.search(read(os.path.join(root, name)) or "") for name, pattern in PIT_BUILD_FILES.items()):
-        tools.add("pit")
     return sorted(tools)
 
 
