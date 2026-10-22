@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: deps-cooling-off-retargets
+description: >
+  A package on a dead line whose two newest majors were published this week. In audit mode the record must target
+  the version that matured months ago (the window retargets, it does not cancel) and mark the line as dead.
+tags: [update-dependencies]
+runs: 2
+expected_outcome: The record targets react-dropzone 15.0.0 as drift-exposed, never 17.0.0, and nothing is published.
+execution:
+  max_turns: 40
+  timeout_seconds: 600
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit]
+context:
+  scaffold_script: seed.sh

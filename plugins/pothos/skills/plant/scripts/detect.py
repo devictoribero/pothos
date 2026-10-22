@@ -257,6 +257,19 @@ def ui_facts(root, pkg, pm):
     }
 
 
+# Bots that already open dependency pull requests, by their config file. update-dependencies reads their pull
+# requests and leaves to them what they do.
+DEPENDENCY_BOTS = {
+    "renovate": ["renovate.json", "renovate.json5", ".renovaterc", ".renovaterc.json", ".github/renovate.json", ".github/renovate.json5"],
+    "dependabot": [".github/dependabot.yml", ".github/dependabot.yaml"],
+}
+DEPENDENCY_POLICY = ["docs/dependencies.md", "docs/DEPENDENCIES.md", "DEPENDENCIES.md"]
+
+
+def dependency_bots(root):
+    return sorted(bot for bot, paths in DEPENDENCY_BOTS.items() if any(os.path.exists(os.path.join(root, p)) for p in paths))
+
+
 def mutation_tools(root, pkg):
     """Mutation tools declared on disk, sorted. Only what a config file or manifest says; never a guess."""
     tools = {tool for tool, files in MUTATION_CONFIGS.items() if find_upwards_of_depth(root, files)}
@@ -344,6 +357,8 @@ def detect(root):
     report["e2e_config_paths"] = sorted(p for paths in e2e_found.values() for p in paths)
     report["mutation_tools"] = mutation_tools(root, pkg)
     report["mutation_temp_ignored"] = mutation_temp_ignored(root, report["mutation_tools"])
+    report["dependency_bots"] = dependency_bots(root)
+    report["dependency_policy"] = next((p for p in DEPENDENCY_POLICY if exists(p)), None)
 
     workflows_dir = os.path.join(root, ".github", "workflows")
     ci = []

@@ -1,0 +1,15 @@
+schema_version: "1.1"
+name: deps-security-red-draft
+description: >
+  A runtime security advisory whose patched version turns a test red. The entry is attempted anyway, its pull
+  request opens as a draft marked for a person with the failure documented, nothing is presented as ready, no label
+  is added and nothing merges.
+tags: [update-dependencies]
+runs: 2
+expected_outcome: The record has lodash as a security entry, a draft pull request was created with the failure named, and no label or merge call was made.
+execution:
+  max_turns: 60
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit]
+context:
+  scaffold_script: seed.sh

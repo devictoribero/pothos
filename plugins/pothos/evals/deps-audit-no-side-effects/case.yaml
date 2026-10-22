@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: deps-audit-no-side-effects
+description: >
+  Audit mode with a security advisory and a dead line on the table. The record exists with both classified; no
+  pull request, ticket or commit on the person's branch exists when it ends, and package.json is as it was.
+tags: [update-dependencies]
+runs: 2
+expected_outcome: A record with lodash as security and react-dropzone as drift-exposed, no publish call, main untouched.
+execution:
+  max_turns: 50
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit]
+context:
+  scaffold_script: seed.sh

@@ -32,7 +32,7 @@ SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "contract
 # Paths that must already exist in the repository.
 PATH_FIELDS = ("docs.glossary", "docs.decisions", "docs.specs", "run.login", "pr.template")
 # Folders a skill creates on first use: they must be relative and inside the repo, but may not exist yet.
-CREATED_LATER_FIELDS = ("tracker.path", "docs.prd")
+CREATED_LATER_FIELDS = ("tracker.path", "docs.prd", "deps.policy")
 CASE_INSENSITIVE_HOSTS = ("github.com", "gitlab.com", "bitbucket.org")
 
 EXIT_OK, EXIT_INVALID, EXIT_MISSING, EXIT_UNSET, EXIT_USAGE = 0, 1, 2, 3, 64
