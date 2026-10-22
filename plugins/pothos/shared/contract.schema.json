@@ -155,7 +155,7 @@
           ]
         },
         "capture": {
-          "description": "How an agent captures a screenshot of one screen without a device: a repository command that renders the screen (a web export of a mobile app, a component page) and prints the image paths. evidence runs it as `<command> <screen> --lang <code> --out <dir>` (plus `--base <ref>` for a before-and-after pair) and expects one absolute path per line on stdout; an image named `*-base.png` is the base branch's. Unset means no such tier: evidence falls back to run.screenshots.",
+          "description": "How an agent captures a screenshot of one screen without a device: a repository command that renders the screen (a web export of a mobile app, a component page, a web page) and prints the image paths. evidence runs it as `<command> <screen> [<screen> ...] --lang <codes> --out <dir>`, codes comma-separated (`es,ca`), and expects one absolute path per line on stdout, one image per screen and language. The before-and-after pair is evidence's job, not the command's: it checks the base out in a throwaway worktree, runs run.setup there and the same command again. Unset means no such tier: evidence falls back to run.screenshots.",
           "type": "object",
           "additionalProperties": false,
           "required": [
@@ -163,7 +163,7 @@
           ],
           "properties": {
             "command": {
-              "description": "Run from the repository root; receives the screen name and the flags above.",
+              "description": "Run from the repository root (of the branch, and of the base worktree for the pair); receives the screen names and the flags above.",
               "type": "string",
               "minLength": 1
             },
@@ -227,7 +227,7 @@
                 ],
                 "properties": {
                   "command": {
-                    "description": "Run from the repository root; receives the screen name and the flags above.",
+                    "description": "Run from the repository root (of the branch, and of the base worktree for the pair); receives the screen names and the flags above.",
                     "type": "string",
                     "minLength": 1
                   },
@@ -271,7 +271,7 @@
                     "uniqueItems": true
                   },
                   "locales": {
-                    "description": "Repository-relative folders or files that hold the user-facing copy per language, one file per language named by its code (`es.ts`, `ca.json`). A change there means copy changed, and evidence captures the languages whose files changed.",
+                    "description": "Repository-relative folders, files or patterns that hold the user-facing copy per language. Either one file per language named by its code (`src/i18n/locales`, holding `es.ts`, `ca.json`), or a pattern with `{lang}` where the code sits in the path (`src/locales/{lang}/*.json`, `android/app/src/main/res/values-{lang}/strings.xml`, `ios/App/{lang}.lproj/Localizable.strings`). A change there means copy changed, and evidence captures those languages.",
                     "type": "array",
                     "items": {
                       "type": "string",
@@ -482,7 +482,7 @@
           "uniqueItems": true
         },
         "locales": {
-          "description": "Repository-relative folders or files that hold the user-facing copy per language, one file per language named by its code (`es.ts`, `ca.json`). A change there means copy changed, and evidence captures the languages whose files changed.",
+          "description": "Repository-relative folders, files or patterns that hold the user-facing copy per language. Either one file per language named by its code (`src/i18n/locales`, holding `es.ts`, `ca.json`), or a pattern with `{lang}` where the code sits in the path (`src/locales/{lang}/*.json`, `android/app/src/main/res/values-{lang}/strings.xml`, `ios/App/{lang}.lproj/Localizable.strings`). A change there means copy changed, and evidence captures those languages.",
           "type": "array",
           "items": {
             "type": "string",

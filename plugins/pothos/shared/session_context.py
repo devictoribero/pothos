@@ -189,8 +189,8 @@ def run_section(data):
     if run.get("screenshots"):
         lines.append(f"- Screenshots for evidence: {SCREENSHOTS[run['screenshots']]}")
     if (run.get("capture") or {}).get("command"):
-        lines.append(f"- Screenshots without a device: `{run['capture']['command']} <screen> --lang <code>` renders one screen and prints "
-                     "the image paths; `/pothos:evidence` runs it through `evidence.py capture`" +
+        lines.append(f"- Screenshots without a device: `{run['capture']['command']} <screen> --lang <codes>` renders one screen and prints "
+                     "the image paths; `/pothos:evidence` runs it through `evidence.py capture`, which also pairs it with the base branch" +
                      (f" (read `{run['capture']['doc']}` for what it can and cannot show)." if run["capture"].get("doc") else "."))
     apps = run.get("apps") or []
     if apps:
@@ -200,7 +200,7 @@ def run_section(data):
             served = f" at {app['url']}" if app.get("url") else ""
             mocked = ", mocked backend" if app.get("mocked") else ""
             shots = f"; screenshots: {SCREENSHOTS[app['screenshots']]}" if app.get("screenshots") else ""
-            capture = (f"; without a device: `{app['capture']['command']} <screen> --lang <code>` through `evidence.py capture`"
+            capture = (f"; without a device: `{app['capture']['command']} <screen> --lang <codes>` through `evidence.py capture`"
                        if (app.get("capture") or {}).get("command") else "")
             lines.append(f"  - `{app['name']}` in `{app['path']}`: {start}{served}{mocked}{shots}{capture}")
     envs = run.get("environments") or []

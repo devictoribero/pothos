@@ -279,7 +279,7 @@ class SessionContextTest(unittest.TestCase):
                                       "ui": {"screens": ["apps/mobile/features/*/screens"], "locales": ["apps/mobile/i18n"],
                                              "languages": ["es", "ca"]}}]}})
         text = context(self.repo, env=self.env)
-        self.assertIn("without a device: `pnpm screenshot <screen> --lang <code>` through `evidence.py capture`", text)
+        self.assertIn("without a device: `pnpm screenshot <screen> --lang <codes>` through `evidence.py capture`", text)
         self.assertIn("Screens and layouts: `apps/mobile/features/*/screens`", text)
         self.assertIn("User-facing copy per language: `apps/mobile/i18n`", text)
         self.assertIn("Screenshot languages: `es` always, `ca` when the change edits copy.", text)

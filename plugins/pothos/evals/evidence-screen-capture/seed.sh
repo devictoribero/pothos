@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # A mobile app in a monorepo with a capture command that stands in for the real web tier: it writes a PNG per
-# screen and language (and a -base one when asked) and prints the paths, so the eval checks the skill's steps,
+# screen and language and prints the paths, so the eval checks the skill's steps,
 # not a browser.
 set -euo pipefail
 cd "${1:-$PWD}"
@@ -56,7 +56,7 @@ TS
 cat > apps/mobile/docs/screenshots.md <<'MD'
 # Screenshots without a device
 
-`node apps/mobile/scripts/screenshot/capture.js <scenario>... [--lang es,ca] [--out DIR] [--base REF]` renders a
+`node apps/mobile/scripts/screenshot/capture.js <scenario>... [--lang es,ca] [--out DIR]` renders a
 scenario in a headless browser and prints one image path per line. Scenarios are the files under
 `apps/mobile/scripts/screenshot/scenarios/`: `pet` is the pet screen, `home` the home tab.
 It cannot show font scale or native surfaces.
@@ -75,15 +75,14 @@ const args = process.argv.slice(2);
 const flag = (name, fallback) => (args.includes(name) ? args[args.indexOf(name) + 1] : fallback);
 const out = path.resolve(flag('--out', '.context/screenshots'));
 const langs = flag('--lang', 'es').split(',');
-const base = args.includes('--base');
-const names = args.filter((a, i) => !a.startsWith('--') && (i === 0 || !['--out', '--lang', '--base'].includes(args[i - 1])));
-if (names.length === 0) { console.error('usage: capture.js <scenario>... [--lang es,ca] [--out DIR] [--base REF]'); process.exit(64); }
+const names = args.filter((a, i) => !a.startsWith('--') && (i === 0 || !['--out', '--lang'].includes(args[i - 1])));
+if (names.length === 0) { console.error('usage: capture.js <scenario>... [--lang es,ca] [--out DIR]'); process.exit(64); }
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
 fs.mkdirSync(out, { recursive: true });
 for (const name of names) {
   if (!fs.existsSync(path.join(__dirname, 'scenarios', `${name}.ts`))) { console.error(`no scenario named ${name}; known: pet, home`); process.exit(1); }
-  for (const lang of langs) for (const suffix of base ? ['', '-base'] : ['']) {
-    const file = path.join(out, `${name}-${lang}${suffix}.png`);
+  for (const lang of langs) {
+    const file = path.join(out, `${name}-${lang}.png`);
     fs.writeFileSync(file, PNG);
     console.log(file);
   }

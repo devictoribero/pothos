@@ -197,6 +197,9 @@ def path_errors(data, root):
     for field, rel in checks:
         if not isinstance(rel, str):
             continue
+        if re.search(r"[*?]|\{lang\}", rel):
+            # A glob or a `{lang}` pattern: the folder before its first wildcard must exist.
+            rel = os.path.dirname(re.split(r"[*?]|\{lang\}", rel, maxsplit=1)[0]) or "."
         target = os.path.realpath(os.path.join(root, rel))
         if os.path.isabs(rel) or not (target == real_root or target.startswith(real_root + os.sep)):
             errors.append(f"contract.{field}: '{rel}' must be a path inside the repository")

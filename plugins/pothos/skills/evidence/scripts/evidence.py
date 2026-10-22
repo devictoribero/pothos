@@ -7,7 +7,8 @@ Usage:
   evidence.py screens [--base BRANCH]              which screens the branch touches (from the contract's ui.screens, ui.components,
                                                    ui.tokens and ui.locales) and which languages to capture
   evidence.py capture SCREEN [SCREEN ...] [--lang es,ca] [--base BRANCH] [--app NAME]
-                                                   run the contract's capture command and keep its images as before/after
+                                                   run the contract's capture command and keep its images as after-…; with --base,
+                                                   run it again in a worktree of that ref (after run.setup) and keep those as before-…
   evidence.py serve [--app NAME] [--env NAME] [--timeout SECS]
                                                    start the contract's dev command, wait for its URL
   evidence.py stop PID                             stop a server started by serve
@@ -115,13 +116,21 @@ def plan(root, args):
     return 0
 
 
+LANG_TOKEN = "{lang}"
+LANG_GROUP = r"(?P<lang>[a-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})?)"
+
+
 def glob_regex(pattern):
     """A repository-relative folder or glob as a regex over repository-relative paths: `**` crosses folders,
-    `*` stays inside one, and a folder matches everything under it."""
+    `*` stays inside one, a folder matches everything under it, and `{lang}` is one language code, captured."""
     out = ""
     i = 0
     while i < len(pattern):
         ch = pattern[i]
+        if pattern.startswith(LANG_TOKEN, i):
+            out += LANG_GROUP
+            i += len(LANG_TOKEN)
+            continue
         if pattern.startswith("**/", i):
             out += "(?:.*/)?"
             i += 3
@@ -144,6 +153,17 @@ def glob_regex(pattern):
 
 def matches_any(path, patterns):
     return any(glob_regex(p).match(path) for p in patterns)
+
+
+def locale_language(path, patterns):
+    """The language a copy file belongs to: the `{lang}` segment of the pattern that matches it
+    (`locales/{lang}/*.json`, `values-{lang}/strings.xml`), else the file's name without its extension
+    (`es.ts`, `ca.json`). None when no pattern matches."""
+    for pattern in patterns:
+        match = glob_regex(pattern).match(path)
+        if match:
+            return match.groupdict().get("lang") or re.sub(r"\..*$", "", os.path.basename(path))
+    return None
 
 
 def ui_sets(data, path):
@@ -210,7 +230,7 @@ def screens(root, args):
         elif matches_any(path, ui.get("components") or []) or matches_any(path, ui.get("tokens") or []):
             via[path] = importers(root, screen_files(root, ui["screens"]), path)
         elif matches_any(path, ui.get("locales") or []):
-            copy_languages.add(re.sub(r"\..*$", "", os.path.basename(path)))
+            copy_languages.add(locale_language(path, ui["locales"]))
     if not direct and not via and not copy_languages:
         print(f"none: the branch touches no screen, shared component, token or copy (compared with {base})")
         return 0
@@ -252,7 +272,9 @@ def capture_command(data, app_name):
 
 def capture(root, args):
     """Runs the contract's capture command for each screen and keeps its images in the evidence folder as
-    after-<screen>-<lang>.png, and before-… for the ones the command marks *-base.png."""
+    after-<screen>-<lang>.png. With --base, checks that ref out in a throwaway worktree, runs run.setup there
+    and the same command again, and keeps those images as before-…; when that cannot be done, says why on
+    stderr and keeps the after images alone."""
     data = load(root)
     command, error = capture_command(data, flag(args, "--app"))
     if error:
@@ -263,32 +285,73 @@ def capture(root, args):
         print("capture needs at least one screen name", file=sys.stderr)
         return 64
     out = folder(root)
-    extra = ["--lang", flag(args, "--lang", "")] if flag(args, "--lang") else []
-    if flag(args, "--base"):
-        extra += ["--base", flag(args, "--base")]
-    full = f"{command} {' '.join(names)} --out {shlex_quote(out)} " + " ".join(extra)
-    result = subprocess.run(full, shell=True, cwd=root, capture_output=True, text=True)
+    lang = ["--lang", flag(args, "--lang")] if flag(args, "--lang") else []
+    after, error = run_capture(root, command, names, lang, out, out, "after-")
+    if error:
+        print(error, file=sys.stderr)
+        return 1
+    kept = list(after)
+    base = flag(args, "--base")
+    if base:
+        before, error = capture_base(root, data, command, names, lang, out, base)
+        if error:
+            print(f"before: {error}; captured the new state only, say so in evidence.md", file=sys.stderr)
+        kept += before
+    print("\n".join(kept))
+    return 0
+
+
+def run_capture(cwd, command, names, lang, shots, out, prefix):
+    """Runs `<command> <names> --out <shots> [--lang <codes>]` from cwd and moves every image it prints into out
+    under the prefix. Returns (paths, None) or ([], why it failed)."""
+    full = f"{command} {' '.join(names)} --out {shlex_quote(shots)} " + " ".join(lang)
+    result = subprocess.run(full, shell=True, cwd=cwd, capture_output=True, text=True)
     sys.stderr.write(result.stderr)
     if result.returncode:
-        print(f"the capture command exited {result.returncode}: {full}", file=sys.stderr)
-        return 1
+        return [], f"the capture command exited {result.returncode}: {full}"
     produced = [line.strip() for line in result.stdout.splitlines() if line.strip()]
     kept = []
     for path in produced:
         if not os.path.isfile(path):
-            print(f"the capture command printed a path that does not exist: {path}", file=sys.stderr)
-            return 1
-        name = os.path.basename(path)
-        stem, ext = os.path.splitext(name)
-        target = os.path.join(out, (f"before-{stem[:-5]}" if stem.endswith("-base") else f"after-{stem}") + ext)
+            return [], f"the capture command printed a path that does not exist: {path}"
+        target = os.path.join(out, prefix + os.path.basename(path))
         if os.path.realpath(path) != os.path.realpath(target):
             shutil.move(path, target)
         kept.append(target)
     if not kept:
-        print("the capture command printed no image path", file=sys.stderr)
-        return 1
-    print("\n".join(kept))
-    return 0
+        return [], "the capture command printed no image path"
+    return kept, None
+
+
+def capture_base(root, data, command, names, lang, out, ref):
+    """The base branch's images: a detached worktree of ref outside the repository, run.setup in it when the
+    contract has one, then the same capture command from that worktree. The worktree is removed afterwards."""
+    sha = contract.git(["rev-parse", "--verify", "--quiet", ref + "^{commit}"], root) \
+        or contract.git(["rev-parse", "--verify", "--quiet", "origin/" + ref + "^{commit}"], root)
+    if not sha:
+        return [], f"no ref named {ref} (nor origin/{ref})"
+    tmp = tempfile.mkdtemp(prefix="pothos-base-")
+    worktree = os.path.join(tmp, "repo")
+    shots = os.path.join(tmp, "shots")
+    os.makedirs(shots)
+    try:
+        added = subprocess.run(["git", "-C", root, "worktree", "add", "--detach", worktree, sha],
+                               capture_output=True, text=True)
+        if added.returncode:
+            return [], f"could not check {ref} out in a worktree: {added.stderr.strip().splitlines()[-1] if added.stderr.strip() else added.returncode}"
+        setup = (data.get("run") or {}).get("setup")
+        if setup:
+            prepared = subprocess.run(setup, shell=True, cwd=worktree, capture_output=True, text=True)
+            if prepared.returncode:
+                tail = "\n".join((prepared.stderr or prepared.stdout).strip().splitlines()[-5:])
+                return [], f"run.setup failed in the worktree of {ref} (exit {prepared.returncode}):\n{tail}"
+        kept, error = run_capture(worktree, command, names, lang, shots, out, "before-")
+        if error:
+            return [], f"on {ref}, {error} (a base that predates the capture command cannot be captured)"
+        return kept, None
+    finally:
+        subprocess.run(["git", "-C", root, "worktree", "remove", "--force", worktree], capture_output=True)
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def shlex_quote(value):
