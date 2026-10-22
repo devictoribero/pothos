@@ -160,10 +160,10 @@ class SessionContextTest(unittest.TestCase):
     def test_verify_commands_and_missing_e2e(self):
         self.write({"version": 1, "verify": {"fast": "npm run lint", "full": "npm test"}})
         text = self.ctx()
-        self.assertIn("the fast check: `npm run lint`**, because the contract's `verify.fast` names it", text)
-        self.assertIn("runs `full`: `npm test` and records a receipt", text)
-        self.assertIn("no end-to-end command", text)
-        self.assertIn("only through verify, in the foreground", text)
+        self.assertIn("**Fast check: `npm run lint`**, because the contract's `verify.fast` names it", text)
+        self.assertIn("`verify.py run all`: `full`: `npm test`", text)
+        self.assertIn("No end-to-end command here", text)
+        self.assertIn("only through verify, never as a background command", text)
 
     def repo_file(self, rel, data):
         path = os.path.join(self.repo, rel)
@@ -175,26 +175,27 @@ class SessionContextTest(unittest.TestCase):
         self.write({"version": 1, "verify": {"fast": "npm run lint", "full": "npm test"}})
         text = self.ctx()
         self.assertIn("### Verification\n\nTwo tiers.", text)
-        self.assertIn("`implement`, `tdd`, `implement-spec`'s implementer subagents", text)
+        self.assertIn("`implement`, `tdd`, `implement-spec`'s implementers", text)
         self.assertIn("after every coherent edit", text)
+        self.assertIn("two source files mean two runs", text)
         self.assertIn("`fast check: picked <command> because <why>`", text)
         self.assertIn("executed nothing counts only for a docs or config change", text)
-        self.assertIn("After three red runs on the same step", text)
+        self.assertIn("After three reds on one step", text)
         self.assertIn("A commit needs a green fast check, not a green gate", text)
-        self.assertIn("never mentioned in a commit message or in the pull request", text)
-        self.assertIn("**Tier 2, the gate: `/pothos:verify`**", text)
-        self.assertIn("Add no row for the fast check and none for the gate command as a whole", text)
-        self.assertIn("mark that step skipped (⏭️) with the reason", text)
-        self.assertIn("push with `--no-verify` only when `verify.py check` passes", text)
-        self.assertIn("Run it once before a push", text)
+        self.assertIn("commit messages and the pull request never mention it", text)
+        self.assertIn("**Gate: `/pothos:verify`**", text)
+        self.assertIn("no row for the fast check and none for the gate command as a whole", text)
+        self.assertIn("marked ⏭️ with the reason", text)
+        self.assertIn("Push with `--no-verify` only when the pre-push hook runs this same gate and `verify.py check` passes", text)
+        self.assertIn("Once before a push", text)
 
     def test_a_root_check_fast_script_wins_over_the_contract(self):
         self.repo_file("package.json", {"scripts": {"check:fast": "turbo lint type-check"}})
         self.repo_file("pnpm-lock.yaml", "")
         self.write({"version": 1, "verify": {"fast": "pnpm run type-check", "full": "pnpm run validate"}})
         text = self.ctx()
-        self.assertIn("the fast check: `pnpm run check:fast`**, because the root package.json declares `check:fast`", text)
-        self.assertIn("The contract's `verify.fast` is `pnpm run type-check`; the repository's script wins", text)
+        self.assertIn("**Fast check: `pnpm run check:fast`**, because the root package.json declares `check:fast`", text)
+        self.assertIn("The contract's `verify.fast` (`pnpm run type-check`) is stale", text)
         self.assertNotIn("picked `", text)  # the eval counts the session's own line, so the template carries no backticks
 
     def test_without_a_fast_command_the_fallback_is_listed_per_package(self):
@@ -202,17 +203,40 @@ class SessionContextTest(unittest.TestCase):
         self.repo_file("apps/api/package.json", {"name": "api", "scripts": {"lint": "eslint .", "test:unit": "jest", "type-check": "tsc"}})
         self.write({"version": 1, "verify": {"full": "npm run validate"}})
         text = self.ctx()
-        self.assertIn("the fast check: no single command.**", text)
-        self.assertIn("- `apps/api`: `npm run lint --workspace apps/api -- <changed files>`; "
-                      "`npm run test:unit --workspace apps/api -- --findRelatedTests <changed files>` (jest); "
+        self.assertIn("**Fast check: fallback**", text)
+        self.assertIn("- `apps/api`: `npm run lint --workspace apps/api -- <files>`; "
+                      "`npm run test:unit --workspace apps/api -- --findRelatedTests <files>` (jest); "
                       "`npm run type-check --workspace apps/api`", text)
         self.assertIn("a root `check:fast` script would replace it", text)
 
     def test_with_nothing_to_run_the_gate_guards_each_commit(self):
         self.write({"version": 1, "verify": {"full": "make check"}})
         text = self.ctx()
-        self.assertIn("the fast check: none here.**", text)
-        self.assertIn("run the gate below before each commit instead", text)
+        self.assertIn("**Fast check: none**", text)
+        self.assertIn("run the gate before each commit", text)
+
+    def test_the_verification_section_stays_small_and_a_monorepo_contract_fits_the_context_limit(self):
+        """Claude Code writes a hook's additionalContext to a file above about 10,000 characters and shows the session
+        only the path, which a sandboxed session cannot read; everything the contract says is lost then. The vendored
+        tracker and domain templates alone cost 4,000 characters, so a three-app monorepo with a local tracker and
+        auto-merge fits only just: 9,600 with a root check:fast, 10,000 when the fallback lists the packages. This
+        guards the verification section's share and the total for the check:fast case."""
+        self.repo_file("package.json", {"name": "shop", "workspaces": ["apps/*"], "scripts": {"validate": "turbo validate", "check:fast": "turbo check:fast"}})
+        self.repo_file("pnpm-lock.yaml", "")
+        for app in ("web", "mobile", "api"):
+            self.repo_file(f"apps/{app}/package.json", {"name": app, "scripts": {"lint": "eslint .", "test:unit": "jest", "type-check": "tsc"}})
+        self.write({"version": 1, "verify": {"full": "pnpm run validate"},
+                    "run": {"setup": "pnpm install && pnpm run db:generate", "dev": "pnpm run dev", "url": "http://localhost:3000",
+                            "apps": [{"name": "web", "path": "apps/web", "dev": "pnpm --filter web dev", "screenshots": "web"},
+                                     {"name": "mobile", "path": "apps/mobile", "screenshots": "ios-simulator"},
+                                     {"name": "api", "path": "apps/api", "screenshots": "none"}]},
+                    "tracker": {"kind": "local", "path": ".scratch"},
+                    "pr": {"base": "main", "auto_merge": {"label": "auto-merge"}}})
+        text = self.ctx()
+        section = text.split("### Verification")[1].split("\n### ")[0]
+        self.assertIn("**Fast check: `pnpm run check:fast`**", section)
+        self.assertLess(len(section), 2500, f"the verification section is {len(section)} characters")
+        self.assertLess(len(text), 9800, f"the session context is {len(text)} characters")
 
     def test_setup_command_runs_first_in_every_worktree(self):
         self.write({"version": 1, "verify": {"full": "npm test"}, "run": {"setup": "npm ci && npm run codegen"}})

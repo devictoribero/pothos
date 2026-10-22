@@ -95,88 +95,66 @@ def domain_section(data):
     return "### Domain docs\n\n" + prefix + demote(template("domain.md"), 2)
 
 
-SKILLS_THAT_EDIT = ("`implement`, `tdd`, `implement-spec`'s implementer subagents (including the one that fixes "
-                    "`code-review`'s findings), `prototype`, `diagnosing-bugs` and `tend`")
+SKILLS_THAT_EDIT = "`implement`, `tdd`, `implement-spec`'s implementers, `prototype`, `diagnosing-bugs`, `tend`"
+CLAUDE_MD_WINS = "A command this repository's CLAUDE.md names for working wins."
 
 
 def fast_check_lines(pick):
     """Tier 1: the command the repository names, or the per-package fallback, with the rules of the edit loop."""
     if pick["command"]:
-        lines = [f"**Tier 1, the fast check: `{pick['command']}`**, because {pick['why']}. Run it after each source "
-                 "file you finish, before you write the next one. When this repository's CLAUDE.md names a command to "
-                 "run while working, that command wins."]
+        lines = [f"**Fast check: `{pick['command']}`**, because {pick['why']}. {CLAUDE_MD_WINS}"]
         if pick.get("drift"):
-            lines.append(f"The contract's `verify.fast` is `{pick['drift']}`; the repository's script wins, and "
-                         "`/pothos:plant audit` would update the contract.")
+            lines.append(f"The contract's `verify.fast` (`{pick['drift']}`) is stale; `/pothos:plant audit` updates it.")
     elif pick["fallback"]:
-        lines = ["**Tier 1, the fast check: no single command.** The root package.json has no `check:fast` script and "
-                 "the contract has no `verify.fast`, so the fast check is a fallback. When this repository's CLAUDE.md "
-                 "names a command to run while working, that command wins instead."]
+        lines = [f"**Fast check: fallback**: no root `check:fast` script, no `verify.fast`. {CLAUDE_MD_WINS}"]
         lines += fast_check.fallback_lines(pick["fallback"])
-        lines.append("Run them after each source file you finish, before you write the next one. In your final message "
-                     "say in one line which fallback you ran and that a root `check:fast` script would replace it. Never "
-                     "write that script yourself and never open a ticket for it.")
+        lines.append("Your final message says in one line which fallback you ran and that a root `check:fast` script would "
+                     "replace it; never add the script or a ticket yourself.")
     else:
-        lines = ["**Tier 1, the fast check: none here.** The repository declares no `check:fast`, no `verify.fast` and "
-                 "no lint, unit test or type-check script. Unless CLAUDE.md names a command to run while working, "
-                 "run the gate below before each commit instead, and say so in your final message. Never set up a "
-                 "fast check yourself."]
+        lines = ["**Fast check: none**: no `check:fast`, no `verify.fast`, no lint, unit test or type-check script. "
+                 f"{CLAUDE_MD_WINS} Otherwise run the gate before each commit, say so in your final message, and never "
+                 "set a fast check up yourself."]
     lines += [
-        "- Run it after every coherent edit: once the edits that make one test pass or complete one function are in. "
-        "One function or test at a time: finish it, run the check, then start the next file. Never write every file of "
-        "a ticket in one go and run the check once at the end, even for a small ticket: two source files mean at least "
-        "two runs. Not mid-edit on a file that does not compile yet, and not after every tool call. Always before the "
-        "next ticket step, before a commit and before reporting a step done.",
-        "- On its first run in this session, say in one line which command you picked and why, in the form "
-        "`fast check: picked <command> because <why>`. Say it once: later runs just run, and the final report does "
-        "not repeat it.",
-        "- A green run that executed nothing counts only for a docs or config change. For a code change in a package "
-        "the command did not cover, run that package's fallback (lint on the changed files, unit tests, type-check) "
-        "and say so.",
-        "- Red is work, not a status: fix, run again, continue. Never go green by deleting, skipping or weakening a "
-        "test. After three red runs on the same step, or when the red is in code this branch did not touch, stop and "
-        "report it with the failing step's output instead of pushing on.",
-        "- A commit needs a green fast check, not a green gate, unless this repository's own rules ask for the gate "
-        "before every commit; then the repository wins.",
-        "- It never decides that work is ready to push, and it is never mentioned in a commit message or in the pull "
-        "request.",
+        "- Run it after every coherent edit: one function or test finished, before the next file; never every file of a "
+        "ticket at once (two source files mean two runs), and never mid-edit. Also before a commit and before reporting "
+        "a step done.",
+        "- On its first run say one line, `fast check: picked <command> because <why>`, never again, not even in the "
+        "final report.",
+        "- Red is work: fix and run again. Never delete, skip or weaken a test to get green. After three reds on "
+        "one step, or a red in code this branch did not touch, stop and report it with the failing output.",
+        "- A green run that executed nothing counts only for a docs or config change; for code it did not cover, run "
+        "that package's lint, unit tests and type-check and say so.",
+        "- A commit needs a green fast check, not a green gate, unless this repository asks for more. It never decides "
+        "that work is ready to push, and commit messages and the pull request never mention it.",
     ]
     return lines
 
 
 def gate_lines(verify):
     """Tier 2: the contract's full validation through verify, once before a push."""
-    rows = [f"`{level}`: `{verify[level]}`" for level in ("full", "e2e") if verify.get(level)]
+    rows = "; ".join(f"`{level}`: `{verify[level]}`" for level in ("full", "e2e") if verify.get(level))
     lines = [
-        "**Tier 2, the gate: `/pothos:verify`** (`verify.py run all`), which runs " + "; ".join(rows) +
-        " and records a receipt for the commit. Run it once before a push, before merging into an integration or "
-        "feature branch and before a pull request leaves draft. The fast check never replaces it, and the gate "
-        "never replaces the fast check. With `implement-spec`, the merger subagent runs it on the integration branch "
-        "after each merge and hands a red result back to an implementer instead of moving on.",
-        "- Keep its output (the receipt names the log): a pull request's test plan takes its rows and counts from "
-        "this run. Add no row for the fast check and none for the gate command as a whole.",
-        "- A step of the gate that cannot run here (no database, no network, a missing tool) is not replaced by the "
-        "fast check: run the gate, mark that step skipped (⏭️) with the reason in the test plan, name it in your "
-        "final message and let CI be the gate. A step that could run and is red blocks the push.",
-        "- When the repository's pre-push hook runs the same gate command, push with `--no-verify` only when "
-        "`verify.py check` passes for the commit you push: the hook would repeat the run that just passed, and CI "
-        "stays the gate nobody skips. Any edit after the green run means the gate runs again. A hook that does "
-        "anything else runs.",
-        "- Run `full` and `e2e` only through verify, in the foreground: a background command dies when your turn "
-        "or subagent ends and nobody is notified. verify keeps slow checks alive in a detached process; when it "
-        "exits 4 they are still going, so run `verify.py wait` until it returns another code.",
+        f"**Gate: `/pothos:verify`** (`verify.py run all`: {rows}), a receipt per commit. Once before a push, before each "
+        "merge into an integration branch (`implement-spec`'s merger runs it; red goes back to an implementer) and before "
+        "a pull request leaves draft.",
+        "- Keep its log (the receipt names it): the pull request's test plan takes its rows and counts from it, with no "
+        "row for the fast check and none for the gate command as a whole. A step this environment cannot run (no "
+        "database, network, tool) is marked ⏭️ with the reason, named in your final message and left to CI; a red step "
+        "that could run blocks the push.",
+        "- Push with `--no-verify` only when the pre-push hook runs this same gate and `verify.py check` passes for the "
+        "pushed commit; a later edit reruns the gate.",
+        "- Run `full` and `e2e` only through verify, never as a background command.",
     ]
     if not verify.get("e2e"):
-        lines.append("- This repository has no end-to-end command; skip that step and say so in the pull request.")
+        lines.append("- No end-to-end command here: skip that step and say so in the pull request.")
     return lines
 
 
 def verify_section(data, start):
     verify = data.get("verify") or {}
     pick = fast_check.discover(contract.repo_root(start), data)
-    intro = ("### Verification\n\nTwo tiers. Every skill step that edits or writes a source file runs the fast check "
-             "after each source file it finishes and before it writes the next one: " + SKILLS_THAT_EDIT +
-             ". A push runs the gate once.")
+    intro = ("### Verification\n\nTwo tiers. Every skill step that edits a source file (" + SKILLS_THAT_EDIT +
+             ") runs the fast check after each source file it finishes; a push runs the gate once.")
     return "\n\n".join([intro, "\n".join(fast_check_lines(pick)), "\n".join(gate_lines(verify))])
 
 

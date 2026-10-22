@@ -69,9 +69,20 @@ class FastCheckTest(unittest.TestCase):
         self.assertFalse(web["jest"])
         self.assertEqual(web["typecheck"], "pnpm --filter @acme/web typecheck")
         lines = fast_check.fallback_lines(pick["fallback"])
-        self.assertIn("run all of these even after one fails", lines[0])
-        self.assertIn("`pnpm --filter @acme/api test:unit -- --findRelatedTests <changed files>` (jest)", lines[1])
+        self.assertIn("all of these even after one fails", lines[0])
+        self.assertIn("`pnpm --filter @acme/api test:unit -- --findRelatedTests <files>` (jest)", lines[1])
         self.assertIn("`pnpm --filter @acme/web test` (not jest", lines[2])
+
+    def test_alike_packages_share_one_fallback_line(self):
+        self.write("package.json", {"name": "shop", "workspaces": ["apps/*"]})
+        for app in ("api", "mobile", "web"):
+            self.write(f"apps/{app}/package.json", {"name": app, "scripts": {"lint": "eslint .", "test:unit": "jest", "type-check": "tsc"}})
+        self.write("apps/docs/package.json", {"name": "docs", "scripts": {"lint": "eslint ."}})
+        lines = fast_check.fallback_lines(fast_check.discover(self.repo, {})["fallback"])
+        self.assertEqual(len(lines), 3)
+        self.assertTrue(lines[1].startswith("- `apps/api`, `apps/mobile`, `apps/web` (shown for `apps/api`): "
+                                            "`npm run lint --workspace apps/api -- <files>`"), lines[1])
+        self.assertTrue(lines[2].startswith("- `apps/docs`: `npm run lint --workspace apps/docs -- <files>`"), lines[2])
 
     def test_pnpm_workspace_yaml_is_read(self):
         self.write("package.json", {"name": "shop"})
@@ -87,7 +98,8 @@ class FastCheckTest(unittest.TestCase):
         self.write("package-lock.json", "{}")
         pick = fast_check.discover(self.repo, {"verify": {"full": "npm run validate"}})
         self.assertEqual(pick["fallback"], [{"path": ".", "name": "ledger", "lint": "npm run lint", "unit": "npm run test:unit",
-                                             "jest": True, "typecheck": "npm run type-check"}])
+                                             "jest": True, "typecheck": "npm run type-check",
+                                             "scripts": ["lint", "test:unit", "type-check"]}])
 
     def test_nothing_to_run_is_reported_as_none(self):
         self.write("package.json", {"name": "site", "scripts": {"build": "astro build"}})

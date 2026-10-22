@@ -114,7 +114,8 @@ def fallback_steps(root, pkg, pm):
         name = manifest.get("name") or os.path.basename(rel) or "root"
         command = lambda script: script_command(pm, rel, name, script) if script else None
         steps.append({"path": rel or ".", "name": name, "lint": command(lint), "unit": command(unit),
-                      "jest": bool(unit and uses_jest(manifest, unit)), "typecheck": command(typecheck)})
+                      "jest": bool(unit and uses_jest(manifest, unit)), "typecheck": command(typecheck),
+                      "scripts": [lint, unit, typecheck]})
     return steps
 
 
@@ -135,21 +136,34 @@ def discover(root, data):
     return {"command": None, "source": "fallback" if steps else "none", "why": None, "drift": None, "fallback": steps}
 
 
-def step_line(step):
+def step_line(paths, step):
+    """One line for every package that shares this step's script names: the command is shown for the first."""
     parts = []
     if step["lint"]:
-        parts.append(f"`{step['lint']} -- <changed files>`")
+        parts.append(f"`{step['lint']} -- <files>`")
     if step["unit"]:
-        parts.append(f"`{step['unit']} -- --findRelatedTests <changed files>` (jest)" if step["jest"]
+        parts.append(f"`{step['unit']} -- --findRelatedTests <files>` (jest)" if step["jest"]
                      else f"`{step['unit']}` (not jest: the package's unit suite)")
     if step["typecheck"]:
         parts.append(f"`{step['typecheck']}`")
-    return f"- `{step['path']}`: " + "; ".join(parts)
+    where = ", ".join(f"`{p}`" for p in paths)
+    alike = f" (shown for `{paths[0]}`)" if len(paths) > 1 else ""
+    return f"- {where}{alike}: " + "; ".join(parts)
 
 
 def fallback_lines(steps):
-    """The fallback as context: one line per package, run for each package that holds a changed code file."""
-    return ["Per package that holds a changed code file, run all of these even after one fails:"] + [step_line(s) for s in steps]
+    """The fallback as context: one line per shape of package, run for each package that holds a changed code file."""
+    shape = lambda s: (tuple(s.get("scripts") or (s["lint"], s["unit"], s["typecheck"])), s["jest"])
+    groups = []
+    for step in steps:
+        for paths, first in groups:
+            if shape(first) == shape(step):
+                paths.append(step["path"])
+                break
+        else:
+            groups.append(([step["path"]], step))
+    return (["Per package with a changed code file, all of these even after one fails:"]
+            + [step_line(paths, first) for paths, first in groups])
 
 
 def main(argv):
