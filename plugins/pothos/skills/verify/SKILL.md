@@ -20,6 +20,8 @@ Every command goes through `"${CLAUDE_SKILL_DIR}/scripts/verify.py"`. Run it fro
 
 A level the contract does not configure is recorded as skipped and does not block. Say so in the pull request.
 
+Under `workflow: repo` the repository's own checks are the gate and this script refuses every level but `mutation`, which runs when the contract names `verify.mutation` and the tree is clean (that workflow writes no `fast` or `full` receipt to require).
+
 After `full`, the UI check runs on the lines the branch adds, when the contract's `ui` sets tokens or icons, and writes a `ui` receipt. It is advisory: it never changes an exit code. Fix its findings or mark an intended value with `ui-ok: <why>`, and list what remains in the pull request.
 
 ## Steps

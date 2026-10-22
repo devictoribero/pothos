@@ -60,15 +60,30 @@ def git(args, cwd):
 
 
 def base_ref(root, data, explicit):
+    """The merge-base of HEAD with the base branch, as a commit.
+
+    The local branch and its `origin/` copy are both tried and the newer merge-base wins: a worktree's local `main`
+    often sits weeks behind the remote (every file since then would count as changed), and a `main` with unpushed
+    commits sits ahead of it.
+    """
     candidates = [explicit] if explicit else [((data.get("pr") or {}).get("base")), "main", "master"]
     for ref in filter(None, candidates):
-        for name in (ref, f"origin/{ref}"):
-            merge_base = (git(["merge-base", name, "HEAD"], root) or "").strip()
-            if merge_base:
-                return merge_base
+        bases = [base for base in ((git(["merge-base", name, "HEAD"], root) or "").strip() for name in (ref, f"origin/{ref}"))
+                 if base]
+        if bases:
+            return newest(root, bases)
     if explicit:
         raise ValueError(f"base '{explicit}' not found")
     return None
+
+
+def newest(root, commits):
+    """The commit no other one in the list descends from; the first one when they are unrelated."""
+    chosen = commits[0]
+    for commit in commits[1:]:
+        if subprocess.run(["git", "-C", root, "merge-base", "--is-ancestor", chosen, commit], capture_output=True).returncode == 0:
+            chosen = commit
+    return chosen
 
 
 def added_lines(root, base):

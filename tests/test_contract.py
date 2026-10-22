@@ -119,6 +119,16 @@ class ContractTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("verify", result.stdout)
 
+    def test_pothos_workflow_requires_verify_full(self):
+        self.write({"version": 1, "verify": {"mutation": {"command": "npx stryker run"}}})
+        result = run(["validate"], self.repo)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("verify: missing required field 'full'", result.stdout)
+
+    def test_repo_workflow_accepts_a_verify_with_only_mutation(self):
+        self.write({"version": 1, "workflow": "repo", "verify": {"mutation": {"command": "npx stryker run"}}})
+        self.assertEqual(run(["validate", "--strict"], self.repo).returncode, 0)
+
     def test_environments_are_validated(self):
         self.write({"version": 1, "verify": {"full": "x"}, "run": {"environments": [{"name": "dev", "dev": "yarn local:dev", "note": "with the backend developer"}, {"name": "demo"}]}})
         result = run(["validate"], self.repo)

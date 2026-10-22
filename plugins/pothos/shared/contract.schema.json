@@ -28,11 +28,8 @@
       ]
     },
     "verify": {
-      "description": "Shell commands, run from the repository root. Each must exit 0 when the change is good. Required unless workflow is repo. A missing e2e means the repo has no end-to-end suite yet: skills skip that check and report it, never improvise one.",
+      "description": "Shell commands, run from the repository root. Each must exit 0 when the change is good. Required unless workflow is repo. A missing e2e means the repo has no end-to-end suite yet: skills skip that check and report it, never improvise one. `full` is required unless the workflow is repo, where only `mutation` is read.",
       "type": "object",
-      "required": [
-        "full"
-      ],
       "additionalProperties": false,
       "properties": {
         "fast": {

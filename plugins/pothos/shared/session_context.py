@@ -157,6 +157,18 @@ def gate_lines(verify):
     return lines
 
 
+def repo_mutation_line(data):
+    """Under workflow repo only the advisory mutation level runs through verify, and only when the contract names it."""
+    mutation = ((data.get("verify") or {}).get("mutation") or {}).get("command")
+    if not mutation:
+        return ""
+    return ("The one verify level that runs here is mutation testing, advisory and outside the repository's own gate: "
+            f"once the repository's checks are green and the work is committed, run `verify.py run mutation` (command `{mutation}`), "
+            "which mutates only the source files the branch changed. What a `new` survivor means is rule 1 of "
+            "`standards/testing.md`; the pull request lists the survivors killed, each with the test that kills it, and the "
+            "survivors left, each with why.\n\n")
+
+
 def verify_section(data, start):
     verify = data.get("verify") or {}
     pick = fast_check.discover(contract.repo_root(start), data)
@@ -399,7 +411,8 @@ def contract_section(start):
                 "Do not use the pothos skills that would compete with it (" + COMPETING_SKILLS + ") unless the user names one "
                 "explicitly; use the repository's own skills for tickets, implementation, verification, review and pull requests. "
                 "Skills that do not own a step of the workflow are fine: grilling, diagnosing-bugs, prototype, tdd, codebase-design, "
-                "domain-modeling, component-design, retro, explain and archify.\n\n" + standards_section(data, repo_workflow=True))
+                "domain-modeling, component-design, retro, explain and archify.\n\n"
+                + repo_mutation_line(data) + standards_section(data, repo_workflow=True))
     errors = contract.check(data, start, strict=False)
     sections = [
         "## pothos: this repository's contract",
