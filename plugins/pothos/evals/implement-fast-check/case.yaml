@@ -1,0 +1,19 @@
+schema_version: "1.1"
+name: implement-fast-check
+description: >
+  A repo with a root `check:fast` and a `validate` script, both logging stand-ins, and a ticket that needs edits
+  in two source files. The fast check must run between the two edits and before the commit, the gate must run exactly
+  once (the pre-push hook would run it again unless the push says --no-verify) and before the push, the session must
+  say once which fast command it picked and why, and neither the commit messages nor the pull request body may
+  mention the fast check.
+tags: [verify, implement]
+runs: 2
+expected_outcome: >
+  .loop/log shows a fast run with one changed source file, then a commit, one validate line, then the push;
+  the trace names the pick once; commits and the pull request body say nothing about check:fast.
+execution:
+  max_turns: 80
+  timeout_seconds: 1200
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit, Agent]
+context:
+  scaffold_script: seed.sh

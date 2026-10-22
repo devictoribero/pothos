@@ -71,6 +71,7 @@ Small work enters at the same point: `implement` builds one ticket on its own br
 - **Output:** a commit on the integration branch with a passing verify receipt.
 - **Who:** one implementer subagent, alone, in its own worktree.
 - **Never re-plans.** If the ticket turns out wrong or too big, the implementer writes what it found on the ticket, marks it `needs-replan` and stops. Improvising scope is how plans and code drift apart.
+- **Two tiers of verification.** After every coherent edit (the edits that make one test pass or complete one function) the implementer runs the repository's fast check, and runs it again before each commit: a root `check:fast` script when the repository has one, else the contract's `verify.fast`, else each package's lint, unit tests and type-check. The gate (`verify`, the contract's `full` and `e2e`) runs once per merge into the integration branch and once before a push. The fast check never decides that work is ready; the gate is never skipped because the fast check was green. The session context carries the command and the rules, so vendored skills follow them unchanged.
 
 ## Branches and merges
 

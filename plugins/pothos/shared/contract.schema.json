@@ -36,7 +36,7 @@
       "additionalProperties": false,
       "properties": {
         "fast": {
-          "description": "Seconds-range check for quick feedback after edits, e.g. type-check plus lint. A Stop hook that runs it is planned.",
+          "description": "The fast check (tier 1): seconds-range, run after every coherent edit and before each commit, e.g. type-check plus lint. A root check:fast script in package.json wins over this value; without either, sessions fall back to each package's lint, unit tests and type-check.",
           "type": "string",
           "minLength": 1
         },
