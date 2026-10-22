@@ -73,13 +73,18 @@ def normalize(text):
 
 
 def typed_by_person(transcript):
-    """What the person typed in this session: user messages without tool results, skill text or pasted content."""
+    """What the person typed in this session: user messages without tool results, skill text or pasted content,
+    and the messages they typed while the agent was busy (queued, and shown to the agent inside a tool result)."""
     typed = []
     with open(transcript, encoding="utf-8") as fh:
         for line in fh:
             try:
                 entry = json.loads(line)
             except ValueError:
+                continue
+            if entry.get("type") == "queue-operation" and entry.get("operation") == "enqueue":
+                if isinstance(entry.get("content"), str):
+                    typed.append(normalize(NOT_TYPED.sub(" ", entry["content"])))
                 continue
             if entry.get("type") != "user" or entry.get("isMeta") or entry.get("isCompactSummary"):
                 continue
