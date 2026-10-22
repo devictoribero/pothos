@@ -19,6 +19,7 @@
     "mocked": false,
     "login": "",
     "screenshots": "none",
+    "capture": {"command": "", "doc": ""},
     "environments": [],
     "apps": []
   },
@@ -46,6 +47,9 @@
     "components": [],
     "tokens": [],
     "icons": "",
+    "screens": [],
+    "locales": [],
+    "languages": [],
     "preview": {
       "command": "",
       "url": ""

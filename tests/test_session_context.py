@@ -272,6 +272,18 @@ class SessionContextTest(unittest.TestCase):
         self.assertIn("never pick one yourself", text)
         self.assertIn("`demo`: `npm run dev:demo`; end-to-end: `npm run e2e:demo`", text)
 
+    def test_capture_command_and_screen_folders_reach_the_session(self):
+        self.write({"version": 1, "verify": {"full": "npm test"},
+                    "run": {"apps": [{"name": "mobile", "path": "apps/mobile", "screenshots": "android-emulator",
+                                      "capture": {"command": "pnpm screenshot", "doc": "docs/screenshots.md"},
+                                      "ui": {"screens": ["apps/mobile/features/*/screens"], "locales": ["apps/mobile/i18n"],
+                                             "languages": ["es", "ca"]}}]}})
+        text = context(self.repo, env=self.env)
+        self.assertIn("without a device: `pnpm screenshot <screen> --lang <codes>` through `evidence.py capture`", text)
+        self.assertIn("Screens and layouts: `apps/mobile/features/*/screens`", text)
+        self.assertIn("User-facing copy per language: `apps/mobile/i18n`", text)
+        self.assertIn("Screenshot languages: `es` always, `ca` when the change edits copy.", text)
+
     def test_screenshots_none_tells_evidence_not_to_try(self):
         self.write({"version": 1, "verify": {"full": "npm test"}, "run": {"dev": "npm start", "screenshots": "none"}})
         self.assertIn("Screenshots for evidence: not supported", self.ctx())

@@ -1,0 +1,16 @@
+schema_version: "1.1"
+name: evidence-screen-capture
+description: >
+  A branch that changes a shared component and the Catalan copy of a mobile app whose contract has a capture
+  command. Asked for evidence, the agent must find the screens through evidence.py screens, capture them in both
+  languages through evidence.py capture (which runs the repository's fake capture command), look at the images,
+  and write an evidence.md that labels them.
+tags: [evidence]
+runs: 2
+expected_outcome: before and after images for the pet screen in es and ca in the evidence folder, and an evidence.md that names the screen and languages.
+execution:
+  max_turns: 40
+  timeout_seconds: 600
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit]
+context:
+  scaffold_script: seed.sh

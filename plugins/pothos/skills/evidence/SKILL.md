@@ -1,6 +1,6 @@
 ---
 name: evidence
-description: Captures proof that a change works, for the Evidence section of a pull request. It records the before and after of a test run, takes screenshots of the running app (web through a headless browser, iOS through the booted simulator, Android through the running emulator) and writes an evidence.md, all stored outside the repository. Use after verify passes and before a pull request leaves draft, or when asked for "evidence", "proof", "screenshots" or "show me it works".
+description: Captures proof that a change works, for the Evidence section of a pull request. It records the before and after of a test run, takes screenshots of the running app (web through a headless browser, iOS through the booted simulator, Android through the running emulator, or a mobile screen without a device through the repository's capture command) and writes an evidence.md, all stored outside the repository. Use after verify passes and before a pull request leaves draft, whenever a change touches a screen, or when asked for "evidence", "proof", "screenshots" or "show me it works".
 ---
 
 # Evidence
@@ -26,7 +26,7 @@ Use the strongest proof the change allows, and more than one when they show diff
 | Fixes a bug | The regression test failing on the base commit, then passing on the branch. Run only that test file both times and keep the two outputs. |
 | Adds or changes behavior with no UI | The new tests' output, plus one real call (a command, a request) that shows the result. |
 | Changes a web UI | Screenshots of each state the change touches: before (base branch) and after. |
-| Changes a mobile UI | Simulator or emulator screenshots, when one is running. Otherwise the component tests' output, and say that screenshots need a device. |
+| Changes a mobile UI | The screens `evidence.py screens` names, captured as described under "Mobile screens": through the capture command when the contract has one, else on the simulator or emulator that is already running, else listed in the pull request's test plan for a person to check by hand. |
 | Refactor with no behavior change | The full suite passing before and after, and a note on what stayed the same. |
 
 ## Web screenshots
@@ -37,12 +37,17 @@ Use the strongest proof the change allows, and more than one when they show diff
 4. Open each screenshot with the Read tool and check it shows what you claim. A blank page, an error overlay or a login wall is not evidence.
 5. Stop the server you started: `evidence.py stop <pid>`.
 
-## Mobile screenshots
+## Screens without a device, and mobile screens
 
-- iOS: `evidence.py sim <name>` captures the booted simulator.
-- Android: `evidence.py emu <name>` captures the running emulator through adb. With several devices attached, set `ANDROID_SERIAL`.
+A screen can pass its tests and still be wrong: a layout that overflows at a large font scale, a sheet whose title sits under the handle, a translation that wraps where the original did not. Only a picture catches that. The capture command is not mobile-only: a web app whose contract names one gets the same screens, languages and pair; `run.screenshots: web` stays for the ad-hoc screenshot of a running dev server at a URL.
 
-The app must already be running a build with the branch's code. Reach the screen with a deep link when the app has one (`adb shell am start -a android.intent.action.VIEW -d "<scheme>://<path>"`, `xcrun simctl openurl booted "<scheme>://<path>"`), otherwise ask the user to open it. Take the before shots with the base branch's code loaded, before your first change or from a worktree of the base branch. Open each capture with the Read tool and check it shows the state you claim.
+1. **Which screens.** Run `python3 "${CLAUDE_SKILL_DIR}/scripts/evidence.py" screens`. From the contract's `ui.screens`, `ui.components`, `ui.tokens` and `ui.locales` it lists the screen files the branch changed, the screens that import a changed component or token (one grep level; when none does, name the screens that use it yourself), the languages whose copy changed, the languages to capture and the capture command. `none` means the change reaches no screen: skip this section and say so. Capture at most three screens, the ones most changed; name them and the ones you left out in the pull request.
+2. **Which languages.** The first of `ui.languages` always; the others only when the change edits copy (`screens` prints the list). A translation that wraps differently is one of the bugs this is for.
+3. **Where you are.** No `adb` and no simulator (a cloud session): use the capture command when the contract has one; without one, list the screens in the pull request's test plan, one checkbox each with the screen, the state and the language, so the reviewer looks at the right ones, and say that no screenshot was possible. On a laptop with the capture command, prefer it; use the emulator for what it cannot show (font scale, native surfaces).
+4. **Capture command.** `evidence.py capture <screen> [<screen> ...] --lang <codes> --base <branch>` runs the contract's command (`<command> <screen> ... --lang <codes> --out <dir>`) and keeps what it prints as `after-<screen>-<lang>.png`. With `--base` it also checks that branch out in a throwaway worktree outside the repository, runs the contract's `run.setup` there and the same command again, and keeps those images as `before-…`. The screen names are the repository's (read the doc the contract names for the list and for how to add one). When the pair cannot be made (no such ref, setup fails, the base predates the command) it says why on stderr and keeps the after images: repeat that reason in evidence.md. The repository decides what the command cannot show; repeat that too, under "Not shown".
+5. **Emulator or simulator.** Only one that is already running with the branch's code: never start one, never start the bundler (that kills the developer's), and when a person is using the device, ask them for the screenshot instead of opening anything. The app must be signed in, or the link lands on the login. Open the screen with a deep link (`adb shell am start -W -a android.intent.action.VIEW -d "<scheme>://<path>" <package>`, `xcrun simctl openurl booted "<scheme>://<path>"`); a link opens a screen, never a sheet, dialog or menu, so for those tap once (`adb shell input tap <x> <y>` at a coordinate you read off a capture, fragile, say so) or ask the person. Switch the language the way the repository's run doc says; an app that follows the account's language needs the account changed, not the device. Then `evidence.py emu <name>` or `evidence.py sim <name>`. Font scale, emulator only: `adb shell settings put system font_scale 1.3`, capture, then the largest value the device accepts (read it back with `settings get system font_scale`), capture, then put `1.0` back.
+6. **The pair.** Capture the same screen on the base branch first, same link, same language, same scale: `--base` on `evidence.py capture`, or the base branch's code on the device from a worktree. If the pair cannot be produced, say why and capture the new state only.
+7. **Look.** Open every capture with the Read tool and check it shows the screen and state you claim; a splash, a login or a blank page is not evidence. Label each image with the screen, the state and the language in evidence.md.
 
 ## Write evidence.md
 

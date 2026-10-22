@@ -4,6 +4,11 @@
 Usage:
   evidence.py dir                                  print (and create) this branch's evidence folder
   evidence.py plan [--base BRANCH]                 which apps the branch touches and which screenshots each allows
+  evidence.py screens [--base BRANCH]              which screens the branch touches (from the contract's ui.screens, ui.components,
+                                                   ui.tokens and ui.locales) and which languages to capture
+  evidence.py capture SCREEN [SCREEN ...] [--lang es,ca] [--base BRANCH] [--app NAME]
+                                                   run the contract's capture command and keep its images as after-…; with --base,
+                                                   run it again in a worktree of that ref (after run.setup) and keep those as before-…
   evidence.py serve [--app NAME] [--env NAME] [--timeout SECS]
                                                    start the contract's dev command, wait for its URL
   evidence.py stop PID                             stop a server started by serve
@@ -17,7 +22,7 @@ Evidence lives in $POTHOS_HOME/evidence/<host>/<owner>/<repo>/<branch>/, never i
 upload needs pr.evidence set to github-release in the contract: it publishes the files as assets of a
 prerelease named pr-evidence-YYYY-MM, one per month so no release reaches GitHub's 1000-asset limit.
 Exit codes: 0 ok, 1 failed (server never answered, no browser, no simulator, upload failed), 2 no contract,
-3 nothing to run (no dev command or URL, upload not enabled), 64 usage.
+3 nothing to run (no dev command or URL, upload not enabled, no capture command), 64 usage.
 """
 import json
 import os
@@ -106,8 +111,252 @@ def plan(root, args):
     for app in targets:
         shots = app.get("screenshots") or "unknown"
         hint = "  (unset: try once; if it fails, suggest setting it with /pothos:plant audit)" if shots == "unknown" else ""
-        print(f"app={app['name']} screenshots={shots} dev={app.get('dev') or '-'} url={app.get('url') or '-'}{hint}")
+        capture = f" capture={app['capture']['command']}" if (app.get("capture") or {}).get("command") else ""
+        print(f"app={app['name']} screenshots={shots}{capture} dev={app.get('dev') or '-'} url={app.get('url') or '-'}{hint}")
     return 0
+
+
+LANG_TOKEN = "{lang}"
+LANG_GROUP = r"(?P<lang>[a-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})?)"
+
+
+def glob_regex(pattern):
+    """A repository-relative folder or glob as a regex over repository-relative paths: `**` crosses folders,
+    `*` stays inside one, a folder matches everything under it, and `{lang}` is one language code, captured."""
+    out = ""
+    i = 0
+    while i < len(pattern):
+        ch = pattern[i]
+        if pattern.startswith(LANG_TOKEN, i):
+            out += LANG_GROUP
+            i += len(LANG_TOKEN)
+            continue
+        if pattern.startswith("**/", i):
+            out += "(?:.*/)?"
+            i += 3
+            continue
+        if pattern.startswith("**", i):
+            out += ".*"
+            i += 2
+            continue
+        if ch == "*":
+            out += "[^/]*"
+        elif ch == "?":
+            out += "[^/]"
+        else:
+            out += re.escape(ch)
+        i += 1
+    has_extension = bool(re.search(r"\.[A-Za-z0-9]+$", pattern))
+    tail = "" if has_extension else "(?:/.*)?"
+    return re.compile("^" + out.rstrip("/") + tail + "$")
+
+
+def matches_any(path, patterns):
+    return any(glob_regex(p).match(path) for p in patterns)
+
+
+def locale_language(path, patterns):
+    """The language a copy file belongs to: the `{lang}` segment of the pattern that matches it
+    (`locales/{lang}/*.json`, `values-{lang}/strings.xml`), else the file's name without its extension
+    (`es.ts`, `ca.json`). None when no pattern matches."""
+    for pattern in patterns:
+        match = glob_regex(pattern).match(path)
+        if match:
+            return match.groupdict().get("lang") or re.sub(r"\..*$", "", os.path.basename(path))
+    return None
+
+
+def ui_sets(data, path):
+    """The ui section that governs a repository-relative path: the app's own in a monorepo, the top level otherwise."""
+    for app in (data.get("run") or {}).get("apps") or []:
+        folder = app.get("path", "").rstrip("/")
+        if folder and (path == folder or path.startswith(folder + "/")) and app.get("ui"):
+            return app["ui"], app
+    return data.get("ui") or {}, None
+
+
+def screen_files(root, patterns):
+    """Every file under the screen patterns, so importers can be looked up by name."""
+    found = []
+    for base, _, files in os.walk(root):
+        if "/node_modules" in base or "/.git" in base:
+            continue
+        for name in files:
+            rel = os.path.relpath(os.path.join(base, name), root)
+            if matches_any(rel, patterns):
+                found.append(rel)
+    return sorted(found)
+
+
+def importers(root, screens, changed):
+    """The screens whose source names the changed file's module (one grep level, by its stem)."""
+    stem = re.sub(r"\.[^.]+$", "", os.path.basename(changed))
+    stem = re.sub(r"\.(spec|test)$", "", stem)
+    if stem in ("index", "") or changed in screens:
+        return []
+    needle = re.compile(r"(?:from|require\()\s*['\"][^'\"]*\b" + re.escape(stem) + r"['\"/]")
+    hits = []
+    for screen in screens:
+        try:
+            with open(os.path.join(root, screen), encoding="utf-8", errors="replace") as fh:
+                if needle.search(fh.read()):
+                    hits.append(screen)
+        except OSError:
+            continue
+    return hits
+
+
+def screens(root, args):
+    """Which screens the branch touches, by the contract's ui.screens, ui.components, ui.tokens and ui.locales,
+    and which languages to capture (ui.languages). Prints `none` when the branch reaches no screen."""
+    data = load(root)
+    base = flag(args, "--base") or (data.get("pr") or {}).get("base") or "main"
+    changed = sorted(f for f in changed_files(root, base) if not re.search(r"\.(spec|test)\.[^./]+$", f))
+    direct, via, copy_languages, languages, capture = [], {}, set(), [], {}
+    seen_ui = []
+    for path in changed:
+        ui, app = ui_sets(data, path)
+        if not ui.get("screens"):
+            continue
+        if ui not in seen_ui:
+            seen_ui.append(ui)
+            if ui.get("languages"):
+                languages = ui["languages"]
+            command = ((app or {}).get("capture") or (data.get("run") or {}).get("capture") or {}).get("command")
+            if command:
+                capture = {"command": command, "app": (app or {}).get("name")}
+        if matches_any(path, ui["screens"]):
+            direct.append(path)
+        elif matches_any(path, ui.get("components") or []) or matches_any(path, ui.get("tokens") or []):
+            via[path] = importers(root, screen_files(root, ui["screens"]), path)
+        elif matches_any(path, ui.get("locales") or []):
+            copy_languages.add(locale_language(path, ui["locales"]))
+    if not direct and not via and not copy_languages:
+        print(f"none: the branch touches no screen, shared component, token or copy (compared with {base})")
+        return 0
+    for path in direct:
+        print(f"screen {path}")
+    for path, hits in via.items():
+        print(f"via {path}: " + (", ".join(hits) if hits else "no screen imports it directly; name the screens that use it"))
+    if copy_languages:
+        print("copy " + ", ".join(sorted(copy_languages)))
+    if languages:
+        chosen = [languages[0]] + ([l for l in languages[1:] if copy_languages] if len(languages) > 1 else [])
+        print("languages " + ",".join(chosen) + (f" ({languages[0]} always; the rest because copy changed)" if len(chosen) > 1 else f" ({languages[0]} always)"))
+    if capture.get("command"):
+        print(f"capture {capture['command']}" + (f" (app {capture['app']})" if capture.get("app") else ""))
+    else:
+        print("capture none: no capture command in the contract; use the device, or list the screens to check by hand")
+    return 0
+
+
+def capture_command(data, app_name):
+    run = data.get("run") or {}
+    if app_name:
+        apps = {a["name"]: a for a in run.get("apps") or []}
+        if app_name not in apps:
+            return None, f"unknown app '{app_name}'; the contract lists: {', '.join(apps) or 'none'}"
+        command = (apps[app_name].get("capture") or {}).get("command")
+    else:
+        command = (run.get("capture") or {}).get("command")
+        if not command:
+            with_capture = [a for a in run.get("apps") or [] if (a.get("capture") or {}).get("command")]
+            if len(with_capture) == 1:
+                command = with_capture[0]["capture"]["command"]
+            elif with_capture:
+                return None, "several apps have a capture command; pass --app NAME"
+    if not command:
+        return None, "the contract has no capture command (run.capture or the app's capture); capture on a device instead"
+    return command, None
+
+
+def capture(root, args):
+    """Runs the contract's capture command for each screen and keeps its images in the evidence folder as
+    after-<screen>-<lang>.png. With --base, checks that ref out in a throwaway worktree, runs run.setup there
+    and the same command again, and keeps those images as before-…; when that cannot be done, says why on
+    stderr and keeps the after images alone."""
+    data = load(root)
+    command, error = capture_command(data, flag(args, "--app"))
+    if error:
+        print(error, file=sys.stderr)
+        return 3
+    names = [a for i, a in enumerate(args) if not a.startswith("--") and (i == 0 or args[i - 1] not in ("--lang", "--base", "--app"))]
+    if not names:
+        print("capture needs at least one screen name", file=sys.stderr)
+        return 64
+    out = folder(root)
+    lang = ["--lang", flag(args, "--lang")] if flag(args, "--lang") else []
+    after, error = run_capture(root, command, names, lang, out, out, "after-")
+    if error:
+        print(error, file=sys.stderr)
+        return 1
+    kept = list(after)
+    base = flag(args, "--base")
+    if base:
+        before, error = capture_base(root, data, command, names, lang, out, base)
+        if error:
+            print(f"before: {error}; captured the new state only, say so in evidence.md", file=sys.stderr)
+        kept += before
+    print("\n".join(kept))
+    return 0
+
+
+def run_capture(cwd, command, names, lang, shots, out, prefix):
+    """Runs `<command> <names> --out <shots> [--lang <codes>]` from cwd and moves every image it prints into out
+    under the prefix. Returns (paths, None) or ([], why it failed)."""
+    full = f"{command} {' '.join(names)} --out {shlex_quote(shots)} " + " ".join(lang)
+    result = subprocess.run(full, shell=True, cwd=cwd, capture_output=True, text=True)
+    sys.stderr.write(result.stderr)
+    if result.returncode:
+        return [], f"the capture command exited {result.returncode}: {full}"
+    produced = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    kept = []
+    for path in produced:
+        if not os.path.isfile(path):
+            return [], f"the capture command printed a path that does not exist: {path}"
+        target = os.path.join(out, prefix + os.path.basename(path))
+        if os.path.realpath(path) != os.path.realpath(target):
+            shutil.move(path, target)
+        kept.append(target)
+    if not kept:
+        return [], "the capture command printed no image path"
+    return kept, None
+
+
+def capture_base(root, data, command, names, lang, out, ref):
+    """The base branch's images: a detached worktree of ref outside the repository, run.setup in it when the
+    contract has one, then the same capture command from that worktree. The worktree is removed afterwards."""
+    sha = contract.git(["rev-parse", "--verify", "--quiet", ref + "^{commit}"], root) \
+        or contract.git(["rev-parse", "--verify", "--quiet", "origin/" + ref + "^{commit}"], root)
+    if not sha:
+        return [], f"no ref named {ref} (nor origin/{ref})"
+    tmp = tempfile.mkdtemp(prefix="pothos-base-")
+    worktree = os.path.join(tmp, "repo")
+    shots = os.path.join(tmp, "shots")
+    os.makedirs(shots)
+    try:
+        added = subprocess.run(["git", "-C", root, "worktree", "add", "--detach", worktree, sha],
+                               capture_output=True, text=True)
+        if added.returncode:
+            return [], f"could not check {ref} out in a worktree: {added.stderr.strip().splitlines()[-1] if added.stderr.strip() else added.returncode}"
+        setup = (data.get("run") or {}).get("setup")
+        if setup:
+            prepared = subprocess.run(setup, shell=True, cwd=worktree, capture_output=True, text=True)
+            if prepared.returncode:
+                tail = "\n".join((prepared.stderr or prepared.stdout).strip().splitlines()[-5:])
+                return [], f"run.setup failed in the worktree of {ref} (exit {prepared.returncode}):\n{tail}"
+        kept, error = run_capture(worktree, command, names, lang, shots, out, "before-")
+        if error:
+            return [], f"on {ref}, {error} (a base that predates the capture command cannot be captured)"
+        return kept, None
+    finally:
+        subprocess.run(["git", "-C", root, "worktree", "remove", "--force", worktree], capture_output=True)
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def shlex_quote(value):
+    import shlex
+    return shlex.quote(value)
 
 
 def serve(root, args):
@@ -323,6 +572,10 @@ def main(argv):
         return 0
     if cmd == "plan":
         return plan(root, rest)
+    if cmd == "screens":
+        return screens(root, rest)
+    if cmd == "capture" and rest:
+        return capture(root, rest)
     if cmd == "serve":
         return serve(root, rest)
     if cmd == "stop" and len(rest) == 1 and rest[0].isdigit() and int(rest[0]) > 1:  # 0 and 1 would signal this shell
