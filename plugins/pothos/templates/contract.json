@@ -5,7 +5,12 @@
   "verify": {
     "fast": "",
     "full": "",
-    "e2e": ""
+    "e2e": "",
+    "mutation": {
+      "command": "",
+      "report": "",
+      "exclude": []
+    }
   },
   "run": {
     "setup": "",

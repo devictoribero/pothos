@@ -37,3 +37,5 @@ Check these gaps, in this order, and list every one that applies:
 8. A repository with UI but no `ui.components` or `ui.tokens`: agents may build a second button or use raw colors.
 9. No PR template.
 10. CI does not block merge on `verify.full`. Only report this when the CI files make it visible.
+11. No `verify.mutation`. Optional: it never blocks readiness, because verify skips the level and says so. A mutation tool configured in the repository closes it; when `mutation_tools` already lists one, the command from the mapping closes it.
+12. `mutation_temp_ignored` is false: the tool's temp folder is not in the ignore file, so a crashed run leaves it in the working tree and the next receipt reports a dirty tree. Optional, never blocks readiness. Naming the folder in `.gitignore` closes it; Pothos does not edit that file.

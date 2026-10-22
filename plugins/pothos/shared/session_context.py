@@ -147,6 +147,13 @@ def gate_lines(verify):
     ]
     if not verify.get("e2e"):
         lines.append("- No end-to-end command here: skip that step and say so in the pull request.")
+    mutation = (verify.get("mutation") or {}).get("command")
+    if mutation:
+        lines.append(f"- Mutation command `{mutation}`: run `verify.py run mutation` once after green and before the pull "
+                     "request, outside `run all`. It is advisory and mutates only the source files the branch changed; what "
+                     "a `new` survivor means is rule 1 of `standards/testing.md`, listed under Coding standards. The pull "
+                     "request lists the survivors killed, each with the name of the test that kills it, and the survivors "
+                     "left, each with why.")
     return lines
 
 

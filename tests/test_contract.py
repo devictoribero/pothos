@@ -145,6 +145,23 @@ class ContractTest(unittest.TestCase):
         self.assertIn("ui.components[0]: path 'src/ui' does not exist", strict.stdout)
         self.assertIn("ui.tokens[0]: '../theme.css' must be a path inside the repository", strict.stdout)
 
+    def test_mutation_section_is_validated(self):
+        self.write({"version": 1, "verify": {"full": "x", "mutation": {"command": "npx stryker run --mutate {files}",
+                                                                      "report": "$POTHOS_MUTATION_OUT/mutation.json",
+                                                                      "exclude": ["src/generated/*"]}}})
+        result = run(["validate", "--strict"], self.repo)
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_mutation_section_rejects_unknown_fields_empty_command_and_non_list_exclude(self):
+        self.write({"version": 1, "verify": {"full": "x", "mutation": {"command": "", "exclude": "src/generated/*", "gate": True}}})
+        result = run(["validate"], self.repo)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("verify.mutation.command: must not be empty", result.stdout)
+        self.assertIn("verify.mutation.exclude: expected array, got str", result.stdout)
+        self.assertIn("verify.mutation: unknown field 'gate'", result.stdout)
+        self.write({"version": 1, "verify": {"full": "x", "mutation": {"exclude": []}}})
+        self.assertIn("verify.mutation: missing required field 'command'", run(["validate"], self.repo).stdout)
+
     def test_app_ui_is_validated(self):
         self.write({"version": 1, "verify": {"full": "x"}, "run": {"apps": [{"name": "web", "path": ".", "ui": {"tokens": ["missing.css"], "extra": 1}}]}})
         self.assertIn("run.apps[0].ui: unknown field 'extra'", run(["validate"], self.repo).stdout)
