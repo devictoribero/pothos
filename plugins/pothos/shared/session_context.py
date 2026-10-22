@@ -102,11 +102,13 @@ CLAUDE_MD_WINS = "A command this repository's CLAUDE.md names for working wins."
 def fast_check_lines(pick):
     """Tier 1: the command the repository names, or the per-package fallback, with the rules of the edit loop."""
     if pick["command"]:
-        lines = [f"**Fast check: `{pick['command']}`**, because {pick['why']}. {CLAUDE_MD_WINS}"]
+        lines = [f"**Fast check: `{pick['command']}`**, because {pick['why']}. Run it after each source file you finish, "
+                 f"before the next one. {CLAUDE_MD_WINS}"]
         if pick.get("drift"):
             lines.append(f"The contract's `verify.fast` (`{pick['drift']}`) is stale; `/pothos:plant audit` updates it.")
     elif pick["fallback"]:
-        lines = [f"**Fast check: fallback**: no root `check:fast` script, no `verify.fast`. {CLAUDE_MD_WINS}"]
+        lines = [f"**Fast check: fallback**: no root `check:fast` script, no `verify.fast`. Run it after each source file "
+                 f"you finish, before the next one. {CLAUDE_MD_WINS}"]
         lines += fast_check.fallback_lines(pick["fallback"])
         lines.append("Your final message says in one line which fallback you ran and that a root `check:fast` script would "
                      "replace it; never add the script or a ticket yourself.")
@@ -118,8 +120,8 @@ def fast_check_lines(pick):
         "- Run it after every coherent edit: one function or test finished, before the next file; never every file of a "
         "ticket at once (two source files mean two runs), and never mid-edit. Also before a commit and before reporting "
         "a step done.",
-        "- On its first run say one line, `fast check: picked <command> because <why>`, never again, not even in the "
-        "final report.",
+        "- On its first run say one line in your reply, `fast check: picked <command> because <why>`, never again, not "
+        "even in the final report.",
         "- Red is work: fix and run again. Never delete, skip or weaken a test to get green. After three reds on "
         "one step, or a red in code this branch did not touch, stop and report it with the failing output.",
         "- A green run that executed nothing counts only for a docs or config change; for code it did not cover, run "
