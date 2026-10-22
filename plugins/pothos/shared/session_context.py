@@ -120,11 +120,13 @@ def fast_check_lines(pick):
                  "run the gate below before each commit instead, and say so in your final message. Never set up a "
                  "fast check yourself."]
     lines += [
-        "- Run it after every coherent edit: once the edits that make one test pass or complete one function are in. "
-        "Not mid-edit on a file that does not compile yet, and not after every tool call. Always before the next "
-        "ticket step, before a commit and before reporting a step done.",
+        "- Run it after every coherent edit: once the edits that make one test pass or complete one function are in, "
+        "before you start on the next function or file, not once after the whole ticket. Not mid-edit on a file that "
+        "does not compile yet, and not after every tool call. Always before the next ticket step, before a commit and "
+        "before reporting a step done.",
         "- On its first run in this session, say in one line which command you picked and why, in the form "
-        "`fast check: picked <command> because <why>`. Later runs just run.",
+        "`fast check: picked <command> because <why>`. Say it once: later runs just run, and the final report does "
+        "not repeat it.",
         "- A green run that executed nothing counts only for a docs or config change. For a code change in a package "
         "the command did not cover, run that package's fallback (lint on the changed files, unit tests, type-check) "
         "and say so.",
