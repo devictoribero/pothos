@@ -17,6 +17,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import contract  # noqa: E402
+import fast_check  # noqa: E402
 
 TEMPLATES = os.path.join(HERE, "vendor", "pocock-setup")
 PLUGIN = os.path.dirname(HERE)
@@ -94,20 +95,67 @@ def domain_section(data):
     return "### Domain docs\n\n" + prefix + demote(template("domain.md"), 2)
 
 
-def verify_section(data):
-    verify = data.get("verify") or {}
-    rows = [f"- `{level}`: `{verify[level]}`" for level in ("fast", "full", "e2e") if verify.get(level)]
-    text = ("### Verification\n\nRun `/pothos:verify` before merging anything into an integration or feature branch and "
-            "before a pull request leaves draft; it runs these commands and records a receipt for the commit. "
-            "With `implement-spec`, the merger subagent runs `verify run all` on the integration branch after each merge and "
-            "hands a red result back to an implementer instead of moving on. "
-            "Run the `fast` command yourself while working. Run `full` and `e2e` only through verify, in the foreground: "
-            "a background command dies when your turn or subagent ends and nobody is notified. verify keeps slow checks "
-            "alive in a detached process; when it exits 4 they are still going, so run `verify.py wait` until it returns "
-            "another code.\n\n" + "\n".join(rows))
+SKILLS_THAT_EDIT = "`implement`, `tdd`, `implement-spec`'s implementers, `prototype`, `diagnosing-bugs`, `tend`"
+CLAUDE_MD_WINS = "A command this repository's CLAUDE.md names for working wins."
+
+
+def fast_check_lines(pick):
+    """Tier 1: the command the repository names, or the per-package fallback, with the rules of the edit loop."""
+    if pick["command"]:
+        lines = [f"**Fast check: `{pick['command']}`**, because {pick['why']}. {CLAUDE_MD_WINS}"]
+        if pick.get("drift"):
+            lines.append(f"The contract's `verify.fast` (`{pick['drift']}`) is stale; `/pothos:plant audit` updates it.")
+    elif pick["fallback"]:
+        lines = [f"**Fast check: fallback**: no root `check:fast` script, no `verify.fast`. {CLAUDE_MD_WINS}"]
+        lines += fast_check.fallback_lines(pick["fallback"])
+        lines.append("Your final message says in one line which fallback you ran and that a root `check:fast` script would "
+                     "replace it; never add the script or a ticket yourself.")
+    else:
+        lines = ["**Fast check: none**: no `check:fast`, no `verify.fast`, no lint, unit test or type-check script. "
+                 f"{CLAUDE_MD_WINS} Otherwise run the gate before each commit, say so in your final message, and never "
+                 "set a fast check up yourself."]
+    lines += [
+        "- Write one source file per command or tool call and run the check before you write the next one: one function "
+        "or test finished, one run. Never write several source files in one command and run it once at the end (two "
+        "source files mean two runs), and never run it mid-edit. Also before a commit and before reporting a step done.",
+        "- Before its first run, write one line in your reply: `fast check: picked <command> because <why>` (for the "
+        "fallback, say so). Never repeat it, not even in the final report.",
+        "- Red is work: fix and run again. Never delete, skip or weaken a test to get green. After three reds on "
+        "one step, or a red in code this branch did not touch, stop and report it with the failing output.",
+        "- A green run that executed nothing counts only for a docs or config change; for code it did not cover, run "
+        "that package's lint, unit tests and type-check and say so.",
+        "- A commit needs a green fast check, not a green gate, unless this repository asks for more. It never decides "
+        "that work is ready to push, and commit messages and the pull request never mention it.",
+    ]
+    return lines
+
+
+def gate_lines(verify):
+    """Tier 2: the contract's full validation through verify, once before a push."""
+    rows = "; ".join(f"`{level}`: `{verify[level]}`" for level in ("full", "e2e") if verify.get(level))
+    lines = [
+        f"**Gate: `/pothos:verify`** (`verify.py run all`: {rows}), a receipt per commit. Once before a push, before each "
+        "merge into an integration branch (`implement-spec`'s merger runs it; red goes back to an implementer) and before "
+        "a pull request leaves draft.",
+        "- Keep its log (the receipt names it): the pull request's test plan takes its rows and counts from it, with no "
+        "row for the fast check and none for the gate command as a whole. A step this environment cannot run (no "
+        "database, network, tool) is marked ⏭️ with the reason, named in your final message and left to CI; a red step "
+        "that could run blocks the push.",
+        "- Push with `--no-verify` only when the pre-push hook runs this same gate and `verify.py check` passes for the "
+        "pushed commit; a later edit reruns the gate.",
+        "- Run `full` and `e2e` only through verify, never as a background command.",
+    ]
     if not verify.get("e2e"):
-        text += "\n\nThis repository has no end-to-end command; skip that step and say so in the pull request."
-    return text
+        lines.append("- No end-to-end command here: skip that step and say so in the pull request.")
+    return lines
+
+
+def verify_section(data, start):
+    verify = data.get("verify") or {}
+    pick = fast_check.discover(contract.repo_root(start), data)
+    intro = ("### Verification\n\nTwo tiers. Every skill step that edits a source file (" + SKILLS_THAT_EDIT +
+             ") runs the fast check after each source file it finishes; a push runs the gate once.")
+    return "\n\n".join([intro, "\n".join(fast_check_lines(pick)), "\n".join(gate_lines(verify))])
 
 
 SCREENSHOTS = {
@@ -327,8 +375,8 @@ def contract_section(start):
     if errors:
         sections.append("The contract has problems; mention them and suggest `/pothos:plant`:\n" + "\n".join(f"- {e}" for e in errors))
     sections.append(tracker_section(data, start))
-    for part in (labels_section, domain_section, verify_section, run_section,
-                 standards_section, review_section):
+    sections += [labels_section(data), domain_section(data), verify_section(data, start)]
+    for part in (run_section, standards_section, review_section):
         text = part(data)
         if text:
             sections.append(text)

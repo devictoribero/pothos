@@ -41,7 +41,7 @@ Every merge decision goes through `"${CLAUDE_SKILL_DIR}/scripts/merge_gate.py"`.
    - **Ready:** go to step 5.
    - **Draft or closed:** nothing to do yourself; say who must act (the author, or `implement-spec` for a draft).
    - **Unanswered review comments, or a review that requests changes:** follow `references/review-comments.md`. A person's review that requests changes stays a blocker until they re-review: after fixing and replying, report that they must approve or dismiss it.
-   - **A failed check:** read its log (`gh run view <run-id> --log-failed`, the run id is in `gh pr checks <n>`), fix the cause, run `verify` (`/pothos:verify`), commit and push. Never weaken, skip or delete a check.
+   - **A failed check:** read its log (`gh run view <run-id> --log-failed`, the run id is in `gh pr checks <n>`), fix the cause, run the fast check the session context names until it is green, commit, run `verify` (`/pothos:verify`) and push. Never weaken, skip or delete a check.
    - **Branch behind the base:** merge the base into the branch (rebase onto it when the contract's method is `rebase`), run `verify`, push.
    - **Green but not a candidate** (no `pr.auto_merge` in the contract, or no label and no authorization): report that the pull request is ready for a person to merge, or that `/pothos:tend <n> merge` lets the gate merge it.
    - **Checks running, conflicts, or only waiting left:** do nothing this pass.

@@ -1,0 +1,18 @@
+schema_version: "1.1"
+name: implement-fast-check-fallback
+description: >
+  The implement-fast-check repo without a root `check:fast`. The fast check falls back to the package's lint,
+  unit tests (jest, so --findRelatedTests with the changed files) and type-check, run between the two edits and
+  before the commit; the gate still runs exactly once before the push; the final message says which fallback ran
+  and that a root `check:fast` would replace it; nothing is written into the repository for it.
+tags: [verify, implement]
+runs: 2
+expected_outcome: >
+  .loop/log shows lint, test:unit and type-check runs with one changed source file, then a commit, one validate
+  line, then the push; the final message suggests check:fast; package.json has no check:fast and no CLAUDE.md exists.
+execution:
+  max_turns: 80
+  timeout_seconds: 1200
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit, Agent]
+context:
+  scaffold_script: seed.sh
