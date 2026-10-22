@@ -13,8 +13,8 @@ Every command goes through `"${CLAUDE_SKILL_DIR}/scripts/verify.py"`. Run it fro
 
 | Level | When | Counts as a gate |
 |---|---|---|
-| `fast` | While working, after each meaningful edit. Seconds. | No |
-| `full` | Before any merge and before a pull request leaves draft. Everything CI checks. | Yes |
+| `fast` | The fast check, tier 1: after every coherent edit and before each commit, run directly, not through this script. The session context names the command (a root `check:fast` script, else the contract's `verify.fast`, else each package's lint, unit tests and type-check) and its rules. Seconds. | No |
+| `full` | The gate, tier 2: once before a push, before any merge and before a pull request leaves draft. Everything CI checks. | Yes |
 | `e2e` | With `full`, when the contract has an end-to-end command. | Yes, when configured |
 
 A level the contract does not configure is recorded as skipped and does not block. Say so in the pull request.
@@ -29,15 +29,15 @@ After `full`, the UI check runs on the lines the branch adds, when the contract'
    ```bash
    python3 "${CLAUDE_SKILL_DIR}/scripts/verify.py" run all [--env NAME]
    ```
-   This runs `full` and then `e2e` when configured. Use `run fast` while iterating.
+   This runs `full` and then `e2e` when configured. `run fast` records a receipt for the contract's fast command; while iterating, run the fast check the session context names directly instead.
 
    Run it in the foreground, never as a background command: a background command dies when your turn or your subagent ends, and nobody gets notified. The checks run in a detached process, and `run` returns within about nine minutes. Exit `4` means they are still going: run `verify.py wait` (also in the foreground) until it returns another code. Never start a second run for the same commit; `run` attaches to the one in progress anyway.
 4. **On failure**, read the tail the script prints, then open the log it names if you need more. Fix the cause, commit, and run again. Never weaken, skip or delete a check to get a pass. If the failure is unrelated to the change and also fails on the base branch, say so with evidence (the base commit's receipt) and stop. Do not paper over it.
-5. **Gate.** Before merging or marking a pull request ready:
+5. **Gate.** Before pushing, merging or marking a pull request ready:
    ```bash
    python3 "${CLAUDE_SKILL_DIR}/scripts/verify.py" check
    ```
-   Exit 0 means the current commit has a passing `full` receipt and, when configured, a passing `e2e` receipt, on a clean tree. Anything else means not verified. Report the exact line it printed.
+   Exit 0 means the current commit has a passing `full` receipt and, when configured, a passing `e2e` receipt, on a clean tree. Anything else means not verified. Report the exact line it printed. When the repository's pre-push hook runs the same gate command, this exit 0 is what allows `git push --no-verify`: the hook would only repeat the run that just passed.
 
 ## Reporting
 
