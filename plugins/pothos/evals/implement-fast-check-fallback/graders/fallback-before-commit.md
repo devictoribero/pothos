@@ -1,7 +1,7 @@
 ---
 type: regex
 target: {source: file, path: ".loop/log"}
-pattern: '^type-check changed=[\s\S]*^commit '
+pattern: '^type-check changed=[^\n]*committed=0'
 flags: m
 weight: 2
 ---

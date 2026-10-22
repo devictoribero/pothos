@@ -15,7 +15,8 @@ git remote add origin https://github.com/acme/ledger.git
 git remote set-url --push origin "$PWD/.origin.git"
 mkdir -p .pothos-home/contracts/github.com/acme "$(dirname "$PWD")/.config" .fakegh .loop .github scripts src test .scratch/refunds/issues
 ln -sfn "$PWD/.pothos-home" "$(dirname "$PWD")/.config/pothos"
-printf '.pothos-home\n.origin.git\n.fakegh\n.loop\n' >> .git/info/exclude
+# The eval harness drops its own dotfiles into the workspace; keep them out of git status, so verify sees a clean tree.
+printf '.pothos-home\n.origin.git\n.fakegh\n.loop\n.claude/\n.claude.json\n.mcp.json\n.eval-artifacts\n.bashrc\n.bash_profile\n.profile\n.zshrc\n.zshenv\n.zprofile\n.gitconfig\n.ripgreprc\n.config/\n.cache/\n.npm/\n.local/\n' >> .git/info/exclude
 cat > .pothos-home/contracts/github.com/acme/ledger.json <<'JSON'
 {"version": 1, "tracker": {"kind": "local", "path": ".scratch"}, "verify": {"full": "npm run validate"},
  "pr": {"base": "main", "template": ".github/pull_request_template.md"}}
@@ -79,11 +80,12 @@ HOOK
 chmod +x .git/hooks/post-commit .git/hooks/pre-push
 cat > scripts/loop-log.sh <<'SH'
 #!/bin/sh
-# Stand-in for a check: logs its name, the source files changed since the base commit and its arguments.
+# Stand-in for a check: logs its name, the source files changed since the base commit, whether anything is committed yet, and its arguments.
 name="$1"; shift
 base=$(cat .loop/base)
 changed=$( { git diff --name-only "$base" -- src; git ls-files --others --exclude-standard -- src; } | sort -u | paste -sd, -)
-echo "$name changed=$changed args=$*" >> .loop/log
+committed=1; [ "$(git rev-parse HEAD)" = "$base" ] && committed=0
+echo "$name changed=$changed committed=$committed args=$*" >> .loop/log
 SH
 cat > scripts/check-fast.sh <<'SH'
 #!/bin/sh
