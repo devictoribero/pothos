@@ -2,7 +2,7 @@
 
 Each example shows the decision, the good version, the bad one and why. Examples are web React; React Native keeps the same shapes with `onPress` and `accessibilityLabel`.
 
-**Contents:** Comment · Callout · Tabs · Stepper · Chat · Tag · Card in two layers · Line item in two layers · Workbench · AvatarGroup · ChoiceCards · A filled contract · Anti-patterns
+**Contents:** Comment · Callout · Tabs · Stepper · Chat · Tag · Card in two layers · Line item in two layers · Extracting a piece · Workbench · AvatarGroup · ChoiceCards · A filled contract · Anti-patterns
 
 ## Comment: slot props for regions, parts for what varies
 
@@ -176,6 +176,29 @@ export function CartLine({ line, onQuantityChange, onRemove }: CartLineProps) {
 - Money formatting, stock rules and copy live in the feature. The primitive imports nothing from `features/`.
 
 ❌ `<LineItem price={…} quantity={…} onRemoveFromCart={…} />` in `ui/`: one business baked into a shared piece, and the dependency points the wrong way the moment it imports `CartLine` types.
+
+## Extracting a piece: a second consumer, not shorter JSX
+
+```tsx
+// features/listings/PhotoUploader: one consumer, one job. Picking, progress, failure and retry stay in the
+// feature, next to photo order and captions.
+export function PhotoUploader({ files, onFilesChange, onUpload }: PhotoUploaderProps) { … }
+
+// Day one, a private <UploadQueue> part inside PhotoUploader is fine: one job (each file's status while
+// mounted), tested through the feature, not exported. What leaves the feature is decided by the second consumer.
+
+// Later, features/profile/AvatarUploader needs the same pick → upload → failed → retry cycle. Now the piece has
+// one coherent job and names a consumer would look for: `useUpload` in the shared hooks folder (no UI of its
+// own) and ui/DropZone, extracted with both consumers moved onto them in the same change.
+<DropZone.Root files={files} onFilesChange={setFiles} status={upload.status} onRetry={upload.retry}>
+  <DropZone.Prompt>Drop photos or browse</DropZone.Prompt>
+</DropZone.Root>
+```
+
+- The first consumer paid for no abstraction it did not use; the second one bought it, and the primitive speaks UI words (`Prompt`, `status`), not `photo` or `avatar`.
+- Extracting changes nothing about who owns the state: `files` controlled in the feature, controlled in the primitive; the hook owns only the transfer.
+
+❌ `<UploadRow>`, `<RetryControls>` and `useUploadMode` extracted on day one to shorten the JSX, or because the design file has layers with those names: three names to search for and nothing reused.
 
 ## Workbench: regions, capabilities by handler presence
 

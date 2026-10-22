@@ -10,7 +10,7 @@ Components are puzzle pieces: small, honest about what they need, and joined by 
 ## How to use this skill
 
 1. Decide the **kind**: a **primitive** knows no business and speaks product and UI words (`author`, `body`, `action`, `media`); a **feature component** renders one concept of one product (`JobCard`) by composing primitives. Asked for something reusable with no design system: build both, the primitive and a thin feature on top.
-2. Read the plumbing you will consume: one component and one test next to where yours goes. If there is no project, write your assumptions at the top of each file.
+2. Look for what exists before writing: a component with the same role (button, field, dialog, menu, card) in the shared UI folder or the design system, the shared hooks and helpers, the tokens and icons; when the session context names those folders, start there. Reuse or extend it (`references/mechanics.md`, Project plumbing): a second button costs every future consumer a choice. Then read one component and one test next to where yours goes. With no project, write your assumptions at the top of each file.
 3. Settle every row of the **decision guide** below, reading the example it points to. Write the contract (`references/contract.md`) before the code.
 4. Build. Then run `scripts/verify.sh`, `scripts/lint.py` and `scripts/check_contract.py`, and fix until they pass. Render the preview and look at it.
 5. Summarize what you assumed, what you decided that the request didn't, and anything you could not run, in the first lines.
@@ -35,13 +35,14 @@ Read `references/examples.md` first: most decisions below are shown there as a g
 | A part every consumer would add | default · explicit part | Render it by default; replaceable with a slot, removable with `null`. Native structures (tables) keep their HTML parts | Callout |
 | Nesting | nested part · composed component | Nest only when it reads root values or the root lays it out. One dot level | Chat |
 | Many items | children · owned iteration · typed data | Children by default. Owned iteration for virtualization, select-all or items the component computes. Neighbor-dependent layout is a grouping part, never a per-item flag | Chat, Stepper |
-| Each state | controlled · uncontrolled with default · by presence · internal | Controlled (`value` + `onValueChange`, `open` + `onOpenChange`) by default. Transient UI is controlled by presence and asks to leave with `onDismiss`. Hover, focus and timers are internal | Tabs |
+| Each state | controlled · uncontrolled with default · by presence · internal · derived | Controlled (`value` + `onValueChange`, `open` + `onOpenChange`) by default. Transient UI is controlled by presence and asks to leave with `onDismiss`. Hover, focus and timers are internal. A value that follows from props or other state is derived at render, never stored (`references/mechanics.md`, State) | Tabs, Workbench |
 | A value several parts need | root value · part prop | Root only when several parts need it or it is a whole-component state (`readOnly`) | Chat |
 | States that exclude each other | union · booleans | One union per independent axis, each member carrying its data; exhaustive `switch` with `never` | Stepper |
 | Names | see `references/naming.md` | Platform words for platform states (`open`, `checked`, `disabled`); item identity `value`; `aria-label` when the name lands on the root; handlers named by where they land; never `default` as a union value | Tag, Tabs |
 | Optional capabilities | handler presence | A capability exists only when its handler is passed: no `onWidthChange`, no resize handle | Workbench |
 | Layout panes on narrow screens | derived · separate state | Derive the visible pane from the selection (nothing selected shows the list; Back clears it); never a second `pane` state that can contradict it. Escape is handled by the innermost layer and stopped | Workbench |
 | Where code lives | primitive · feature · screen | Primitives in the shared UI folder with no business imports; business rules, data and copy in the feature; routing and wiring in the screen. `scripts/lint.py` checks the direction | Card in two layers |
+| Extracting a piece | private file · shared · inline | A piece with one coherent job, a name a consumer would look for and tests of its own may be a file of its own, private to the feature; it moves to the shared UI or hooks folder only when a second consumer appears. Never for length alone, or because the design file has a layer with that name. State ownership is the "Each state" row, whatever the request says | Extracting a piece |
 | Outer layout | none | No outer margin, width or self-positioning; overlaid parts offer an `Anchor` and `placement` | Comment |
 | Copy | consumer's | A primitive holds no copy, numbers or units; accessible names content can't provide are required props | AvatarGroup |
 | Files and exports | namespace with `Root` · plain export | Parts make a namespace (`<Tabs.Root>`); no parts, a plain export. Project conventions win | Tabs |
@@ -54,12 +55,13 @@ Anything the input doesn't settle is written in the contract's Decisions with it
 - The contract's minimal and full usages are the first two tests.
 - Every line of the contract's State, Behavior and Accessibility sections has a test with the same words. `scripts/check_contract.py <README.md> <test files…>` lists the lines with no matching test.
 - Every member of a closed set and every failure state renders in a test.
-- Every test has the Given, When, Then structure: the situation in a `describe('given …')`, one plain sentence per `it` (`it('sends it again when the reader presses Retry')`), and `// Given`, `// When`, `// Then` in the body. Names use the product's words so a non-technical person understands them.
+- Every test has the Given, When, Then structure: the situation in a `describe('given …')`, one plain sentence per `it` (`it('sends it again when the reader presses Retry')`), with setup, action and check separated by blank lines. Names use the product's words so a non-technical person understands them.
 - Tests go through roles, text and real interaction, never class names or handler calls.
 - `scripts/lint.py <src> --business-words <the domain's words>` flags imports that point the wrong way (a primitive importing a feature, domain, DTO or data module; a feature reaching into another feature's internals), business words in primitive props, and names off the vocabulary (`isOpen`, `onSelect`, `selectedId`, `default` as a value, `id` as an item's identity).
-- `scripts/verify.sh <project> [files…]` runs the project's type-check and tests in a scratch copy, so the project is never modified. Without a project, it builds a minimal one.
+- `scripts/verify.sh <project> [overlay-dir]` runs the project's type-check and tests in a scratch copy, so the project is never modified; with an overlay, its `src/` is laid over the copy and only the overlay's test files run (every test when the overlay has none). Without a project, `scripts/verify.sh --minimal <dir>` builds a minimal one.
 - The preview shows **every state** the product needs side by side, rendered from the real components: loading, empty, failed, failed after retry, long and missing content, and each member of each closed set. A state that exists only in code is invisible to the reviewer.
 - When behavior lives in CSS (sticky, overflow, layering), also look at it in a real browser or a headless screenshot: jsdom doesn't lay out.
+- Look at layouts narrow as well as wide: at 390 px (a viewport, or a 390 px container when the browser will not shrink) the page never scrolls sideways, every control stays reachable and text wraps; a box that scrolls by design (a wide table) scrolls inside its own bounds. The preview includes one 390 px wide container, so the reviewer sees it: panes and toolbars that only work wide are not done.
 
 Details and tooling: `references/testing.md`. How to write the tests themselves (test data, what to replace, timers, async): the testing standards listed under Coding standards in the session context (`standards/testing.md` in this plugin).
 

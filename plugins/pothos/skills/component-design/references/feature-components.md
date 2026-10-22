@@ -28,7 +28,7 @@ Dependencies point one way: screen → feature (container → view → primitive
 - **UI states**: without a frame (a card, a row), the container renders loading/empty/failed with primitives. With a frame (a sheet, a section), the view receives the resource as a union and renders each case inside it.
 - **Navigation** is a route descriptor from a pure function, rendered with the project's `Link`; `on<Open>` callbacks are for side effects.
 - **Permissions** are domain functions taking the actor; the container passes the result.
-- **Processes** (an intention plus a draft): the draft is view state; derive the selection from current options every render; the connected component owns the entry button and `open`, mounting the process only while open.
+- **Processes** (an intention plus a draft): the draft is view state; derive the selection from current options every render; the connected component renders the entry button and mounts the process only while open. `open` of a process the consumer can start (a dialog, an inline edit) follows the "Each state" row of the skill: controlled by default (`open` + `onOpenChange`, `defaultOpen` through the project's controllable-state hook), so a screen can start the process from elsewhere without a second trigger inside the component. What the component shows on its own (a toast, an inline message) stays transient UI by presence.
 - **Small features** (under about 50 lines, no intentions) may keep container and view in one file.
 - **Business rules beat the request**: keep the documented rule, draft the spec change, ask.
 

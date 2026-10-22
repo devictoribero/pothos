@@ -3,3 +3,6 @@ __pycache__/
 .DS_Store
 evals/results/
 plugins/*/evals/results/
+node_modules/
+.vite-cache/
+plugins/*/skills/*/evals/fixtures/*/package-lock.json

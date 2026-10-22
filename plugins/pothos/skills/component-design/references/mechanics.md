@@ -2,7 +2,7 @@
 
 How to build what the decision guide chose. Web React first; React Native notes at the end.
 
-**Contents:** Files and exports · Context · State · Default parts · Registration · Pass-through and refs · Links and cards · Native form controls · Hosts · Spacing and anchoring · Layout components · Scroll containers · Lists · Async work · Extending · Project plumbing · React Native
+**Contents:** Files and exports · Context · State · Default parts · Registration · Pass-through and refs · Links and cards · Native form controls · Wrapping a primitive that renders no element · Hosts · Spacing and anchoring · Layout components · Scroll containers · Lists · Async work · Extending · Project plumbing · React Native
 
 ## Files and exports
 
@@ -28,7 +28,7 @@ Memoize the value. Never export the context or its hook. A grouping part (`Accor
 
 ## State
 
-One hook resolves controlled and uncontrolled so the rest of the component never knows the mode. Use the project's (`useControllableState`); otherwise:
+One hook resolves controlled and uncontrolled so the rest of the component never knows the mode. Use the project's (`useControllableState`); otherwise create it once in the shared hooks folder:
 
 ```tsx
 function useControllableState<T>(controlled: T | undefined, defaultValue: T, onChange?: (next: T) => void) {
@@ -40,6 +40,8 @@ function useControllableState<T>(controlled: T | undefined, defaultValue: T, onC
 ```
 
 The handler fires in both modes. Transient UI controlled by presence takes `open` only when it needs an exit animation or a portal. A timer that ends in an event is internal, configured by a prop named after the outcome and its unit (`autoDismissAfter`), restarted only when that prop changes.
+
+Derive, don't duplicate: a value that follows from props or other state (the visible pane from the selection, `isEmpty` from the items, a count) is computed at render, never stored where it can disagree. When controlled state names an item (`value`, `selectedIds`) and that item leaves the data, the component renders as nothing selected and the contract says so; the consumer picks the next one (a recipe in the contract). It never shows a ghost item nor selects a neighbour on its own. Plumbing hooks (controllable state, focus trap, roving focus) are shared from day one, as above. Whether feature logic becomes a hook is the row "Extracting a piece" in SKILL.md; such a hook has no UI of its own and moves to the shared hooks folder with its second consumer.
 
 ## Default parts
 
@@ -118,7 +120,7 @@ Additive first: optional part, optional prop with a behavior-preserving default,
 
 ## Project plumbing
 
-Project rules win on plumbing: primitives, tokens, lint, exports, test tooling. Consume shared behavior (focus trap, controllable state, roving focus, class-name helper); search before creating one; if missing, create it once in the shared place. An additive change the new component needs on a shared primitive (pass-through, a name) goes in the same change; plumbing that hurts accessibility is fixed at its source or recorded as a red finding, never wrapped locally. Without tokens, keep values where tokens can replace them: prefixed custom properties with fallbacks (`var(--card-radius, 8px)`). A third-party behavior library is consumed for behavior; override roles and `tabindex` that contradict the pattern.
+Project rules win on plumbing: primitives, tokens, lint, exports, test tooling. Shared behavior (focus trap, controllable state, roving focus, class-name helper) is consumed, never rewritten: step 2 of the skill looks for it first, and what is missing is created once in the shared place. An additive change the new component needs on a shared primitive (pass-through, a name) goes in the same change; plumbing that hurts accessibility is fixed at its source or recorded as a red finding, never wrapped locally. Without tokens, keep values where tokens can replace them: prefixed custom properties with fallbacks (`var(--card-radius, 8px)`). A third-party behavior library is consumed for behavior; override roles and `tabindex` that contradict the pattern.
 
 ## React Native
 

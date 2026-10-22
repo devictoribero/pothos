@@ -1,0 +1,18 @@
+:root {
+  --color-text: #1f2328;
+  --color-muted: #59636e;
+  --color-border: #d0d7de;
+  --color-surface: #ffffff;
+  --color-primary: #0969da;
+  --color-primary-text: #ffffff;
+  --color-danger: #cf222e;
+  --color-danger-text: #ffffff;
+  --color-focus: #0969da;
+  --radius-sm: 6px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+}
