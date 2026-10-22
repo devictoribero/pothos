@@ -102,8 +102,9 @@ SKILLS_THAT_EDIT = ("`implement`, `tdd`, `implement-spec`'s implementer subagent
 def fast_check_lines(pick):
     """Tier 1: the command the repository names, or the per-package fallback, with the rules of the edit loop."""
     if pick["command"]:
-        lines = [f"**Tier 1, the fast check: `{pick['command']}`**, because {pick['why']}. "
-                 "When this repository's CLAUDE.md names a command to run while working, that command wins."]
+        lines = [f"**Tier 1, the fast check: `{pick['command']}`**, because {pick['why']}. Run it after each source "
+                 "file you finish, before you write the next one. When this repository's CLAUDE.md names a command to "
+                 "run while working, that command wins."]
         if pick.get("drift"):
             lines.append(f"The contract's `verify.fast` is `{pick['drift']}`; the repository's script wins, and "
                          "`/pothos:plant audit` would update the contract.")
@@ -112,8 +113,9 @@ def fast_check_lines(pick):
                  "the contract has no `verify.fast`, so the fast check is a fallback. When this repository's CLAUDE.md "
                  "names a command to run while working, that command wins instead."]
         lines += fast_check.fallback_lines(pick["fallback"])
-        lines.append("In your final message say in one line which fallback you ran and that a root `check:fast` "
-                     "script would replace it. Never write that script yourself and never open a ticket for it.")
+        lines.append("Run them after each source file you finish, before you write the next one. In your final message "
+                     "say in one line which fallback you ran and that a root `check:fast` script would replace it. Never "
+                     "write that script yourself and never open a ticket for it.")
     else:
         lines = ["**Tier 1, the fast check: none here.** The repository declares no `check:fast`, no `verify.fast` and "
                  "no lint, unit test or type-check script. Unless CLAUDE.md names a command to run while working, "
@@ -122,8 +124,9 @@ def fast_check_lines(pick):
     lines += [
         "- Run it after every coherent edit: once the edits that make one test pass or complete one function are in. "
         "One function or test at a time: finish it, run the check, then start the next file. Never write every file of "
-        "a ticket and run the check once at the end. Not mid-edit on a file that does not compile yet, and not after "
-        "every tool call. Always before the next ticket step, before a commit and before reporting a step done.",
+        "a ticket in one go and run the check once at the end, even for a small ticket: two source files mean at least "
+        "two runs. Not mid-edit on a file that does not compile yet, and not after every tool call. Always before the "
+        "next ticket step, before a commit and before reporting a step done.",
         "- On its first run in this session, say in one line which command you picked and why, in the form "
         "`fast check: picked <command> because <why>`. Say it once: later runs just run, and the final report does "
         "not repeat it.",
@@ -171,8 +174,9 @@ def gate_lines(verify):
 def verify_section(data, start):
     verify = data.get("verify") or {}
     pick = fast_check.discover(contract.repo_root(start), data)
-    intro = ("### Verification\n\nTwo tiers. Every skill step that edits or writes a source file runs the fast check: "
-             + SKILLS_THAT_EDIT + ". A push runs the gate once.")
+    intro = ("### Verification\n\nTwo tiers. Every skill step that edits or writes a source file runs the fast check "
+             "after each source file it finishes and before it writes the next one: " + SKILLS_THAT_EDIT +
+             ". A push runs the gate once.")
     return "\n\n".join([intro, "\n".join(fast_check_lines(pick)), "\n".join(gate_lines(verify))])
 
 

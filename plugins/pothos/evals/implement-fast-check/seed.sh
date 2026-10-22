@@ -16,7 +16,7 @@ git remote set-url --push origin "$PWD/.origin.git"
 mkdir -p .pothos-home/contracts/github.com/acme "$(dirname "$PWD")/.config" .fakegh .loop .github scripts src test .scratch/refunds/issues
 ln -sfn "$PWD/.pothos-home" "$(dirname "$PWD")/.config/pothos"
 # The eval harness drops its own dotfiles into the workspace; keep them out of git status, so verify sees a clean tree.
-printf '.pothos-home\n.origin.git\n.fakegh\n.loop\n.claude/\n.claude.json\n.mcp.json\n.eval-artifacts\n.bashrc\n.bash_profile\n.profile\n.zshrc\n.zshenv\n.zprofile\n.gitconfig\n.ripgreprc\n.config/\n.cache/\n.npm/\n.local/\n' >> .git/info/exclude
+printf '.pothos-home\n.origin.git\n.fakegh\n.loop\n.claude/\n.claude.json\n.mcp.json\n.eval-artifacts\n.bashrc\n.bash_profile\n.profile\n.zshrc\n.zshenv\n.zprofile\n.gitconfig\n.gitmodules\n.idea\n.vscode\n.ripgreprc\n.config/\n.cache/\n.npm/\n.local/\n' >> .git/info/exclude
 cat > .pothos-home/contracts/github.com/acme/ledger.json <<'JSON'
 {"version": 1, "tracker": {"kind": "local", "path": ".scratch"}, "verify": {"full": "npm run validate"},
  "pr": {"base": "main", "template": ".github/pull_request_template.md"}}
