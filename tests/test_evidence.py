@@ -91,6 +91,159 @@ class EvidenceTest(unittest.TestCase):
         self.assertIn("app=mobile screenshots=none", out)
         self.assertNotIn("app=web", out)
 
+    def write_file(self, rel, text):
+        path = os.path.join(self.repo, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as fh:
+            fh.write(text)
+
+    def mobile_contract(self, capture=True):
+        app = {"name": "mobile", "path": "apps/mobile", "screenshots": "android-emulator",
+               "ui": {"components": ["apps/mobile/components"], "tokens": ["apps/mobile/shared/theme"],
+                      "screens": ["apps/mobile/features/*/screens", "apps/mobile/app/**/_layout.tsx"],
+                      "locales": ["apps/mobile/shared/i18n/locales"], "languages": ["es", "ca"]}}
+        if capture:
+            app["capture"] = {"command": f"{sys.executable} capture.py"}
+        self.contract({"run": {"apps": [app]}, "pr": {"base": "main"}})
+
+    def test_screens_names_the_screens_the_branch_touches_and_the_importers_of_a_component(self):
+        self.write_file("apps/mobile/features/pet/screens/PetScreen.tsx", "import { Button } from '@/primitives/Button/Button';\n")
+        self.write_file("apps/mobile/features/home/screens/HomeScreen.tsx", "import { Card } from '@/primitives/Card/Card';\n")
+        self.write_file("apps/mobile/components/primitives/Button/Button.tsx", "export const Button = 1;\n")
+        self.write_file("apps/mobile/shared/i18n/locales/ca.ts", "export const ca = {};\n")
+        self.commit("README.md")
+        subprocess.run(["git", "-C", self.repo, "branch", "main"], check=True)
+        self.write_file("apps/mobile/components/primitives/Button/Button.tsx", "export const Button = 2;\n")
+        self.write_file("apps/mobile/components/primitives/Button/Button.spec.tsx", "test\n")
+        self.write_file("apps/mobile/shared/i18n/locales/ca.ts", "export const ca = { a: 1 };\n")
+        self.write_file("apps/mobile/app/(tabs)/_layout.tsx", "layout\n")
+        self.commit("apps/mobile/features/pet/screens/other.txt")
+        self.mobile_contract()
+        result = self.run_script("screens")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        out = result.stdout
+        self.assertIn("screen apps/mobile/app/(tabs)/_layout.tsx", out)
+        self.assertIn("via apps/mobile/components/primitives/Button/Button.tsx: apps/mobile/features/pet/screens/PetScreen.tsx", out)
+        self.assertNotIn("HomeScreen", out.split("via")[1].split("\n")[0])
+        self.assertNotIn("Button.spec", out)
+        self.assertIn("copy ca", out)
+        self.assertIn("languages es,ca", out)
+        self.assertIn(f"capture {sys.executable} capture.py (app mobile)", out)
+
+    def test_screens_captures_only_the_first_language_when_no_copy_changed(self):
+        self.commit("README.md")
+        subprocess.run(["git", "-C", self.repo, "branch", "main"], check=True)
+        self.commit("apps/mobile/features/pet/screens/PetScreen.tsx")
+        self.mobile_contract(capture=False)
+        out = self.run_script("screens").stdout
+        self.assertIn("screen apps/mobile/features/pet/screens/PetScreen.tsx", out)
+        self.assertIn("languages es (es always)", out)
+        self.assertIn("capture none", out)
+
+    def test_screens_says_none_when_the_branch_reaches_no_screen(self):
+        self.commit("README.md")
+        subprocess.run(["git", "-C", self.repo, "branch", "main"], check=True)
+        self.commit("apps/mobile/features/pet/api/pet.ts")
+        self.mobile_contract()
+        out = self.run_script("screens").stdout
+        self.assertTrue(out.startswith("none:"), out)
+
+    CAPTURE_STUB = "\n".join([
+        "import os, sys",
+        "args = sys.argv[1:]",
+        "out = args[args.index('--out') + 1]",
+        "langs = args[args.index('--lang') + 1].split(',') if '--lang' in args else ['es']",
+        "names = [a for i, a in enumerate(args) if not a.startswith('--') and (i == 0 or args[i-1] not in ('--out', '--lang'))]",
+        "assert '--base' not in args, 'the command never sees --base'",
+        "version = open('version.txt').read().strip() + ('+setup' if os.path.exists('setup-ran') else '')",
+        "os.makedirs(out, exist_ok=True)",
+        "for n in names:",
+        "    for l in langs:",
+        "        p = os.path.join(out, f'{n}-{l}.png')",
+        "        open(p, 'w').write(version)",
+        "        print(p)",
+    ]) + "\n"
+
+    def test_capture_runs_the_contract_command_and_keeps_the_after_images(self):
+        self.write_file("capture.py", self.CAPTURE_STUB)
+        self.write_file("version.txt", "new\n")
+        self.mobile_contract()
+        result = self.run_script("capture", "home", "--lang", "es,ca")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        folder = self.run_script("dir").stdout.strip()
+        names = sorted(os.path.basename(p) for p in result.stdout.split())
+        self.assertEqual(names, ["after-home-ca.png", "after-home-es.png"])
+        for name in names:
+            self.assertEqual(open(os.path.join(folder, name)).read(), "new")
+
+    def test_capture_with_base_pairs_the_images_from_a_worktree_of_the_base_after_run_setup(self):
+        self.write_file("capture.py", self.CAPTURE_STUB)
+        self.write_file("version.txt", "old\n")
+        self.commit("README.md")
+        subprocess.run(["git", "-C", self.repo, "branch", "main"], check=True)
+        self.write_file("version.txt", "new\n")
+        self.commit("apps/mobile/features/home/screens/HomeScreen.tsx")
+        app = {"name": "mobile", "path": "apps/mobile", "capture": {"command": f"{sys.executable} capture.py"},
+               "ui": {"screens": ["apps/mobile/features/*/screens"], "languages": ["es"]}}
+        self.contract({"run": {"setup": f"{sys.executable} -c \"open('setup-ran', 'w').close()\"", "apps": [app]}, "pr": {"base": "main"}})
+        result = self.run_script("capture", "home", "--base", "main", timeout=120)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        folder = self.run_script("dir").stdout.strip()
+        names = sorted(os.path.basename(p) for p in result.stdout.split())
+        self.assertEqual(names, ["after-home-es.png", "before-home-es.png"])
+        self.assertEqual(open(os.path.join(folder, "after-home-es.png")).read(), "new")
+        self.assertEqual(open(os.path.join(folder, "before-home-es.png")).read(), "old+setup")
+        self.assertFalse(os.path.exists(os.path.join(self.repo, "setup-ran")), "run.setup ran in the worktree, not here")
+        worktrees = subprocess.run(["git", "-C", self.repo, "worktree", "list"], capture_output=True, text=True).stdout
+        self.assertEqual(len(worktrees.strip().splitlines()), 1, worktrees)
+
+    def test_capture_keeps_the_after_images_and_says_why_when_the_base_cannot_be_captured(self):
+        self.commit("README.md")
+        subprocess.run(["git", "-C", self.repo, "branch", "main"], check=True)
+        self.write_file("capture.py", self.CAPTURE_STUB)
+        self.write_file("version.txt", "new\n")
+        self.commit("apps/mobile/features/home/screens/HomeScreen.tsx")
+        self.mobile_contract()
+        result = self.run_script("capture", "home", "--base", "main", timeout=120)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([os.path.basename(p) for p in result.stdout.split()], ["after-home-es.png"])
+        self.assertIn("before: on main, the capture command exited", result.stderr)
+        self.assertIn("captured the new state only", result.stderr)
+        result = self.run_script("capture", "home", "--base", "no-such-branch")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("no ref named no-such-branch", result.stderr)
+
+    def test_screens_reads_the_language_from_the_lang_segment_of_a_locales_pattern(self):
+        self.commit("README.md")
+        subprocess.run(["git", "-C", self.repo, "branch", "main"], check=True)
+        self.write_file("apps/mobile/i18n/ca/common.json", "{}\n")
+        self.write_file("android/app/src/main/res/values-en/strings.xml", "<resources/>\n")
+        self.commit("apps/mobile/i18n/ca/pet.json")
+        app = {"name": "mobile", "path": "apps/mobile",
+               "ui": {"screens": ["apps/mobile/features/*/screens"], "languages": ["es", "ca", "en"],
+                      "locales": ["apps/mobile/i18n/{lang}/*.json"]}}
+        self.contract({"run": {"apps": [app]},
+                       "ui": {"screens": ["android/app/src/main/java/**/*Screen.kt"], "locales": ["android/app/src/main/res/values-{lang}/strings.xml"],
+                              "languages": ["es", "en"]},
+                       "pr": {"base": "main"}})
+        result = self.run_script("screens")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("copy ca, en", result.stdout)
+        self.assertNotIn("common", result.stdout)
+
+    def test_capture_without_a_capture_command_exits_3(self):
+        self.mobile_contract(capture=False)
+        result = self.run_script("capture", "home")
+        self.assertEqual(result.returncode, 3)
+        self.assertIn("no capture command", result.stderr)
+
+    def test_capture_reports_a_command_that_fails(self):
+        self.write_file("capture.py", "import sys; sys.exit(7)\n")
+        self.mobile_contract()
+        result = self.run_script("capture", "home")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("exited 7", result.stderr)
+
     def test_plan_without_apps_reports_the_repository_and_flags_unknown(self):
         self.contract({"run": {"dev": "true"}})
         out = self.run_script("plan").stdout
