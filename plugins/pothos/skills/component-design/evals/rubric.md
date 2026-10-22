@@ -13,9 +13,9 @@ Score each output 0, 1 or 2 per criterion (0 = missing or wrong, 1 = partly, 2 =
 | 7 | Extensibility | the next likely need is additive (a new part, prop or union value) without touching existing parts | reviewer names two likely needs and checks |
 | 8 | Maintainability | one way to do each thing; layers separated (feature: domain, data, view, container); no duplicated helpers; size proportional to the problem | reviewer |
 | 9 | Honest verification | the summary states what ran, what didn't and every assumption | reviewer |
-| 10 | Product completeness | realistic states the product needs (empty, loading, failed, edge content) are handled and visible in the preview | reviewer looks at preview.html in a browser |
+| 10 | Product completeness | realistic states the product needs (empty, loading, failed, edge content) are handled and visible in the preview, including a 390 px wide container that does not scroll sideways | reviewer looks at preview.html in a browser |
 | 11 | Dependencies and boundaries | imports point one way and primitives hold no business words | `scripts/lint.py <output>/src --business-words <the eval's domain words>` (Boundaries section) plus reviewer |
-| 12 | Reuse of what exists | the feature imports every primitive and hook named in the eval's `reuse` entry (the entry names only what the task's state calls for) and adds no second one; 1 if it reuses some and rebuilds or omits the rest; 0 if it builds its own | `evals/reuse_check.py <eval-id> <project>` plus reviewer; only evals with a fixture |
+| 12 | Reuse of what exists | the feature renders every primitive and calls every hook named in the eval's `reuse` entry (`useControllableState` because the editing state is controlled by default: `feature-components.md`, Processes) and adds no second one; 1 if it reuses some and rebuilds or omits the rest; 0 if it builds its own. A hook or second-copy finding is confirmed by the reviewer before it lowers the score: a closed union that exposes the controlled props is the hook's job done another way, and a new primitive with a role of its own is not a copy | `evals/reuse_check.py <eval-id> <project>` plus reviewer; only evals with a fixture |
 
 ## Comparing two skill versions
 

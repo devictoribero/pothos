@@ -12,7 +12,7 @@
   cursor: pointer;
 }
 .root:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
-.root:disabled, .root[aria-disabled='true'] { opacity: 0.6; cursor: default; }
+.root:disabled, .root[aria-disabled='true'] { color: var(--color-muted); border-color: var(--color-border); background: var(--color-surface); cursor: default; }
 .primary { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-primary-text); }
 .danger { background: var(--color-danger); border-color: var(--color-danger); color: var(--color-danger-text); }
 .root[aria-busy='true']::before {

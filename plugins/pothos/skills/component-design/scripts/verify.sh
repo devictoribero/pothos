@@ -16,6 +16,7 @@ trap 'rm -rf "$SCRATCH"' EXIT
 
 if [[ "${1:-}" == "--minimal" ]]; then
   SRC="$(cd "${2:?usage: verify.sh --minimal <dir>}" && pwd)"
+  [[ -d "$SRC/src" ]] || { echo "$SRC has no src/: put the component and its tests under src/." >&2; exit 1; }
   TC="$("$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/toolchain.sh")"
   cd "$SCRATCH"
   cat > tsconfig.json <<'JSON'

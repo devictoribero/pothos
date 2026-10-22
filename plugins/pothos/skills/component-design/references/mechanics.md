@@ -28,7 +28,7 @@ Memoize the value. Never export the context or its hook. A grouping part (`Accor
 
 ## State
 
-One hook resolves controlled and uncontrolled so the rest of the component never knows the mode. Use the project's (`useControllableState`); otherwise:
+One hook resolves controlled and uncontrolled so the rest of the component never knows the mode. Use the project's (`useControllableState`); otherwise create it once in the shared hooks folder:
 
 ```tsx
 function useControllableState<T>(controlled: T | undefined, defaultValue: T, onChange?: (next: T) => void) {
@@ -41,7 +41,7 @@ function useControllableState<T>(controlled: T | undefined, defaultValue: T, onC
 
 The handler fires in both modes. Transient UI controlled by presence takes `open` only when it needs an exit animation or a portal. A timer that ends in an event is internal, configured by a prop named after the outcome and its unit (`autoDismissAfter`), restarted only when that prop changes.
 
-Derive, don't duplicate: a value that follows from props or other state (the visible pane from the selection, `isEmpty` from the items, a count) is computed at render, never stored where it can disagree. When controlled state names an item (`value`, `selectedIds`) and that item leaves the data, the component renders as nothing selected and the contract says so (a pattern that always has one selected item, a tablist, says in its contract which one takes over); it never shows a ghost item nor silently selects a neighbour. Whether logic becomes a hook is the row "Extracting a piece" in SKILL.md; a hook has no UI of its own, and lives in the shared hooks folder once a second component uses it.
+Derive, don't duplicate: a value that follows from props or other state (the visible pane from the selection, `isEmpty` from the items, a count) is computed at render, never stored where it can disagree. When controlled state names an item (`value`, `selectedIds`) and that item leaves the data, the component renders as nothing selected and the contract says so; the consumer picks the next one (a recipe in the contract). It never shows a ghost item nor selects a neighbour on its own. Whether logic becomes a hook is the row "Extracting a piece" in SKILL.md; a hook has no UI of its own, and lives in the shared hooks folder once a second component uses it.
 
 ## Default parts
 

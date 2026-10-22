@@ -11,7 +11,7 @@ with `reuse_check.py <eval-id> <dest>`; the exact command is printed on stderr.
 Exit 2 on a usage error (also -h), 1 when the toolchain cannot be installed or lacks a package the
 fixture needs (the copy is removed, since its prompt promises a project that runs).
 """
-import argparse, json, os, shutil, subprocess, sys
+import argparse, json, os, shlex, shutil, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLCHAIN = os.path.join(os.path.dirname(HERE), "scripts", "toolchain.sh")
@@ -79,10 +79,10 @@ def main(argv):
         return 1
     reuse = ev.get("reuse") or {}
     if reuse.get("components"):
-        score = f"{os.path.join(HERE, 'reuse_check.py')} {a.eval_id} {dest}"
+        command = [os.path.join(HERE, "reuse_check.py"), a.eval_id, dest]
         if os.path.abspath(a.evals) != os.path.join(HERE, "evals.json"):
-            score += f" --evals {os.path.abspath(a.evals)}"
-        print(f"Project ready at {dest}. Score criterion 12 afterwards with:\n  {score}", file=sys.stderr)
+            command += ["--evals", os.path.abspath(a.evals)]
+        print(f"Project ready at {dest}. Score criterion 12 afterwards with:\n  {shlex.join(command)}", file=sys.stderr)
     else:
         print(f"Project ready at {dest}. Eval {a.eval_id!r} names no `reuse.components`, so criterion 12 has "
               "nothing to score; add them to evals.json.", file=sys.stderr)

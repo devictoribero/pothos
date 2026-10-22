@@ -181,8 +181,7 @@ export function CartLine({ line, onQuantityChange, onRemove }: CartLineProps) {
 
 ```tsx
 // features/listings/PhotoUploader: one consumer, one job. Picking, progress, failure and retry stay in the
-// feature, next to photo order and captions. `files` is controlled by default (`files` + `onFilesChange`)
-// because the "Each state" row says so, not because anyone asked for it.
+// feature, next to photo order and captions.
 export function PhotoUploader({ files, onFilesChange, onUpload }: PhotoUploaderProps) { … }
 
 // Day one, a private <UploadQueue> part inside PhotoUploader is fine: one job (each file's status while
