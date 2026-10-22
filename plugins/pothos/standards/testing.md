@@ -4,7 +4,7 @@ Personal standards for automated tests, read by `tdd`, `implement`, `implement-s
 
 ## Rules
 
-1. **A test you have not seen fail proves nothing.** After green, break the behavior the test names (flip the condition, return the wrong value), watch it fail with a message that names the problem, and restore. A bug fix starts with the test that reproduces the bug, seen failing on the bug.
+1. **A test you have not seen fail proves nothing.** After green, break the behavior the test names (flip the condition, return the wrong value), watch it fail with a message that names the problem, and restore. Where the repository has a mutation command, the mutation receipt does this for every line you added: a `new` survivor is a missing test or dead code, and a test added to kill it obeys rule 7. A bug fix starts with the test that reproduces the bug, seen failing on the bug.
 2. **When you fix a bug, guard what is next to it.** Add tests for the neighbouring behavior of the code you touched: the other branches of the same function and the paths that share the line you changed. A fix tested only by its own regression test leaves the next change free to break the rest.
 3. **Control the clock; never wait for real time.** Debounce, throttle, polling, timeouts and retries run under fake timers, advanced explicitly. Pin both sides of a time rule: nothing at 299 ms, the effect at 300 ms. A test that sleeps is slow, and when the machine is busy it fails.
 4. **Settle before asserting that something did not happen.** Wait for the request to finish, or the error to render, before checking that nothing changed. A negative assertion made too early passes while the bug is still there.

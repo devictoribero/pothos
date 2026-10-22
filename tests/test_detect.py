@@ -164,6 +164,27 @@ class DetectTest(unittest.TestCase):
         self.assertEqual(report["tracker_hints"]["issue_keys"], ["ABC"])
         self.assertEqual(report["existing_contract"], contract)
 
+    def test_no_mutation_tool_means_an_empty_list_and_no_ignore_verdict(self):
+        report = detect(self.repo)
+        self.assertEqual(report["mutation_tools"], [])
+        self.assertIsNone(report["mutation_temp_ignored"])
+
+    def test_stryker_config_or_core_package_reports_stryker(self):
+        self.write("stryker.config.mjs", "export default {}")
+        self.assertEqual(detect(self.repo)["mutation_tools"], ["stryker"])
+        os.remove(os.path.join(self.repo, "stryker.config.mjs"))
+        self.write("package.json", json.dumps({"devDependencies": {"@stryker-mutator/core": "8.0.0"}}))
+        self.assertEqual(detect(self.repo)["mutation_tools"], ["stryker"])
+
+    def test_temp_folder_ignored_only_when_the_ignore_file_names_the_tools_folder(self):
+        self.write("stryker.config.json", "{}")
+        self.assertFalse(detect(self.repo)["mutation_temp_ignored"])
+        self.write(".gitignore", "node_modules\n# stryker leaves a sandbox behind on a crash\n.stryker-tmp/\n")
+        self.assertTrue(detect(self.repo)["mutation_temp_ignored"])
+        self.write(".gitignore", "/.stryker-tmp\n")
+        self.assertTrue(detect(self.repo)["mutation_temp_ignored"])
+        self.write(".gitignore", "node_modules\n")
+        self.assertFalse(detect(self.repo)["mutation_temp_ignored"])
 
 if __name__ == "__main__":
     unittest.main()
