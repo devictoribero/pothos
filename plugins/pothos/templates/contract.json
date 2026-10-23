@@ -55,6 +55,15 @@
       "url": ""
     }
   },
+  "deps": {
+    "exclude": [],
+    "cooling_off_days": 14,
+    "dead_line_months": 12,
+    "review_budget": 3,
+    "label": "dependency-update",
+    "policy": "",
+    "gates": {}
+  },
   "pr": {
     "base": "main",
     "template": "",

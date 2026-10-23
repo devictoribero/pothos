@@ -83,6 +83,16 @@ In a monorepo, each app gets its own `ui` inside its `run.apps` entry, built fro
 - `languages`: the codes to capture screenshots in, the app's primary language first; the rest are captured only when copy changes. Set it with `locales`, from the file names, and ask which comes first.
 - `preview`: a `preview_scripts` entry, with `command` as given and `url` only when it carries a port. `storybook_config` without a script means the preview cannot be started; leave it out and report the gap.
 
+## deps
+
+Only when the user wants `update-dependencies` to run in this repository: the section's presence is what tells sessions that dependency updates go through the skill. Every field is optional; the defaults (cooling-off 14 days, dead line 12 months, review budget 3, label `dependency-update`) stay out of the contract unless the user changes them. The package manager is never declared: the skill reads the lockfile, as detection does.
+
+- `policy`: `dependency_policy` when the report found one; otherwise propose `docs/dependencies.md` and leave it uncreated (the skill writes holds and decisions there only when the user asks; until then the run record outside the repository is the memory).
+- `exclude`: the organisation's own scope (`@acme/*`) when the dependencies include packages from it, and anything the user names.
+- `label`: the label the repository already uses for dependency pull requests (a bot in `dependency_bots` usually has one); otherwise the default.
+- `gates`: ask for a command per package type only when `candidates` has a build script and the dependencies include a bundler or transpiler (`vite`, `esbuild`, `typescript`, `webpack`, `next`) or a database client (`prisma`, `@prisma/client`, `drizzle-orm`, `knex`): `{"^(vite|esbuild|typescript)$": "<build command>"}`. Never invent the command.
+- `dependency_bots` is not a contract field: report it. With Renovate or Dependabot present, the skill reads their open pull requests and leaves to them what they do.
+
 ## pr
 
 - `base`: `default_branch`. When it is null, ask; without a user, use `main` only if that branch exists and list it as an assumption.

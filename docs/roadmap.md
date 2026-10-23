@@ -11,6 +11,19 @@ Status of each phase.
 | 4 | Work repositories, once the pilot holds | later |
 | 5 | Remaining repositories and more autonomy | later |
 | 6 | Frontend: page design and review of the running app | contract `ui` and `ui_check` done; the rest below |
+| 7 | Dependencies: `update-dependencies` | first version done (correctness, safety, grouping, audit mode); the precision signals below |
+
+## Phase 7: dependencies
+
+`update-dependencies` bumps a package only with an evidenced driver, targets the newest version that has matured, applies every candidate at once in a worktree and lets the measured diff decide the pull request's shape. `scripts/deps.py` does the deterministic part (inventory, registry facts, drivers, targets, radius, policy, reconciliation, the run record); the model reads changelogs against the imported symbols and writes migrations. The contract's `deps` section holds the few values a repository changes.
+
+Still open, each only on evidence from real runs:
+
+- Type-check as the detector of a removed API, so "API removed" is a measurement rather than a changelog read.
+- Visual evidence for UI packages through `evidence`, once mapping a call site to a screen is reliable.
+- Finer abandonment signals than "no release on the line for twelve months".
+- Per-package gates beyond the contract's `deps.gates` map.
+- Other ecosystems: the inventory, the registry and the anchored import are npm's; another one needs an adapter in `deps.py`.
 
 ## Phase 6: frontend
 

@@ -526,6 +526,55 @@
         }
       }
     },
+    "deps": {
+      "description": "How update-dependencies works in this repository. Every field is optional; the section itself tells sessions that dependency updates go through that skill. The package manager is not declared: it comes from the lockfile.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "exclude": {
+          "description": "Package name globs the skill never proposes unless named explicitly, such as the organisation's own packages (@acme/*).",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "cooling_off_days": {
+          "description": "A target version must have been published at least this many days ago (default 14). The window retargets to the newest matured version; it never cancels. A security driver ignores it.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "dead_line_months": {
+          "description": "An installed major line with no release in this many months, while a newer major exists, is dead (default 12): a future advisory will not be patched there, and the entry's driver becomes drift-exposed.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "review_budget": {
+          "description": "Migration pull requests one run may open (default 3). The rest queue, ordered by driver and age, and the summary lists them.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "label": {
+          "description": "Label of the pull requests the skill opens, and of the open ones it reconciles with (default dependency-update).",
+          "type": "string",
+          "minLength": 1
+        },
+        "policy": {
+          "description": "Repository-relative markdown file with the holds (`- react stays on 18 until 2027-01-01: why`) and the live decisions (`- zod: not before 2026-12-01: why`). The team sees it; without it, the run record outside the repository is the only memory.",
+          "type": "string",
+          "minLength": 1
+        },
+        "gates": {
+          "description": "Extra gates per package: a regular expression over package names mapped to a command run after verify for the matching entries, such as the build for bundlers and transpilers or a smoke test for the database client.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
     "pr": {
       "description": "Pull request conventions.",
       "type": "object",

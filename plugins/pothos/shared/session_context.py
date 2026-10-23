@@ -332,6 +332,20 @@ def pr_section(data, start):
     return "\n".join(lines)
 
 
+def deps_section(data):
+    """Only in repositories whose contract has a deps section: one line, so the context stays small."""
+    deps = data.get("deps")
+    if not isinstance(deps, dict):
+        return None
+    facts = [f"label `{deps['label']}`" if deps.get("label") else None,
+             f"policy file `{deps['policy']}`" if deps.get("policy") else None,
+             f"cooling-off {deps['cooling_off_days']} days" if deps.get("cooling_off_days") is not None else None]
+    detail = " (" + ", ".join(f for f in facts if f) + ")" if any(facts) else ""
+    return ("### Dependencies\n\nDependency updates go through `/pothos:update-dependencies`" + detail +
+            ": it bumps only with an evidenced driver and measures before opening anything. Outside it, bump a "
+            "dependency only when the task needs it, and say so in the pull request.")
+
+
 def pr_template_on_disk(start):
     """A template the repository carries counts even when the contract predates the field."""
     root = contract.repo_root(start)
@@ -397,7 +411,7 @@ def contract_section(start):
         sections.append("The contract has problems; mention them and suggest `/pothos:plant`:\n" + "\n".join(f"- {e}" for e in errors))
     sections.append(tracker_section(data, start))
     sections += [labels_section(data), domain_section(data), verify_section(data, start)]
-    for part in (run_section, standards_section, review_section):
+    for part in (run_section, standards_section, review_section, deps_section):
         text = part(data)
         if text:
             sections.append(text)
