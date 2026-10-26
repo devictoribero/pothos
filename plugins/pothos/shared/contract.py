@@ -210,8 +210,11 @@ def path_errors(data, root):
 
 def check(data, repo, strict):
     errors = schema_errors(data, load(SCHEMA_PATH))
-    if isinstance(data, dict) and data.get("workflow", "pothos") == "pothos" and "verify" not in data:
-        errors.append("contract: missing required field 'verify' (only optional when workflow is repo)")
+    if isinstance(data, dict) and data.get("workflow", "pothos") == "pothos":
+        if "verify" not in data:
+            errors.append("contract: missing required field 'verify' (only optional when workflow is repo)")
+        elif isinstance(data["verify"], dict) and "full" not in data["verify"]:
+            errors.append("verify: missing required field 'full' (only optional when workflow is repo)")
     if strict:
         errors.extend(path_errors(data, repo_root(repo)))
     return errors

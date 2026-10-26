@@ -46,6 +46,35 @@ class VerifyTest(unittest.TestCase):
         self.contract({"workflow": "repo"})
         self.assertEqual(self.run_script("run", "full").returncode, 3)
 
+    def test_repo_workflow_without_a_mutation_command_refuses_mutation_and_says_what_would_run(self):
+        self.contract({"workflow": "repo"})
+        run = self.run_script("run", "mutation")
+        self.assertEqual(run.returncode, 3)
+        self.assertIn("Only `run mutation` runs here", run.stderr)
+
+    def test_repo_workflow_runs_mutation_on_a_clean_tree_without_a_receipt(self):
+        self.contract({"workflow": "repo", "verify": {"mutation": {"command": "touch mutation-ran"}}})
+        self.branch_with("src/a.js")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertTrue(os.path.exists(os.path.join(self.repo, "mutation-ran")))
+        self.assertEqual(json.loads(self.run_script("show").stdout)["receipts"]["mutation"]["status"], "ran")
+        self.assertEqual(self.run_script("run", "full").returncode, 3)
+        self.assertEqual(self.run_script("check").returncode, 3)
+
+    def test_repo_workflow_refuses_mutation_on_a_dirty_tree(self):
+        self.contract({"workflow": "repo", "verify": {"mutation": {"command": "touch mutation-ran"}}})
+        self.branch_with("src/a.js")
+        self.add_file("src/b.js")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+        self.assertIn("mutation: commit first", run.stdout)
+        self.assertFalse(os.path.exists(os.path.join(self.repo, "mutation-ran")))
+
     def test_passing_full_run_writes_a_receipt_and_check_passes(self):
         self.contract({"verify": {"full": "echo all good"}})
         self.assertEqual(self.run_script("run", "full").returncode, 0)
@@ -290,6 +319,23 @@ class VerifyTest(unittest.TestCase):
         receipt = self.mutation_receipt()
         self.assertTrue(receipt["dirty_before"])
         self.assertTrue(receipt["dirty_after"])
+
+    def test_mutation_measures_against_the_newer_of_local_and_remote_base(self):
+        self.contract({"verify": {"full": "true", "mutation": {"command": "printf '%s' \"$POTHOS_CHANGED_FILES\" > \"$POTHOS_MUTATION_OUT/seen\""}}})
+        # Stale local main: the branch builds on a commit origin/main has and the local main does not.
+        self.add_file("src/old.js")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "landed upstream")
+        self.git("update-ref", "refs/remotes/origin/main", "HEAD")
+        self.branch_with("src/new.js")
+        self.git("update-ref", "refs/heads/main", "main~1")
+        self.run_script("run", "full")
+
+        run = self.run_script("run", "mutation")
+
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        receipt = json.loads(self.run_script("show").stdout)["receipts"]["mutation"]
+        self.assertEqual(receipt["files"], ["src/new.js"])
 
     def test_mutation_without_a_base_branch_is_an_error(self):
         self.contract({"verify": {"full": "true", "mutation": {"command": "touch mutation-ran"}}})

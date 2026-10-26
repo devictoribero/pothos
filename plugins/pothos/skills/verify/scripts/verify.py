@@ -14,7 +14,8 @@ to them. A run on a dirty working tree is recorded but never counts as a pass: c
 After full, the contract's ui check runs on the branch's added lines and writes ui.json. It is advisory:
 it never changes an exit code, and check only mentions it.
 `run mutation` is advisory too and stays out of `run all`: it needs a passing clean fast or full receipt
-for HEAD, runs the contract's mutation command on the source files added or modified since the merge-base
+for HEAD (a clean tree under workflow repo, the one level that runs there, since the repository's own
+checks are the gate and write no receipt), runs the contract's mutation command on the source files added or modified since the merge-base
 with the pull request base, and writes mutation.json. When the contract names a report and the command
 wrote it, the receipt lists the surviving mutants in the changed files, `new` on a line the branch added
 or `inherited`, and its status is clean or findings; otherwise ran, error or skipped. Only new findings
@@ -74,16 +75,28 @@ def receipt_dir(root, commit):
     return os.path.join(contract.pothos_home(), "receipts", key, commit)
 
 
-def load_contract(root):
+def load_contract(root, level=None):
+    """The contract, or exit. Under `workflow: repo` the repository's own checks are the gate, so only the advisory
+    `mutation` level runs here, and only when the contract names its command; `level` None (wait) attaches to any run."""
     path = contract.locate(root)
     if not path:
         print("no pothos contract for this repository; run /pothos:plant", file=sys.stderr)
         sys.exit(2)
     data = contract.load(path)
-    if data.get("workflow") == "repo":
-        print("this repository follows its own workflow (contract workflow: repo); use its own checks", file=sys.stderr)
+    if repo_workflow(data) and level is not None and not (level == "mutation" and mutation_command(data)):
+        print("this repository follows its own workflow (contract workflow: repo); use its own checks"
+              + ("" if mutation_command(data) else ". Only `run mutation` runs here, once the contract has verify.mutation"),
+              file=sys.stderr)
         sys.exit(3)
     return data
+
+
+def repo_workflow(data):
+    return data.get("workflow") == "repo"
+
+
+def mutation_command(data):
+    return ((data.get("verify") or {}).get("mutation") or {}).get("command")
 
 
 def command_for(data, level, env_name):
@@ -475,8 +488,13 @@ def alive(pid):
     return True
 
 
-def mutation_allowed(found):
-    """HEAD has a fast or full receipt that passed on a clean tree: never mutate red or uncommitted work."""
+def mutation_allowed(root, data, found):
+    """HEAD has a fast or full receipt that passed on a clean tree: never mutate red or uncommitted work.
+
+    Under `workflow: repo` the repository's own gate is what passed and it writes no receipt, so a clean tree is the rule.
+    """
+    if repo_workflow(data):
+        return not dirty(root, data)
     return any(r.get("status") == "passed" and not r.get("dirty") for r in (found.get("fast"), found.get("full")) if r)
 
 
@@ -486,8 +504,9 @@ def start(root, data, level, env, seconds):
         print("no commit yet; commit before verifying", file=sys.stderr)
         return 3
     if level == "mutation":
-        if not mutation_allowed(receipts(root)[1]):
-            print("mutation: run fast or full first")
+        if not mutation_allowed(root, data, receipts(root)[1]):
+            print("mutation: commit first; the repository's own checks are the gate here" if repo_workflow(data)
+                  else "mutation: run fast or full first")
             return 1
     for one in {"all": ("full", "e2e"), "mutation": ()}.get(level, (level,)):
         if one != "e2e" or level == "e2e" or command_for_any_e2e(data):
@@ -560,16 +579,16 @@ def main(argv):
         if len(argv) < 2 or argv[1] not in LEVELS + ("all", "mutation"):
             print("usage: verify.py run fast|full|e2e|all|mutation [--env NAME] [--wait SECONDS]", file=sys.stderr)
             return 64
-        data = load_contract(root)
+        data = load_contract(root, argv[1])
         return start(root, data, argv[1], option(argv, "--env"), budget(argv))
     if cmd == "_exec":
-        data = load_contract(root)
+        data = load_contract(root, argv[1])
         return execute(root, data, argv[1], option(argv, "--env"))
     if cmd == "wait":
         load_contract(root)
         return attach(root, None, budget(argv))
     if cmd == "check":
-        data = load_contract(root)
+        data = load_contract(root, "full")
         return check(root, data, "--no-e2e" not in argv)
     if cmd == "show":
         commit, found = receipts(root)

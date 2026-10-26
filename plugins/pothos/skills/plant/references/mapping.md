@@ -34,6 +34,7 @@ Read `mutation_tools`. Leave the whole field out when the list is empty: most re
 
 - `stryker`: `command` is `npx stryker run --incremental --incrementalFile "$POTHOS_MUTATION_CACHE/stryker-incremental.json" --reporters json --mutate {files} --concurrency <N>` and `report` is `"$POTHOS_MUTATION_OUT/mutation.json"`. Only the `json` reporter: the progress reporter fills the log with a bar nobody watches. `<N>` is about half the machine's cores (`getconf _NPROCESSORS_ONLN`); propose the number and have the user confirm it, since two worktrees often run at once and it stays in the contract as a tunable. Stryker takes no file name for the json reporter on the command line, so the file name goes in the Stryker config as `jsonReporter.fileName`: the config reads `process.env.POTHOS_MUTATION_OUT` and points the file at `$POTHOS_MUTATION_OUT/mutation.json`. Say so in the report when the config is a JSON file or does not set it; until then the reporter writes under `reports/` inside the repository. A config that already narrows `mutate` from `POTHOS_CHANGED_FILES` can drop `--mutate {files}`.
 - `exclude`: only globs the user names, such as generated code. Test files are already excluded by verify.
+- Under `workflow: repo` this is the one `verify` field that is read: set it alone, without `full`, and verify runs the level on a clean tree.
 
 ## run
 
