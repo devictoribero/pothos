@@ -1,5 +1,5 @@
 {
-  "description": "Hands the repository's private pothos contract to every skill at session start, so third-party skills get their configuration without files in the repository, keeps agents from merging pull requests or adding the auto-merge label outside the merge gate's person-authorized step, assigns every pull request a session opens to the person who opened it, and fast-forwards a plugin loaded in place from a git checkout to its remote's default branch.",
+  "description": "Hands the repository's private pothos contract to every skill at session start, so third-party skills get their configuration without files in the repository, names the folder where the repository's retro findings go, keeps agents from merging pull requests or adding the auto-merge label outside the merge gate's person-authorized step, assigns every pull request a session opens to the person who opened it, and fast-forwards a plugin loaded in place from a git checkout to its remote's default branch.",
   "hooks": {
     "SessionStart": [
       {
@@ -7,6 +7,11 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/shared/session_context.py\"",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/shared/retro_context.py\"",
             "timeout": 10
           },
           {
