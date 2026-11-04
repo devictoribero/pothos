@@ -313,6 +313,17 @@ def ticket_authorizes(path):
     return False
 
 
+def agent_banner(root):
+    """The callout every agent-posted comment starts with (the session context asks the agent for the same one), so a
+    reader tells it from a comment the person typed. The script posts under the person's account like the agent does."""
+    try:
+        login = gh(["api", "user", "--jq", ".login"], root).strip()
+    except GhError:
+        login = ""
+    who = f"@{login}" if login else "the account owner"
+    return f"> [!NOTE]\n> 🤖 **Claude Code (`tend` merge gate) responding on behalf of {who}**\n\n"
+
+
 def authorize(root, data, number, quote, ticket):
     label = ((data.get("pr") or {}).get("auto_merge") or {}).get("label")
     if not label:
@@ -327,7 +338,7 @@ def authorize(root, data, number, quote, ticket):
         return READY
     source = (f"the person, in their own words:\n\n> {quote}" if quote
               else f"the ticket `{ticket}`, which carries `Merge: auto`.")
-    body = (f"Auto-merge authorized by {source}\n\n`tend` merges this pull request through its merge gate once every "
+    body = (agent_banner(root) + f"Auto-merge authorized by {source}\n\n`tend` merges this pull request through its merge gate once every "
             f"check is green, no review asks for changes and no thread is open. Remove the label `{label}` to stop it.")
     gh(["pr", "edit", str(pr["number"]), "--add-label", label], root)
     gh(["pr", "comment", str(pr["number"]), "--body", body], root)

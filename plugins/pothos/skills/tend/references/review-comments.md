@@ -21,7 +21,7 @@ Work through unresolved threads, review bodies that list findings, and issue com
 ## Act
 
 - Apply every accepted change, run the fast check the session context names until it is green, commit once, run `verify`, then push.
-- Reply on each thread with what you did: the commit for an applied change, the reason for a decline, the follow-up for out of scope. Reply in the thread, not as a new comment:
+- Reply on each thread with what you did: the commit for an applied change, the reason for a decline, the follow-up for out of scope. Start the reply with the agent callout the session context describes (`> [!NOTE]` / `> 🤖 **<model> responding on behalf of @<login>**`). Reply in the thread, not as a new comment:
   ```bash
   gh api graphql -f query='mutation($t:ID!,$b:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$t,body:$b}){comment{id}}}' -F t=<thread id> -F b='<reply>'
   ```

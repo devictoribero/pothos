@@ -30,6 +30,8 @@ if args[:2] == ["pr", "view"]:
     answer("pr.json")
 elif args[:2] == ["api", "graphql"]:
     answer("threads.json")
+elif args[:2] == ["api", "user"]:
+    answer("user.json") if os.path.exists(os.path.join(d, "user.json")) else None
 elif args[:2] == ["pr", "list"]:
     answer("dependants.json") if os.path.exists(os.path.join(d, "dependants.json")) else print("[]")
 elif args[:1] == ["api"] and "/git/ref/heads/" in args[-1]:
@@ -351,9 +353,17 @@ class MergeGateCliTest(unittest.TestCase):
         result = self.gate("authorize", "7", "--quote", "and merge it when green")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("pr edit 7 --add-label auto-merge", self.calls())
-        self.assertIn("pr comment 7 --body Auto-merge authorized by the person, in their own words:\n\n> and merge it when green",
-                      self.calls())
+        self.assertIn("pr comment 7 --body > [!NOTE]\n> 🤖 **Claude Code (`tend` merge gate) responding on behalf of the account owner**"
+                      "\n\nAuto-merge authorized by the person, in their own words:\n\n> and merge it when green", self.calls())
         self.assertNotIn("pr merge", self.calls())
+
+    def test_authorize_names_the_account_the_comment_appears_under(self):
+        self.contract(CONTRACT)
+        self.pull_request(labels=[])
+        with open(os.path.join(self.fake, "user.json"), "w") as fh:
+            fh.write("octocat\n")
+        self.gate("authorize", "7", "--quote", "merge it")
+        self.assertIn("responding on behalf of @octocat**", self.calls())
 
     def test_authorize_with_a_ticket_needs_merge_auto_in_its_header(self):
         self.contract(CONTRACT)
