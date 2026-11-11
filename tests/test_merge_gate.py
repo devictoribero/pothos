@@ -63,8 +63,8 @@ def run(name, status, conclusion=None):
 
 
 class EvaluateTest(unittest.TestCase):
-    def verdict(self, pr_data, contract=CONTRACT, receipt_ok=False):
-        return merge_gate.evaluate(pr_data, contract, receipt_ok)
+    def verdict(self, pr_data, contract=CONTRACT, receipt_ok=False, checks_expected=False):
+        return merge_gate.evaluate(pr_data, contract, receipt_ok, checks_expected)
 
     def test_green_labelled_pull_request_is_ready(self):
         verdict, facts, reasons = self.verdict(pr())
@@ -82,9 +82,33 @@ class EvaluateTest(unittest.TestCase):
         self.assertEqual(self.verdict(pr(), contract=contract)[0], merge_gate.NOT_CANDIDATE)
         self.assertEqual(self.verdict(pr(labels=[{"name": "ship-it"}]), contract=contract)[0], merge_gate.READY)
 
-    def test_drafts_closed_and_other_bases_are_not_candidates(self):
-        for changes in ({"isDraft": True}, {"state": "MERGED"}, {"baseRefName": "feature/x"}, {"labels": []}):
-            self.assertEqual(self.verdict(pr(**changes))[0], merge_gate.NOT_CANDIDATE, changes)
+    def test_drafts_closed_and_unlabelled_pull_requests_are_not_candidates(self):
+        for changes in ({"isDraft": True}, {"state": "MERGED"}, {"labels": []},
+                        {"baseRefName": "feature/x", "labels": []}):
+            self.assertEqual(self.verdict(pr(**changes), receipt_ok=True)[0], merge_gate.NOT_CANDIDATE, changes)
+
+    def test_a_pull_request_into_an_integration_branch_needs_a_verify_receipt(self):
+        verdict, facts, reasons = self.verdict(pr(baseRefName="trash/05-restore-record"))
+        self.assertEqual(verdict, merge_gate.WAITING)
+        self.assertIn("candidate: yes, label 'auto-merge', into the integration branch 'trash/05-restore-record'", facts)
+        self.assertIn("checks: 1 passed, 0 running, 0 failed; verify receipt missing or not passing", facts)
+        self.assertEqual(reasons, ["no passing verify receipt for the head commit, which a merge into the integration "
+                                   "branch 'trash/05-restore-record' needs: run verify on it"])
+        verdict, facts, _ = self.verdict(pr(baseRefName="trash/05-restore-record"), receipt_ok=True)
+        self.assertEqual(verdict, merge_gate.READY)
+        self.assertIn("checks: 1 passed, 0 running, 0 failed; verify receipt passed", facts)
+
+    def test_an_integration_merge_does_not_wait_for_workflows_that_only_run_into_the_base(self):
+        verdict, facts, _ = self.verdict(pr(baseRefName="feature/x", statusCheckRollup=[]), receipt_ok=True,
+                                         checks_expected=True)
+        self.assertEqual(verdict, merge_gate.READY)
+        self.assertIn("checks: none on this commit; verify receipt passed", facts)
+
+    def test_an_integration_merge_still_waits_on_a_red_check(self):
+        verdict, _, reasons = self.verdict(pr(baseRefName="feature/x", statusCheckRollup=[run("lint", "COMPLETED", "FAILURE")]),
+                                           receipt_ok=True)
+        self.assertEqual(verdict, merge_gate.WAITING)
+        self.assertEqual(reasons, ["failed checks: lint"])
 
     def test_a_non_candidate_verdict_still_says_what_else_is_missing(self):
         _, _, reasons = self.verdict(pr(labels=[]))
@@ -405,6 +429,22 @@ class MergeGateCliTest(unittest.TestCase):
         result = self.gate("status", "7")
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("verify receipt passed", result.stdout)
+
+    def test_merge_into_an_integration_branch_reads_the_verify_receipt_for_the_head_commit(self):
+        self.contract(CONTRACT)
+        self.pull_request(baseRefName="trash/05-restore-record")
+        result = self.gate("merge", "7")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("run verify on it", result.stdout)
+        self.assertNotIn("pr merge", self.calls())
+        folder = os.path.join(self.home, "receipts", "github.com", "acme", "shop", SHA)
+        os.makedirs(folder)
+        with open(os.path.join(folder, "full.json"), "w") as fh:
+            json.dump({"status": "passed", "dirty": False}, fh)
+        result = self.gate("merge", "7")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(f"pr merge 7 --squash --match-head-commit {SHA}", self.calls())
+        self.assertIn("merged: #7 into trash/05-restore-record", result.stdout)
 
     def test_a_receipt_does_not_replace_checks_the_workflows_will_report(self):
         self.contract(CONTRACT)
