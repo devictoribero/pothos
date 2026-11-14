@@ -11,7 +11,10 @@ Usage:
 PR is a number; without it, the pull request of the current branch. Run it from inside the repository.
 
 A pull request is a candidate only when the contract has `pr.auto_merge` and the pull request carries its
-label: the label is a person's decision about that pull request. `authorize` adds it on their behalf, with
+label: the label is a person's decision about that pull request. Its base is the contract's base branch or an
+integration branch (another pull request's branch in a stack, `feature/<slug>`); a merge into an integration
+branch also needs a passing verify receipt for the head commit, since workflows that run only on pull requests
+into the base say nothing about it. `authorize` adds it on their behalf, with
 their own words (`--quote`, which the PreToolUse hook checks against what the person typed in the session)
 or a ticket that carries a `Merge: auto` line above its first section (`--ticket`). A candidate
 is ready when, on its head commit, every check finished green (or, in a repository whose workflows never
@@ -62,25 +65,9 @@ class GhError(Exception):
     pass
 
 
-def remote_hosts(root):
-    """The hosts this checkout's remotes point at, with ssh aliases such as github.com-work read as github.com."""
-    urls = (contract.git(["config", "--get-regexp", r"^remote\..*\.url$"], root) or "").splitlines()
-    keys = (contract.remote_key(line.split(None, 1)[1]) for line in urls if len(line.split(None, 1)) == 2)
-    return {key.split("/", 1)[0] for key in keys if key}
-
-
-def gh_env(root):
-    """The environment without GH_HOST when no remote points at it: gh would then talk to a host this
-    repository does not live on (or to an ssh alias, which is no host gh knows) and fail every call."""
-    host = (os.environ.get("GH_HOST") or "").strip().lower()
-    if not host or host in remote_hosts(root):
-        return None
-    return {k: v for k, v in os.environ.items() if k != "GH_HOST"}
-
-
 def gh(args, root):
     try:
-        out = subprocess.run(["gh", *args], cwd=root, capture_output=True, text=True, env=gh_env(root))
+        out = subprocess.run(["gh", *args], cwd=root, capture_output=True, text=True, env=contract.gh_env(root))
     except FileNotFoundError:
         raise GhError("gh is not installed")
     if out.returncode != 0:
@@ -187,12 +174,24 @@ def expects_checks(root):
     return False
 
 
+def base_branch(data):
+    return (data.get("pr") or {}).get("base") or "main"
+
+
+def into_integration_branch(pr, data):
+    """True when the pull request merges into a branch other than the contract's base: another pull request's
+    branch in a stack, or `feature/<slug>`. Workflows that run only on pull requests into the base say nothing
+    about it, so its merge needs the verify receipt that every merge into an integration branch needs."""
+    return pr.get("baseRefName") != base_branch(data)
+
+
 def evaluate(pr, data, receipt_ok, checks_expected=False):
     """The verdict and the facts behind it. Pure: everything it needs comes in as arguments.
-    checks_expected: the repository has workflows that run on this pull request, so no checks means not yet."""
+    checks_expected: the repository has workflows that run on this pull request, so no checks means not yet.
+    receipt_ok: a passing verify receipt exists for the head commit."""
     auto = ((data.get("pr") or {}).get("auto_merge")) or {}
     label = auto.get("label")
-    base = (data.get("pr") or {}).get("base") or "main"
+    integration = into_integration_branch(pr, data)
     labels = {(l.get("name") or "").casefold() for l in pr.get("labels") or []}  # GitHub matches labels regardless of case
     checks = latest_checks(pr.get("statusCheckRollup") or [])
     states = [(check_name(c), check_state(c)) for c in checks]
@@ -209,14 +208,15 @@ def evaluate(pr, data, receipt_ok, checks_expected=False):
 
     facts = [f"pr #{pr.get('number')} ({pr.get('headRefName')} -> {pr.get('baseRefName')}) at {(pr.get('headRefOid') or '')[:12]}"
              + (" from a fork" if pr.get("isCrossRepository") else "")]
-    if not checks and checks_expected:
+    receipt = "verify receipt " + ("passed" if receipt_ok else "missing or not passing")
+    if not checks and checks_expected and not integration:
         facts.append("checks: none reported yet on this commit (the repository has workflows that run on it)")
     elif not checks:
-        facts.append("checks: none on this commit; verify receipt " + ("passed" if receipt_ok else "missing or not passing"))
+        facts.append("checks: none on this commit; " + receipt)
     else:
         passed = len(states) - len(failed) - len(pending)
         facts.append(f"checks: {passed} passed, {len(pending)} running, {len(failed)} failed"
-                     + (f" ({', '.join(failed)})" if failed else ""))
+                     + (f" ({', '.join(failed)})" if failed else "") + (f"; {receipt}" if integration else ""))
     facts.append("reviews: " + (f"changes requested by {', '.join(changes)}" if changes else "none asking for changes"))
     facts.append(f"threads: {threads} unresolved" + (" of the first 100; there are more" if more_threads else ""))
     facts.append(f"mergeable: {mergeable.lower()}, merge state: {merge_state.lower()}")
@@ -230,9 +230,9 @@ def evaluate(pr, data, receipt_ok, checks_expected=False):
         not_candidate.append(f"the pull request is {(pr.get('state') or 'unknown').lower()}")
     if pr.get("isDraft"):
         not_candidate.append("the pull request is a draft")
-    if pr.get("baseRefName") != base:
-        not_candidate.append(f"it targets {pr.get('baseRefName')!r}, not the contract's base {base!r}")
-    facts.append("candidate: " + ("yes, label " + repr(label) if not not_candidate else "no, " + "; ".join(not_candidate)))
+    facts.append("candidate: " + ("yes, label " + repr(label)
+                                  + (f", into the integration branch {pr.get('baseRefName')!r}" if integration else "")
+                                  if not not_candidate else "no, " + "; ".join(not_candidate)))
 
     person, waiting = [], []
     if changes:
@@ -243,7 +243,11 @@ def evaluate(pr, data, receipt_ok, checks_expected=False):
         waiting.append(f"failed checks: {', '.join(failed)}")
     if pending:
         waiting.append(f"checks still running: {', '.join(pending)}")
-    if not checks and checks_expected:
+    if integration:
+        if not receipt_ok:
+            waiting.append(f"no passing verify receipt for the head commit, which a merge into the integration branch "
+                           f"{pr.get('baseRefName')!r} needs: run verify on it")
+    elif not checks and checks_expected:
         waiting.append("the workflows have not reported on this commit yet")
     elif not checks and not receipt_ok:
         waiting.append("no checks on this commit and no passing verify receipt")
@@ -395,7 +399,8 @@ def main(argv):
         pr = fetch(root, number)
         checks = pr.get("statusCheckRollup") or []
         expected = not checks and expects_checks(root)
-        receipt_ok = not checks and not expected and receipt_passed(root, data, pr.get("headRefOid") or "")
+        needs_receipt = into_integration_branch(pr, data) or (not checks and not expected)
+        receipt_ok = needs_receipt and receipt_passed(root, data, pr.get("headRefOid") or "")
         verdict, facts, reasons = evaluate(pr, data, receipt_ok, expected)
         report(verdict, facts, reasons)
         if command == "status" or verdict != READY:

@@ -88,6 +88,23 @@ def remote_key(url):
     return "/".join([host, *parts])
 
 
+def remote_hosts(root):
+    """The hosts this checkout's remotes point at, with ssh aliases such as github.com-work read as github.com."""
+    urls = (git(["config", "--get-regexp", r"^remote\..*\.url$"], root) or "").splitlines()
+    keys = (remote_key(line.split(None, 1)[1]) for line in urls if len(line.split(None, 1)) == 2)
+    return {key.split("/", 1)[0] for key in keys if key}
+
+
+def gh_env(root):
+    """The environment for gh in this checkout: without GH_HOST when no remote points at it, since gh would then
+    talk to a host this repository does not live on (or to an ssh alias, which is no host gh knows) and fail
+    every call. None, which keeps the current environment, otherwise."""
+    host = (os.environ.get("GH_HOST") or "").strip().lower()
+    if not host or host in remote_hosts(root):
+        return None
+    return {k: v for k, v in os.environ.items() if k != "GH_HOST"}
+
+
 def local_identity(start, remote):
     """A stable folder for repos without a network remote, shared by clones and worktrees where possible."""
     root = repo_root(start)
