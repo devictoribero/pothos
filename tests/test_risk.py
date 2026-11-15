@@ -98,6 +98,19 @@ class Classification(RiskRepoTest):
             "src/cart.test.ts": "test", "src/__tests__/helper.ts": "test", "CHANGELOG.md": "docs",
             "apps/web/NOTES.md": "docs", "docs/guide.txt": "docs", "src/cart.ts": "source"})
 
+    def test_test_files_of_other_conventions_count_as_tests(self):
+        self.contract()
+        tests = ("api/add.integration-spec.ts", "api/add_spec.rb", "tests/test_cart.py", "pkg/cart_test.go",
+                 "api/test/doubles/fake.ts", "tests/fixtures/seed.sh")
+        for rel in (*tests, "src/test_data.ts", "src/testing.ts"):
+            self.write(rel, 2)
+        self.commit()
+
+        classes = {f["path"]: f["class"] for f in self.assess()["files"]}
+
+        self.assertEqual({rel: classes[rel] for rel in tests}, {rel: "test" for rel in tests})
+        self.assertEqual((classes["src/test_data.ts"], classes["src/testing.ts"]), ("source", "source"))
+
     def test_a_binary_file_counts_as_zero_lines(self):
         self.contract()
         with open(os.path.join(self.repo, "logo.png"), "wb") as fh:

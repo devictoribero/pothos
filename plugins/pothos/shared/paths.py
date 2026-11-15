@@ -12,8 +12,8 @@ import contract
 LANG_TOKEN = "{lang}"
 LANG_GROUP = r"(?P<lang>[a-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})?)"
 # The files Stryker's default mutate option leaves out (an explicit --mutate replaces those defaults).
-TEST_FILE_GLOBS = ("*.test.*", "*.spec.*")
-TEST_FOLDERS = ("__tests__",)
+TEST_FILE_GLOBS = ("*.test.*", "*.spec.*", "*-spec.*", "*_spec.*", "test_*.py", "*_test.*")
+TEST_FOLDERS = ("__tests__", "test", "tests")
 
 
 def glob_regex(pattern):
