@@ -172,6 +172,29 @@ class ContractTest(unittest.TestCase):
         self.write({"version": 1, "verify": {"full": "x", "mutation": {"exclude": []}}})
         self.assertIn("verify.mutation: missing required field 'command'", run(["validate"], self.repo).stdout)
 
+    def test_risk_section_is_validated_and_its_globs_need_not_exist(self):
+        self.write({"version": 1, "verify": {"full": "x"}, "pr": {"risk": {
+            "core": [{"name": "billing", "paths": ["services/billing/**"]}],
+            "one_way": [{"why": "database migration", "paths": ["**/migrations/**"]}],
+            "contract": [{"name": "API contract", "paths": ["api/openapi.json"]}],
+            "generated": ["src/generated"]}}})
+        result = run(["validate", "--strict"], self.repo)
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_risk_section_rejects_unknown_fields_and_entries_without_their_name_or_paths(self):
+        self.write({"version": 1, "verify": {"full": "x"}, "pr": {"risk": {
+            "core": [{"name": "billing"}], "one_way": [{"paths": ["db"], "name": "x"}],
+            "contract": [{"name": "", "paths": "api.json"}], "generated": "dist", "thresholds": {}}}})
+        result = run(["validate"], self.repo)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("pr.risk: unknown field 'thresholds'", result.stdout)
+        self.assertIn("pr.risk.core[0]: missing required field 'paths'", result.stdout)
+        self.assertIn("pr.risk.one_way[0]: missing required field 'why'", result.stdout)
+        self.assertIn("pr.risk.one_way[0]: unknown field 'name'", result.stdout)
+        self.assertIn("pr.risk.contract[0].name: must not be empty", result.stdout)
+        self.assertIn("pr.risk.contract[0].paths: expected array, got str", result.stdout)
+        self.assertIn("pr.risk.generated: expected array, got str", result.stdout)
+
     def test_app_ui_is_validated(self):
         self.write({"version": 1, "verify": {"full": "x"}, "run": {"apps": [{"name": "web", "path": ".", "ui": {"tokens": ["missing.css"], "extra": 1}}]}})
         self.assertIn("run.apps[0].ui: unknown field 'extra'", run(["validate"], self.repo).stdout)

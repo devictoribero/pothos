@@ -1,0 +1,15 @@
+schema_version: "1.1"
+name: risk-migration-in-core
+description: >
+  A branch that adds a database migration inside billing, a core area the contract declares. Asked for the pull
+  request body, the agent must assess it through risk.py and write a Risk section that says High, names the
+  migration as a one-way door and names billing as the core area, placed before the repository template's test plan.
+tags: [risk]
+runs: 2
+expected_outcome: pr-body.md has a Risk section with Risk High that names the database migration and the billing core area, before the test plan.
+execution:
+  max_turns: 40
+  timeout_seconds: 600
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit]
+context:
+  scaffold_script: seed.sh

@@ -615,6 +615,102 @@
               ]
             }
           }
+        },
+        "risk": {
+          "description": "What the risk skill needs to know about this repository to assess a pull request. Every field is optional; without one, risk.py uses its defaults and says so.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "core": {
+              "description": "Core areas: the parts of the product where a regression hurts most. A change that touches one raises the suggested risk.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "paths"
+                ],
+                "properties": {
+                  "name": {
+                    "description": "How the pull request names the area.",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "paths": {
+                    "description": "Repository-relative globs: `**` crosses folders, `*` stays inside one, a folder matches everything under it. Patterns, so they need not exist.",
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              }
+            },
+            "one_way": {
+              "description": "Paths whose change cannot simply be reverted. A change that touches one is a one-way door. Default: database migrations (**/migrations/**).",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "why",
+                  "paths"
+                ],
+                "properties": {
+                  "why": {
+                    "description": "Why a change here is one-way, as the pull request says it.",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "paths": {
+                    "description": "Repository-relative globs: `**` crosses folders, `*` stays inside one, a folder matches everything under it. Patterns, so they need not exist.",
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              }
+            },
+            "contract": {
+              "description": "Public contracts other code or other teams depend on, such as a generated API schema. They may match generated files.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "paths"
+                ],
+                "properties": {
+                  "name": {
+                    "description": "How the pull request names the contract.",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "paths": {
+                    "description": "Repository-relative globs: `**` crosses folders, `*` stays inside one, a folder matches everything under it. Patterns, so they need not exist.",
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              }
+            },
+            "generated": {
+              "description": "Globs of generated files, left out of the complexity like the lockfiles risk.py always leaves out.",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
         }
       }
     }
