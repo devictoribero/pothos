@@ -29,6 +29,7 @@ Small work skips levels: a signal can become a single ticket with no spec, built
 ```
 OUTER LOOP: one per initiative, a person decides
   signal ─▶ triage ─▶ grilling / grill-with-docs ─▶ to-spec ─▶ to-tickets (Blocked by edges)
+                         └─ a fork that is costly to revert ─▶ council ─▶ the person decides
                                               │
                          frontier: open, unblocked, unclaimed tickets
                                               │
@@ -64,6 +65,17 @@ Small work enters at the same point: `implement` builds one ticket on its own br
 - **Output:** a spec when needed, and tickets with blocking edges, labelled `ready-for-agent`.
 - **Who:** you and an agent in an interactive session. `grilling` needs you; `to-spec` and `to-tickets` only need your approval of the result.
 - **Re-entry:** the outer loop runs again when an inner loop finds the plan is wrong.
+
+### Deciding a fork
+
+- **Input:** one decision with real alternatives, its options already concrete. Before `grilling` has done that, a council argues about a strawman.
+- **Output:** a verdict tied to evidence in the repository, in a council folder under `~/.config/pothos/councils/`, and a receipt that says whether it moved the lean the session had sealed.
+- **Who:** `council`. Advisors that each hold one angle and cannot see each other, reviewers that check their claims without knowing who made them, and a chair. The person decides; `council.py decide` records what they chose, also when it goes against the verdict.
+- **Why it exists:** `grilling` questions the person, `code-review` judges code that is already written, and `prototype` answers what running it can answer. Nothing else contrasts a decision before it is taken, and one agent asked "A or B?" anchors on how the question was put.
+- **When:** between `grilling` and `to-spec` or a decision record. Also on re-entry: a ticket marked `needs-replan` because the plan met a fork, or a review that finds a design fork instead of a defect. There the code already written is listed as a cost of an option, never as the default.
+- **Sized by three facts:** costly to revert, crosses a module or a public contract, creates or contradicts a recorded decision. None: no council, the session decides and says why. One: three advisors. Two or three: five advisors, three reviewers and a chair.
+- **Never:** for what a test, a measurement or a prototype settles (run that instead), for what a recorded decision already answers, or after the person has decided, where it would only be validation theatre.
+- **Next:** `domain-modeling` records the decision; `grilling` takes the questions the verdict left for the person.
 
 ### Inner loop
 

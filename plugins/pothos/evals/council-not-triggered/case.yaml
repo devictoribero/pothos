@@ -1,0 +1,13 @@
+schema_version: "1.1"
+name: council-not-triggered
+description: >
+  An ordinary either-or with nothing at stake. The skill must not fire: no subagents, no council folder.
+tags: [council, trigger]
+runs: 2
+expected_outcome: A direct answer.
+execution:
+  max_turns: 10
+  timeout_seconds: 300
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit, Agent]
+context:
+  scaffold_script: seed.sh

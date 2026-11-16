@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: council-refuses-measurable
+description: >
+  Asked to council a question that a script in the repository settles by running. No council: the answer names
+  the measurement.
+tags: [council]
+runs: 2
+expected_outcome: No subagents and no council folder; the answer points at scripts/bench-search.js.
+execution:
+  max_turns: 15
+  timeout_seconds: 300
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit, Agent]
+context:
+  scaffold_script: seed.sh
