@@ -56,6 +56,7 @@ Only `version` and `verify.full` are required. The schema documents every field,
 |---|---|---|---|
 | Connect a repo | `plant` | Pothos | Writes or audits the private contract and reports what blocks autonomous work. |
 | Define | `grilling`, `grill-with-docs` | Pocock | Interview until a plan has no open questions; the second also writes the glossary and decision records. |
+| Decide | `council` | Pothos | Contrasts a fork that is costly to revert before it is taken: independent advisors read the repository, reviewers check their claims anonymously, one verdict tied to evidence. Sized by the stakes; a script does everything but the arguing. |
 | Specify | `to-spec` | Pocock | Turns the conversation into a spec in the tracker. |
 | Plan | `to-tickets`, `wayfinder` | Pocock | Tracer-bullet tickets with blocking edges; a decision map for work bigger than one session. |
 | Build | `implement`, `implement-spec`, `tdd`, `prototype` | Pocock | One ticket, or a whole spec on an integration branch with implementer subagents in worktrees. |

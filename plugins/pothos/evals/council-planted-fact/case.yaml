@@ -1,0 +1,15 @@
+schema_version: "1.1"
+name: council-planted-fact
+description: >
+  A decision whose obvious answer is wrong: the person leans towards a timer inside the API, and a decision record
+  the prompt never mentions says the API runs as several instances. A full council must find the record, recommend
+  against the lean, and keep the lean out of everything the advisors read.
+tags: [council]
+runs: 1
+expected_outcome: Five advisors, three reviewers and a chair; the verdict recommends the queue and cites decision 0004.
+execution:
+  max_turns: 40
+  timeout_seconds: 1500
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit, Agent]
+context:
+  scaffold_script: seed.sh

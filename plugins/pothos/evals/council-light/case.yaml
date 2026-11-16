@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: council-light
+description: >
+  The same decision asked as a light council, with no lean. Three advisors and no review: the session chairs.
+  The precedent seat must still find the decision record.
+tags: [council]
+runs: 1
+expected_outcome: Three advisors, no reviewers; the verdict recommends the queue and cites decision 0004.
+execution:
+  max_turns: 30
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit, Agent]
+context:
+  scaffold_script: seed.sh

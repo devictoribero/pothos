@@ -1,0 +1,1 @@
+Council this, it is costly to undo and it touches both the api and the worker: owners must get a reminder a day before an appointment. Should the API start a timer that checks every minute and sends them, or should creating the appointment enqueue a job for the worker? I lean towards the timer, it is less code.

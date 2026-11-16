@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: council-defers-to-record
+description: >
+  A council is asked for by name, on a question two decision records already answer: one forbids timers inside
+  the API, the other sends delayed work to the queue. The skill must stand aside, cite the record and seat nobody.
+tags: [council]
+runs: 2
+expected_outcome: No advisors and no council folder; the reply cites decision 0004 and answers with the queue.
+execution:
+  max_turns: 20
+  timeout_seconds: 300
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit, Agent]
+context:
+  scaffold_script: seed.sh

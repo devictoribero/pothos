@@ -1,0 +1,32 @@
+{
+  "sizes": {
+    "light": {"seats": ["skeptic", "reframer", "precedent"], "reviewers": 0, "chair": "session"},
+    "full": {"seats": ["skeptic", "reframer", "operator", "precedent", "consumer"], "reviewers": 3, "chair": "agent"}
+  },
+  "models": {"advisor": "sonnet", "reviewer": "inherit", "chair": "inherit"},
+  "caps": {"answer_words": 250, "critique_words": 150, "verdict_words": 400, "pack_lines": 400, "lookups": 5},
+  "seats": {
+    "skeptic": {
+      "looks_for": "How each option fails: the edge case, the migration, the cost nobody priced. Assume every option has a flaw and find it.",
+      "require_line": "^Data, security, migration:",
+      "require_hint": "a line starting `Data, security, migration:` (write `none found` when there is none)"
+    },
+    "reframer": {
+      "looks_for": "Whether this is the right question. What is the problem underneath it, and which option did nobody list? Pick `none` when a better one exists and name it."
+    },
+    "operator": {
+      "looks_for": "What each option costs to build and to live with: the first commit, who keeps it working in a year, and how it is undone if it turns out wrong."
+    },
+    "precedent": {
+      "looks_for": "What this repository has already decided: its decision records, its glossary, the patterns the code already follows, earlier councils. Say which option continues them and which one contradicts them."
+    },
+    "consumer": {
+      "looks_for": "The person who lives with the result: the user of the product, or the caller of the API. What changes for them under each option, and which option is best for the engineers and wrong for them?"
+    }
+  },
+  "review_questions": [
+    "Which single claim, in any answer, is most likely false? Check it in the repository and cite what you found.",
+    "Having read every answer, which option do you pick, and which answer moved you?",
+    "What did every answer miss?"
+  ]
+}
