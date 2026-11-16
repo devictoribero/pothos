@@ -39,6 +39,7 @@ import sys
 SHARED = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "shared")
 sys.path.insert(0, os.path.realpath(SHARED))
 import contract  # noqa: E402
+import paths  # noqa: E402
 
 READY, WAITING, NO_CONTRACT, NOT_CANDIDATE, NEEDS_PERSON, GH_FAILED, USAGE = 0, 1, 2, 3, 4, 5, 64
 VERDICTS = {READY: "ready", WAITING: "waiting", NOT_CANDIDATE: "not a candidate", NEEDS_PERSON: "needs a person"}
@@ -128,7 +129,7 @@ def latest_checks(checks):
 
 def receipt_passed(root, data, commit):
     """A passing, clean verify receipt for this commit: full, and e2e when the contract configures it."""
-    folder = os.path.join(contract.pothos_home(), "receipts", contract.key_for(root, "receipts"), commit)
+    folder = paths.receipt_dir(root, commit)
     levels = ["full"]
     if (data.get("verify") or {}).get("e2e") or any(e.get("e2e") for e in ((data.get("run") or {}).get("environments") or [])):
         levels.append("e2e")

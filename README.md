@@ -63,6 +63,7 @@ Only `version` and `verify.full` are required. The schema documents every field,
 | Verify | `verify` | Pothos | Runs the contract's checks and keeps a receipt per commit; the merge gate. |
 | Prove | `evidence` | Pothos | Screenshots and before/after output for the pull request, stored outside the repo; mobile screens through the repository's capture command when it has one. |
 | Review | `code-review` | Pocock | Standards and spec review in parallel subagents. Reads Pothos's standards too. |
+| Assess | `risk` | Pothos | Risk, complexity and confidence for the pull request, each Low, Medium or High: the door, the blast radius, the size of the source change and the verify receipts measured by a script, raised or capped by what the model knows. |
 | Ship | `pr` | Pocock | Pull request body with summary, evidence and merge danger. |
 | Tend | `tend` | Pothos | Babysits a ready pull request: answers review comments, fixes red checks and, when a person authorized it (the auto-merge label, "and merge it", or a `Merge: auto` ticket), merges through a gate once everything is green. |
 | Learn | `diagnosing-bugs`, `retro` | Pocock | Find the cause of a bug; look back at a session. |

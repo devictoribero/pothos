@@ -39,6 +39,7 @@ import urllib.request
 SHARED = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "shared")
 sys.path.insert(0, os.path.realpath(SHARED))
 import contract  # noqa: E402
+from paths import evidence_dir, glob_regex, matches_any  # noqa: E402
 
 BROWSERS = [
     "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
@@ -55,9 +56,7 @@ def flag(args, name, default=None):
 
 
 def folder(root):
-    branch = contract.git(["symbolic-ref", "--short", "-q", "HEAD"], root) or "detached"
-    slug = re.sub(r"[^A-Za-z0-9._-]+", "-", branch).strip("-") or "branch"
-    path = os.path.join(contract.pothos_home(), "evidence", contract.key_for(root, "evidence"), slug)
+    path = evidence_dir(root)
     os.makedirs(path, exist_ok=True)
     return path
 
@@ -114,45 +113,6 @@ def plan(root, args):
         capture = f" capture={app['capture']['command']}" if (app.get("capture") or {}).get("command") else ""
         print(f"app={app['name']} screenshots={shots}{capture} dev={app.get('dev') or '-'} url={app.get('url') or '-'}{hint}")
     return 0
-
-
-LANG_TOKEN = "{lang}"
-LANG_GROUP = r"(?P<lang>[a-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})?)"
-
-
-def glob_regex(pattern):
-    """A repository-relative folder or glob as a regex over repository-relative paths: `**` crosses folders,
-    `*` stays inside one, a folder matches everything under it, and `{lang}` is one language code, captured."""
-    out = ""
-    i = 0
-    while i < len(pattern):
-        ch = pattern[i]
-        if pattern.startswith(LANG_TOKEN, i):
-            out += LANG_GROUP
-            i += len(LANG_TOKEN)
-            continue
-        if pattern.startswith("**/", i):
-            out += "(?:.*/)?"
-            i += 3
-            continue
-        if pattern.startswith("**", i):
-            out += ".*"
-            i += 2
-            continue
-        if ch == "*":
-            out += "[^/]*"
-        elif ch == "?":
-            out += "[^/]"
-        else:
-            out += re.escape(ch)
-        i += 1
-    has_extension = bool(re.search(r"\.[A-Za-z0-9]+$", pattern))
-    tail = "" if has_extension else "(?:/.*)?"
-    return re.compile("^" + out.rstrip("/") + tail + "$")
-
-
-def matches_any(path, patterns):
-    return any(glob_regex(p).match(path) for p in patterns)
 
 
 def locale_language(path, patterns):

@@ -41,13 +41,11 @@ import time
 SHARED = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "shared")
 sys.path.insert(0, os.path.realpath(SHARED))
 import contract  # noqa: E402
+import paths  # noqa: E402
 import ui_check  # noqa: E402
 
 LEVELS = ("fast", "full", "e2e")
 ADVISORY = ("ui", "mutation")
-# The files Stryker's default mutate option leaves out (an explicit --mutate replaces those defaults).
-TEST_FILE_GLOBS = ("*.test.*", "*.spec.*")
-TEST_FOLDERS = ("__tests__",)
 # Every status of the mutation-testing-report-schema: only the first kind is a finding.
 MUTANT_STATUSES = {"Survived": "finding", "NoCoverage": "finding", "Killed": "killed", "Timeout": "killed",
                    "Ignored": "ignored", "CompileError": "noise", "RuntimeError": "noise", "Pending": "noise"}
@@ -68,11 +66,6 @@ def dirty(root, data=None):
     ignored = (tracker.get("path") or ".scratch").rstrip("/") + "/" if tracker.get("kind", "none") in ("none", "local") else None
     changed = [line[3:].strip('"') for line in out.splitlines() if line.strip()]
     return any(not (ignored and (path == ignored.rstrip("/") or path.startswith(ignored))) for path in changed)
-
-
-def receipt_dir(root, commit):
-    key = contract.key_for(root, "receipts")
-    return os.path.join(contract.pothos_home(), "receipts", key, commit)
 
 
 def load_contract(root, level=None):
@@ -130,7 +123,7 @@ def run_level(root, data, level, env_name):
     if not commit:
         print("no commit yet; commit before verifying", file=sys.stderr)
         sys.exit(3)
-    folder = receipt_dir(root, commit)
+    folder = paths.receipt_dir(root, commit)
     base = {"commit": commit, "level": level, "env": env, "command": command,
             "at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")}
     if not command:
@@ -162,7 +155,7 @@ def receipts(root):
     commit = head(root)
     if not commit:
         return None, {}
-    folder = receipt_dir(root, commit)
+    folder = paths.receipt_dir(root, commit)
     found = {}
     for level in LEVELS + ADVISORY:
         path = os.path.join(folder, f"{level}.json")
@@ -224,27 +217,21 @@ def ui_level(root, data):
         base = ui_check.base_ref(root, data, None)
         result = ui_check.findings(root, data, base)
     except Exception as exc:  # an advisory check must never break verification
-        write_receipt(receipt_dir(root, commit), "ui", {**receipt, "status": "error", "error": str(exc)})
+        write_receipt(paths.receipt_dir(root, commit), "ui", {**receipt, "status": "error", "error": str(exc)})
         print(f"ui: could not run ({exc}); advisory only")
         return
     if result is None:
-        write_receipt(receipt_dir(root, commit), "ui", {**receipt, "status": "skipped"})
+        write_receipt(paths.receipt_dir(root, commit), "ui", {**receipt, "status": "skipped"})
         print("ui: skipped (the contract's ui sets neither tokens nor icons)")
         return
     active, found = result
-    write_receipt(receipt_dir(root, commit), "ui", {**receipt, "status": "findings" if found else "clean",
+    write_receipt(paths.receipt_dir(root, commit), "ui", {**receipt, "status": "findings" if found else "clean",
                                                     "rules": active, "findings": found})
     if found:
         print("\n".join(found[:TAIL]))
         print(f"ui: {len(found)} finding(s), advisory, does not block. {ui_check.HINT}")
     else:
         print("ui: clean")
-
-
-def is_test_file(path):
-    name = os.path.basename(path)
-    return (any(fnmatch.fnmatch(name, glob) for glob in TEST_FILE_GLOBS)
-            or any(part in TEST_FOLDERS for part in path.split("/")[:-1]))
 
 
 def changed_source_files(root, base, exclude):
@@ -255,13 +242,13 @@ def changed_source_files(root, base, exclude):
     out = contract.git(["-c", "core.quotepath=off", "diff", "--no-renames", "--name-only", "--diff-filter=AM", base, "HEAD"],
                        root) or ""
     return [path for path in out.splitlines()
-            if path and not is_test_file(path) and not any(fnmatch.fnmatch(path, glob) for glob in exclude)]
+            if path and not paths.is_test_file(path) and not any(fnmatch.fnmatch(path, glob) for glob in exclude)]
 
 
 def mutation_level(root, data):
     """Advisory: the contract's mutation command on the source files the branch changed. Exit 1 only on error."""
     commit = head(root)
-    folder = receipt_dir(root, commit)
+    folder = paths.receipt_dir(root, commit)
     settings = (data.get("verify") or {}).get("mutation") or {}
     receipt = {"commit": commit, "level": "mutation", "at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")}
     if not settings.get("command"):
@@ -474,7 +461,7 @@ def execute(root, data, level, env):
 
 
 def marker_paths(root):
-    folder = receipt_dir(root, head(root))
+    folder = paths.receipt_dir(root, head(root))
     return folder, os.path.join(folder, "run.json")
 
 

@@ -68,6 +68,7 @@
     "base": "main",
     "template": "",
     "evidence": "",
-    "auto_merge": {"label": ""}
+    "auto_merge": {"label": ""},
+    "risk": {"core": [], "one_way": [], "contract": [], "generated": []}
   }
 }
